@@ -1,0 +1,46 @@
+name: coverage
+
+on: ["push", "pull_request"]
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  forge:
+    strategy:
+      fail-fast: true
+
+    name: Foundry project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build --sizes
+        id: build
+
+      - name: Install lcov
+        uses: hrishikesh-kadam/setup-lcov@v1.0.0
+
+      - name: Run Forge coverage
+        env:
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+        run: |
+          forge coverage --report lcov && lcov --remove lcov.info -o lcov.info 'test/contracts/mock/*' 'test/fork' 'test/unit' 'script/*'
+        id: coverage
+
+      - name: Report code coverage
+        uses: zgosalvez/github-actions-report-lcov@v1.5.0
+        with:
+          coverage-files: lcov.info
+          minimum-coverage: 90
+          github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,37 @@
+{
+  "name": "@pooltogether/foundry-template",
+  "version": "1.0.0",
+  "description": "Template to kickstart a Foundry project",
+  "author": {
+    "name": "PoolTogether Inc.",
+    "url": "https://github.com/pooltogether"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pooltogether/foundry-template.git"
+  },
+  "scripts": {
+    "clean": "forge clean",
+    "compile": "forge compile",
+    "coverage": "forge coverage --report lcov && lcov --remove lcov.info -o lcov.info 'test/contracts/mock/*' 'test/fork' 'test/unit' 'script/*' && genhtml lcov.info -o coverage",
+    "format": "prettier --config .prettierrc --write \"**/*.{json,md,sol,yml}\"",
+    "format:file": "prettier --config .prettierrc --write",
+    "hint": "solhint --config \"./.solhint.json\" \"{src,test}/**/*.sol\"",
+    "lint-staged": "lint-staged",
+    "prepack": "pinst --disable && yarn clean && yarn compile && yarn typechain",
+    "prepare": "husky install",
+    "test": "forge test"
+  },
+  "devDependencies": {
+    "husky": "8.0.3",
+    "lint-staged": "13.1.0",
+    "prettier": "2.8.3",
+    "prettier-plugin-solidity": "1.1.1",
+    "solhint": "3.3.8",
+    "solhint-plugin-prettier": "0.0.5"
+  },
+  "files": [
+    "src/**",
+    "out/**"
+  ]
+}

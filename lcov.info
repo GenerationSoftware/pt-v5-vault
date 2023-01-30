@@ -1,0 +1,10 @@
+TN:
+SF:src/Foo.sol
+FN:5,Foo.getFoo
+FNDA:1,Foo.getFoo
+FNF:1
+FNH:1
+DA:6,1
+LF:1
+LH:1
+end_of_record
