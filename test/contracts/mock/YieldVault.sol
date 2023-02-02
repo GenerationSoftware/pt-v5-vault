@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { ERC4626, ERC20, IERC20 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import { ERC4626Mock, IERC20Metadata } from "openzeppelin/mocks/ERC4626Mock.sol";
 
-import { IYieldVault, IERC4626 } from "../../../src/interfaces/IYieldVault.sol";
-
-contract YieldVault is IYieldVault, ERC4626 {
+contract YieldVault is ERC4626Mock {
   constructor(
-    IERC20 _asset,
+    IERC20Metadata _asset,
     string memory _name,
-    string memory _symbol,
-    address _yieldSource
-  ) ERC4626(_asset) ERC20(_name, _symbol) {}
+    string memory _symbol
+  ) ERC4626Mock(_asset, _name, _symbol) {}
 }

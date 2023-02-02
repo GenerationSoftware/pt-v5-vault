@@ -1,3 +1,9 @@
+ds-test/=lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/erc4626-tests/
 forge-std/=lib/forge-std/src/
-src/=src/
+
 openzeppelin/=lib/openzeppelin-contracts/contracts/
+
+v5-twab-controller/=lib/v5-twab-controller/src/
+
+src/=src/
