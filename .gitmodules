@@ -12,3 +12,6 @@
 [submodule "lib/v5-twab-controller"]
 	path = lib/v5-twab-controller
 	url = https://github.com/pooltogether/v5-twab-controller
+[submodule "lib/v5-liquidator"]
+	path = lib/v5-liquidator
+	url = https://github.com/pooltogether/v5-liquidator
