@@ -115,17 +115,16 @@ contract PrizeVault is ERC4626 {
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
   function maxMint(address) public view virtual override returns (uint256) {
-      return type(uint112).max;
+    return type(uint112).max;
   }
 
   /// @inheritdoc ERC4626
   function deposit(uint256 _assets, address _receiver) public virtual override returns (uint256) {
     /// TODO: remove, delegation should be handled by TwabController
     _twabController.delegate(address(this), _receiver, _receiver);
+
     /// TODO: handle use of assets in the vault and move to another PrizeVault
-    uint256 _shares = super.deposit(_assets, _receiver);
-    _depositIntoYieldVault(convertToAssets(_shares));
-    return _shares;
+    return super.deposit(_assets, _receiver);
   }
 
   /// @inheritdoc ERC4626
@@ -133,9 +132,7 @@ contract PrizeVault is ERC4626 {
     /// TODO: remove, delegation should be handled by TwabController
     _twabController.delegate(address(this), _receiver, _receiver);
 
-    uint256 _assets = super.mint(_shares, _receiver);
-    _depositIntoYieldVault(convertToAssets(_shares));
-    return _assets;
+    return super.mint(_shares, _receiver);
   }
 
   /// @inheritdoc ERC4626
@@ -182,6 +179,58 @@ contract PrizeVault is ERC4626 {
    */
   function _balanceOf(address _account) internal view returns (uint256) {
     return _twabController.balanceOf(address(this), _account);
+  }
+
+  /**
+   * @notice Deposit/mint common workflow.
+   * @dev If there are currently some underlying assets in the vault,
+   *      we only transfer the difference from the user wallet into the vault.
+   *      The difference is calculated this way:
+   *      - if `_vaultAssets` balance is greater than 0 and lower than `assets`,
+   *        we substract `_vaultAssets` from `assets` and deposit `_assetsDeposit` amount into the vault
+   *      - if `_vaultAssets` balance is greater than or equal to `assets`,
+   *        we know the vault has enough underlying assets to fulfill the deposit
+   *        so we don't transfer any assets from the user wallet into the vault
+   */
+  function _deposit(
+    address _caller,
+    address _receiver,
+    uint256 _assets,
+    uint256 _shares
+  ) internal virtual override {
+    IERC20 _asset = IERC20(asset());
+    uint256 _vaultAssets = _asset.balanceOf(address(this));
+
+    // If _asset is ERC777, `transferFrom` can trigger a reenterancy BEFORE the transfer happens through the
+    // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
+    // calls the vault, which is assumed not malicious.
+    //
+    // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
+    // assets are transferred and before the shares are minted, which is a valid state.
+
+    // We only need to deposit new assets if there is not enough assets in the vault to fulfill the deposit
+    if (_assets > _vaultAssets) {
+      uint256 _assetsDeposit;
+
+      unchecked {
+        if (_vaultAssets != 0) {
+          _assetsDeposit = _assets - _vaultAssets;
+        }
+      }
+
+      // slither-disable-next-line reentrancy-no-eth
+      SafeERC20.safeTransferFrom(
+        _asset,
+        _caller,
+        address(this),
+        _assetsDeposit != 0 ? _assetsDeposit : _assets
+      );
+    }
+
+    _depositIntoYieldVault(_assets);
+    _mint(_receiver, _shares);
+
+    emit Deposit(_caller, _receiver, _assets, _shares);
   }
 
   /**
