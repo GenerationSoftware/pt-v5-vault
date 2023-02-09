@@ -4,7 +4,11 @@ pragma solidity 0.8.17;
 import { ERC4626, ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
+import { LiquidationPair } from "v5-liquidator/src/LiquidationPair.sol";
+import { ILiquidationSource } from "v5-liquidator/src/interfaces/ILiquidationSource.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
+
+import { console2 } from "forge-std/Test.sol";
 
 /**
  * @title  PoolTogether V5 PrizeVault
@@ -13,10 +17,10 @@ import { TwabController } from "v5-twab-controller/TwabController.sol";
  *         Users deposit an underlying asset (i.e. USDC) in this contract and receive in exchange an ERC20 token
  *         representing their share of deposit in the vault.
  *         Underlying assets are then deposited in a YieldVault to generate yield.
- *         This yield is sold for POOL tokens via the Liquidator and captured by the PrizePool to be awarded to depositors.
+ *         This yield is sold for reserve tokens (i.e. POOL) via the Liquidator and captured by the PrizePool to be awarded to depositors.
  * @dev    Balances are stored in the TwabController contract.
  */
-contract PrizeVault is ERC4626 {
+contract PrizeVault is ERC4626, ILiquidationSource {
   using SafeERC20 for IERC20;
 
   /* ============ Events ============ */
@@ -26,24 +30,36 @@ contract PrizeVault is ERC4626 {
    * @param asset Address of the underlying asset used by the vault
    * @param name Name of the ERC20 share minted by the vault
    * @param symbol Symbol of the ERC20 share minted by the vault
-   * @param twabController Address of the TWABController used to keep track of balances
+   * @param twabController Address of the TwabController used to keep track of balances
    * @param yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
+   * @param liquidationPair Address of the LiquidationPair used to liquidate yield for reserve token
    */
   event NewPrizeVault(
     IERC20 indexed asset,
     string name,
     string symbol,
-    TwabController indexed twabController,
-    IERC4626 indexed yieldVault
+    TwabController twabController,
+    IERC4626 indexed yieldVault,
+    LiquidationPair indexed liquidationPair
   );
+
+  /**
+   * @notice Emitted when yield has been contributed to the PrizePool
+   * @param yield Amount of yield contributed
+   * @param reserveToken Amount of reserve token received by PrizePool
+   */
+  event YieldContributed(uint256 yield, uint256 reserveToken);
 
   /* ============ Variables ============ */
 
-  /// @notice Address of the TWABController used to keep track of balances
+  /// @notice Address of the TwabController used to keep track of balances
   TwabController private immutable _twabController;
 
   /// @notice Address of the ERC4626 vault generating yield
   IERC4626 private immutable _yieldVault;
+
+  /// @notice Address of the LiquidationPair used to liquidate yield for reserve token
+  LiquidationPair private immutable _liquidationPair;
 
   /// @notice Amount of underlying assets supplied to the YieldVault
   uint256 private _assetSupplyBalance;
@@ -53,28 +69,33 @@ contract PrizeVault is ERC4626 {
    * @param _asset Address of the underlying asset used by the vault
    * @param _name Name of the ERC20 share minted by the vault
    * @param _symbol Symbol of the ERC20 share minted by the vault
-   * @param twabController_ Address of the TWABController used to keep track of balances
+   * @param twabController_ Address of the TwabController used to keep track of balances
    * @param yieldVault_ Address of the ERC4626 vault in which assets are deposited to generate yield
+   * @param liquidationPair_ Address of the LiquidationPair used to liquidate yield for reserve token
    */
   constructor(
     IERC20 _asset,
     string memory _name,
     string memory _symbol,
     TwabController twabController_,
-    IERC4626 yieldVault_
+    IERC4626 yieldVault_,
+    LiquidationPair liquidationPair_
   ) ERC4626(_asset) ERC20(_name, _symbol) {
     require(address(twabController_) != address(0), "PV/twabCtrlr-not-zero-address");
     require(address(yieldVault_) != address(0), "PV/yieldVault-not-zero-address");
-    /// TODO: setup liquidation pair/source
-    /// yield needs to be exposed but also other yield farm tokens => need for ownership
+    require(address(liquidationPair_) != address(0), "PV/LP-not-zero-address");
+
+    /// TODO: yield needs to be exposed but also other yield farm tokens => need for ownership
 
     _twabController = twabController_;
     _yieldVault = yieldVault_;
+    _liquidationPair = liquidationPair_;
 
     // Approve once for max amount
     _asset.safeApprove(address(yieldVault_), type(uint256).max);
+    _asset.safeApprove(address(liquidationPair_), type(uint256).max);
 
-    emit NewPrizeVault(_asset, _name, _symbol, twabController_, yieldVault_);
+    emit NewPrizeVault(_asset, _name, _symbol, twabController_, yieldVault_, liquidationPair_);
   }
 
   /* ============ External Functions ============ */
@@ -89,7 +110,7 @@ contract PrizeVault is ERC4626 {
   /**
    * @inheritdoc ERC4626
    * @dev The total amount of assets managed by this vault is equal to
-   *      the amount supplied to the YieldVault + the amount living in this vault.
+   *      the total amount supplied to the YieldVault + the amount living in this vault.
    */
   function totalAssets() public view virtual override returns (uint256) {
     return _assetSupplyBalance + super.totalAssets();
@@ -123,7 +144,6 @@ contract PrizeVault is ERC4626 {
     /// TODO: remove, delegation should be handled by TwabController
     _twabController.delegate(address(this), _receiver, _receiver);
 
-    /// TODO: handle use of assets in the vault and move to another PrizeVault
     return super.deposit(_assets, _receiver);
   }
 
@@ -156,19 +176,79 @@ contract PrizeVault is ERC4626 {
   }
 
   /**
-   * @notice Address of the TWABController keeping track of balances.
-   * @return address TWABController address
+   * @notice Address of the TwabController keeping track of balances.
+   * @return address TwabController address
    */
   function twabController() external view returns (address) {
     return address(_twabController);
   }
 
   /**
-   * @notice Address of the ERC4626 vault generating yield
+   * @notice Address of the ERC4626 vault generating yield.
    * @return address YieldVault address
    */
   function yieldVault() external view returns (address) {
     return address(_yieldVault);
+  }
+
+  /**
+   * @notice Address of the LiquidationPair used to liquidate yield for reserve token.
+   * @return address LiquidationPair address
+   */
+  function liquidationPair() external view returns (address) {
+    return address(_liquidationPair);
+  }
+
+  /**
+   * @notice Capture yield accrued by this PrizeVault from the YieldVault and
+   *         swap it for reserve token via the Liquidator to contribute to the PrizePool
+   * @return uint256 Amount of yield contributed
+   */
+  // function contributeYield() external returns (uint256) {
+  //   console2.log("_yieldVault.maxWithdraw(address(this))", _yieldVault.maxWithdraw(address(this)));
+  //   console2.log("totalSupply()", totalSupply());
+
+  //   uint256 _yield = _yieldVault.maxWithdraw(address(this)) - totalSupply();
+  //   _yieldVault.withdraw(_yield, address(this), address(this));
+
+  //   console2.log("_yield", _yield);
+  //   console2.log("totalAssets()", totalAssets());
+
+  //   uint256 _amountOut = _liquidationPair.swapExactAmountIn(_yield, 0);
+  //   emit YieldContributed(_yield, _amountOut);
+
+  //   return _yield;
+  // }
+
+  /**
+   * @inheritdoc ILiquidationSource
+   * @dev The available yield to liquidate is equal to the maximum amount of assets
+   *      that can be withdrawn from the YieldVault minus the total amount of assets managed by this vault
+   *      which is equal to the total amount supplied to the YieldVault + the amount living in this vault.
+   * @dev If `_totalAssets` is greater than `_withdrawableAssets`, it means that no yield has accrued
+   *      but there are assets living in this vault that are liquidatable.
+   */
+  function availableBalanceOf(address /* _token */) external override returns (uint256) {
+    uint256 _totalAssets = totalAssets();
+    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
+
+    unchecked {
+      return
+        _totalAssets > _withdrawableAssets
+          ? _totalAssets - _withdrawableAssets
+          : _withdrawableAssets - _totalAssets;
+    }
+  }
+
+  /**
+   * @inheritdoc ILiquidationSource
+   */
+  function liquidateTo(
+    address _token,
+    address _target,
+    uint256 _amount
+  ) external override returns (bool) {
+    return true;
   }
 
   /* ============ Internal Functions ============ */
@@ -186,9 +266,9 @@ contract PrizeVault is ERC4626 {
    * @dev If there are currently some underlying assets in the vault,
    *      we only transfer the difference from the user wallet into the vault.
    *      The difference is calculated this way:
-   *      - if `_vaultAssets` balance is greater than 0 and lower than `assets`,
-   *        we substract `_vaultAssets` from `assets` and deposit `_assetsDeposit` amount into the vault
-   *      - if `_vaultAssets` balance is greater than or equal to `assets`,
+   *      - if `_vaultAssets` balance is greater than 0 and lower than `_assets`,
+   *        we substract `_vaultAssets` from `_assets` and deposit `_assetsDeposit` amount into the vault
+   *      - if `_vaultAssets` balance is greater than or equal to `_assets`,
    *        we know the vault has enough underlying assets to fulfill the deposit
    *        so we don't transfer any assets from the user wallet into the vault
    */

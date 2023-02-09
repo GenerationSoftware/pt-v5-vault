@@ -18,7 +18,7 @@
     "format:file": "prettier --config .prettierrc --write",
     "hint": "solhint --config \"./.solhint.json\" \"{src,test}/**/*.sol\"",
     "lint-staged": "lint-staged",
-    "prepack": "pinst --disable && yarn clean && yarn compile && yarn typechain",
+    "prepack": "npm run clean && npm run compile",
     "prepare": "husky install",
     "test": "forge test"
   },

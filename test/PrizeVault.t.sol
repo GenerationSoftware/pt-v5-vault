@@ -2,9 +2,15 @@
 pragma solidity 0.8.17;
 
 import "forge-std/Test.sol";
+import { console2 } from "forge-std/Test.sol";
 import { ERC4626Test, IMockERC20 } from "erc4626-tests/ERC4626.test.sol";
 import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { ERC20Mock, IERC20Metadata } from "openzeppelin/mocks/ERC20Mock.sol";
+
+import { LiquidationPair } from "v5-liquidator/src/LiquidationPair.sol";
+import { UFixed32x9 } from "v5-liquidator/src/libraries/FixedMathLib.sol";
+
+import { MockLiquidationPairYieldSource, ILiquidationSource } from "v5-liquidator/test/mocks/MockLiquidationPairYieldSource.sol";
 
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 
@@ -18,39 +24,63 @@ contract PrizeVaultTest is ERC4626Test {
     IERC20 indexed asset,
     string name,
     string symbol,
-    TwabController indexed twabController,
-    IERC4626 indexed yieldVault
+    TwabController twabController,
+    IERC4626 indexed yieldVault,
+    LiquidationPair indexed liquidationPair
   );
 
   /* ============ Variables ============ */
 
-  // ERC20 public asset;
-
   string public prizeVaultName = "PoolTogether aEthDAI Prize Token (PTaEthDAI)";
   string public prizeVaultSymbol = "PTaEthDAI";
 
-  TwabController public twabController;
-
   IERC4626 public yieldVault;
-  string public yieldVaultName = "PoolTogether aEthDAI Yield (PTaEthDAIY)";
-  string public yieldVaultSymbol = "PTaEthDAIY";
+  ERC20Mock public underlyingToken;
+  ERC20Mock public reserveToken;
+
+  LiquidationPair public liquidationPair;
+  address public liquidationPairTarget = 0xcbE704e38ddB2E6A8bA9f4d335f2637132C20113;
+
+  TwabController public twabController;
 
   /* ============ Setup ============ */
 
   function setUp() public override {
-    _underlying_ = address(new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0));
+    underlyingToken = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
+    _underlying_ = address(underlyingToken);
+
+    reserveToken = new ERC20Mock("PoolTogether", "POOL", address(this), 0);
+
+    ILiquidationSource liquidationSource = new MockLiquidationPairYieldSource();
+
+    liquidationPair = new LiquidationPair(
+      msg.sender,
+      liquidationSource,
+      liquidationPairTarget,
+      underlyingToken,
+      reserveToken,
+      UFixed32x9.wrap(0.3e9),
+      UFixed32x9.wrap(0.02e9),
+      100,
+      50
+    );
 
     twabController = new TwabController();
 
-    yieldVault = new YieldVault(IERC20Metadata(_underlying_), yieldVaultName, yieldVaultSymbol);
+    yieldVault = new YieldVault(
+      underlyingToken,
+      "PoolTogether aEthDAI Yield (PTaEthDAIY)",
+      "PTaEthDAIY"
+    );
 
     _vault_ = address(
       new PrizeVault(
-        IERC20(_underlying_),
+        underlyingToken,
         prizeVaultName,
         prizeVaultSymbol,
         twabController,
-        yieldVault
+        yieldVault,
+        liquidationPair
       )
     );
 
@@ -68,7 +98,8 @@ contract PrizeVaultTest is ERC4626Test {
       prizeVaultName,
       prizeVaultSymbol,
       twabController,
-      yieldVault
+      yieldVault,
+      liquidationPair
     );
 
     PrizeVault testPrizeVault = new PrizeVault(
@@ -76,7 +107,8 @@ contract PrizeVaultTest is ERC4626Test {
       prizeVaultName,
       prizeVaultSymbol,
       twabController,
-      yieldVault
+      yieldVault,
+      liquidationPair
     );
 
     assertEq(testPrizeVault.asset(), _underlying_);
@@ -85,6 +117,7 @@ contract PrizeVaultTest is ERC4626Test {
     assertEq(testPrizeVault.decimals(), ERC20(_underlying_).decimals());
     assertEq(testPrizeVault.twabController(), address(twabController));
     assertEq(testPrizeVault.yieldVault(), address(yieldVault));
+    assertEq(testPrizeVault.liquidationPair(), address(liquidationPair));
   }
 
   function testConstructorTwabControllerZero() external {
@@ -95,7 +128,8 @@ contract PrizeVaultTest is ERC4626Test {
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       TwabController(address(0)),
-      yieldVault
+      yieldVault,
+      liquidationPair
     );
   }
 
@@ -107,7 +141,21 @@ contract PrizeVaultTest is ERC4626Test {
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
-      IERC4626(address(0))
+      IERC4626(address(0)),
+      liquidationPair
+    );
+  }
+
+  function testConstructorLiquidationPairZero() external {
+    vm.expectRevert(bytes("PV/LP-not-zero-address"));
+
+    new PrizeVault(
+      IERC20(_underlying_),
+      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+      "PTaEthDAI",
+      twabController,
+      yieldVault,
+      LiquidationPair(address(0))
     );
   }
 
@@ -277,5 +325,33 @@ contract PrizeVaultTest is ERC4626Test {
     shares = bound(shares, 0, _max_mint(owner));
     _approve(_vault_, owner, caller, allowance);
     propTransfer(caller, receiver, owner, shares);
+  }
+
+  /* ============ availableBalanceOf ============ */
+  function propAvailableBalanceOf(address caller, uint256 yield) public {
+    vm.prank(caller);
+    uint256 availableBalanceOf = _call_vault(
+      abi.encodeWithSelector(PrizeVault.availableBalanceOf.selector, address(0))
+    );
+    uint256 totalAssets = _call_vault(abi.encodeWithSelector(PrizeVault.totalAssets.selector));
+    uint256 withdrawableAssets = yieldVault.maxWithdraw(_vault_);
+
+    if (totalAssets > withdrawableAssets) {
+      assertApproxEqAbs(availableBalanceOf, totalAssets - withdrawableAssets, _delta_, "yield");
+    } else {
+      assertApproxEqAbs(availableBalanceOf, withdrawableAssets - totalAssets, _delta_, "yield");
+    }
+  }
+
+  function test_availableBalanceOf(Init memory init, uint shares, uint allowance) public virtual {
+    setUpVault(init);
+
+    // We mint underlying assets to the YieldVault to generate yield
+    uint256 yield = bound(shares, 0, 10000 * 1000);
+    underlyingToken.mint(address(yieldVault), yield);
+
+    address caller = init.user[0];
+    shares = bound(shares, 0, _max_mint(caller));
+    propAvailableBalanceOf(caller, yield);
   }
 }
