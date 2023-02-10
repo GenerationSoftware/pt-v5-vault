@@ -16,3 +16,7 @@
 [submodule "lib/v5-liquidator"]
 	path = lib/v5-liquidator
 	url = https://github.com/pooltogether/v5-liquidator
+[submodule "lib/v5-prize-pool"]
+	path = lib/v5-prize-pool
+	url = https://github.com/pooltogether/v5-prize-pool
+	branch = pool-2554-prize-pool
