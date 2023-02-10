@@ -176,6 +176,47 @@ contract PrizeVault is ERC4626, ILiquidationSource {
   }
 
   /**
+   * @inheritdoc ILiquidationSource
+   * @dev The available yield to liquidate is equal to the maximum amount of assets
+   *      that can be withdrawn from the YieldVault minus the total amount of assets managed by this vault
+   *      which is equal to the total amount supplied to the YieldVault + the amount living in this vault.
+   * @dev If `_totalAssets` is greater than `_withdrawableAssets`, it means that no yield has accrued
+   *      but there are assets living in this vault that are liquidatable.
+   */
+  function availableBalanceOf(address _token) public view override returns (uint256) {
+    require(_token == address(this), "PV/token-not-vault-share");
+
+    uint256 _totalAssets = totalAssets();
+    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
+
+    unchecked {
+      return
+        _totalAssets > _withdrawableAssets
+          ? _totalAssets - _withdrawableAssets
+          : _withdrawableAssets - _totalAssets;
+    }
+  }
+
+  /**
+   * @inheritdoc ILiquidationSource
+   * @dev User provides reserve tokens and receives in exchange PrizeVault shares.
+   */
+  function liquidateTo(
+    address _token ,
+    address _target,
+    uint256 _amount
+  ) external override returns (bool) {
+    require(msg.sender == address(_liquidationPair), "PV/caller-not-liquidation-pair");
+
+    uint256 _availableBalance = availableBalanceOf(_token);
+    require(_availableBalance >= _amount, "PV/amount-gt-liquidatable-yield");
+
+    _mint(_target, _amount);
+
+    return true;
+  }
+
+  /**
    * @notice Address of the TwabController keeping track of balances.
    * @return address TwabController address
    */
@@ -197,58 +238,6 @@ contract PrizeVault is ERC4626, ILiquidationSource {
    */
   function liquidationPair() external view returns (address) {
     return address(_liquidationPair);
-  }
-
-  /**
-   * @notice Capture yield accrued by this PrizeVault from the YieldVault and
-   *         swap it for reserve token via the Liquidator to contribute to the PrizePool
-   * @return uint256 Amount of yield contributed
-   */
-  // function contributeYield() external returns (uint256) {
-  //   console2.log("_yieldVault.maxWithdraw(address(this))", _yieldVault.maxWithdraw(address(this)));
-  //   console2.log("totalSupply()", totalSupply());
-
-  //   uint256 _yield = _yieldVault.maxWithdraw(address(this)) - totalSupply();
-  //   _yieldVault.withdraw(_yield, address(this), address(this));
-
-  //   console2.log("_yield", _yield);
-  //   console2.log("totalAssets()", totalAssets());
-
-  //   uint256 _amountOut = _liquidationPair.swapExactAmountIn(_yield, 0);
-  //   emit YieldContributed(_yield, _amountOut);
-
-  //   return _yield;
-  // }
-
-  /**
-   * @inheritdoc ILiquidationSource
-   * @dev The available yield to liquidate is equal to the maximum amount of assets
-   *      that can be withdrawn from the YieldVault minus the total amount of assets managed by this vault
-   *      which is equal to the total amount supplied to the YieldVault + the amount living in this vault.
-   * @dev If `_totalAssets` is greater than `_withdrawableAssets`, it means that no yield has accrued
-   *      but there are assets living in this vault that are liquidatable.
-   */
-  function availableBalanceOf(address /* _token */) external override returns (uint256) {
-    uint256 _totalAssets = totalAssets();
-    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
-
-    unchecked {
-      return
-        _totalAssets > _withdrawableAssets
-          ? _totalAssets - _withdrawableAssets
-          : _withdrawableAssets - _totalAssets;
-    }
-  }
-
-  /**
-   * @inheritdoc ILiquidationSource
-   */
-  function liquidateTo(
-    address _token,
-    address _target,
-    uint256 _amount
-  ) external override returns (bool) {
-    return true;
   }
 
   /* ============ Internal Functions ============ */

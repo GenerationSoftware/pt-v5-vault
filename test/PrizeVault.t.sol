@@ -330,9 +330,11 @@ contract PrizeVaultTest is ERC4626Test {
   /* ============ availableBalanceOf ============ */
   function propAvailableBalanceOf(address caller, uint256 yield) public {
     vm.prank(caller);
+
     uint256 availableBalanceOf = _call_vault(
-      abi.encodeWithSelector(PrizeVault.availableBalanceOf.selector, address(0))
+      abi.encodeWithSelector(PrizeVault.availableBalanceOf.selector, _vault_)
     );
+
     uint256 totalAssets = _call_vault(abi.encodeWithSelector(PrizeVault.totalAssets.selector));
     uint256 withdrawableAssets = yieldVault.maxWithdraw(_vault_);
 
