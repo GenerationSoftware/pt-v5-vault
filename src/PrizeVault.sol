@@ -140,22 +140,6 @@ contract PrizeVault is ERC4626, ILiquidationSource {
   }
 
   /// @inheritdoc ERC4626
-  function deposit(uint256 _assets, address _receiver) public virtual override returns (uint256) {
-    /// TODO: remove, delegation should be handled by TwabController
-    _twabController.delegate(address(this), _receiver, _receiver);
-
-    return super.deposit(_assets, _receiver);
-  }
-
-  /// @inheritdoc ERC4626
-  function mint(uint256 _shares, address _receiver) public virtual override returns (uint256) {
-    /// TODO: remove, delegation should be handled by TwabController
-    _twabController.delegate(address(this), _receiver, _receiver);
-
-    return super.mint(_shares, _receiver);
-  }
-
-  /// @inheritdoc ERC4626
   function withdraw(
     uint256 _assets,
     address _receiver,
@@ -202,7 +186,7 @@ contract PrizeVault is ERC4626, ILiquidationSource {
    * @dev User provides reserve tokens and receives in exchange PrizeVault shares.
    */
   function liquidateTo(
-    address _token ,
+    address _token,
     address _target,
     uint256 _amount
   ) external override returns (bool) {
@@ -310,7 +294,8 @@ contract PrizeVault is ERC4626, ILiquidationSource {
   function _mint(address _account, uint256 _shares) internal virtual override {
     require(_account != address(0), "PV/mint-to-zero-address");
 
-    _twabController.mint(address(this), _account, _shares);
+    // TODO: we should still have to pass the PrizeVault address cause TwabController may not be called by a vault
+    _twabController.twabMint(_account, _shares);
     emit Transfer(address(0), _account, _shares);
   }
 
@@ -326,7 +311,8 @@ contract PrizeVault is ERC4626, ILiquidationSource {
     uint256 _accountBalance = _balanceOf(_account);
     require(_accountBalance >= _shares, "PV/burn-amount-gt-balance");
 
-    _twabController.burn(address(this), _account, _shares);
+    // TODO: we should still have to pass the PrizeVault address cause TwabController may not be called by a vault
+    _twabController.twabBurn(_account, _shares);
     emit Transfer(_account, address(0), _shares);
   }
 
@@ -337,17 +323,14 @@ contract PrizeVault is ERC4626, ILiquidationSource {
    * @dev `_from` must have a balance of at least `_shares`.
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
-    /// TODO: remove, delegation should be handled by TwabController
-    _twabController.delegate(address(this), _from, _from);
-    _twabController.delegate(address(this), _to, _to);
-
     require(_from != address(0), "PV/from-not-zero-address");
     require(_to != address(0), "PV/to-not-zero-address");
 
     uint256 _fromBalance = _balanceOf(_from);
     require(_fromBalance >= _shares, "PV/transfer-amount-gt-balance");
 
-    _twabController.twabTransfer(address(this), _from, _to, _shares);
+    // TODO: we should still have to pass the PrizeVault address cause TwabController may not be called by a vault
+    _twabController.twabTransfer(_from, _to, _shares);
     emit Transfer(_from, _to, _shares);
   }
 

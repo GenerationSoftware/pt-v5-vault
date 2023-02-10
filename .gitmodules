@@ -12,6 +12,7 @@
 [submodule "lib/v5-twab-controller"]
 	path = lib/v5-twab-controller
 	url = https://github.com/pooltogether/v5-twab-controller
+	branch = pool-2557-twabcontroller-tweaks
 [submodule "lib/v5-liquidator"]
 	path = lib/v5-liquidator
 	url = https://github.com/pooltogether/v5-liquidator
