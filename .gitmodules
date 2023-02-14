@@ -20,3 +20,7 @@
 	path = lib/v5-prize-pool
 	url = https://github.com/pooltogether/v5-prize-pool
 	branch = pool-2554-prize-pool
+[submodule "lib/owner-manager-contracts"]
+	path = lib/owner-manager-contracts
+	url = https://github.com/pooltogether/owner-manager-contracts
+	branch = v1.1.0
