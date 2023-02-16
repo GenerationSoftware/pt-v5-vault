@@ -4,74 +4,106 @@ pragma solidity 0.8.17;
 import { ERC4626, ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
+import { Ownable } from "owner-manager-contracts/Ownable.sol";
 import { LiquidationPair } from "v5-liquidator/src/LiquidationPair.sol";
 import { ILiquidationSource } from "v5-liquidator/src/interfaces/ILiquidationSource.sol";
+import { PrizePool } from "v5-prize-pool/src/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 
 import { console2 } from "forge-std/Test.sol";
 
 /**
- * @title  PoolTogether V5 PrizeVault
+ * @title  PoolTogether V5 Vault
  * @author PoolTogether Inc Team
- * @notice PrizeVault extends the ERC4626 standard and is the entry point for users interacting with a V5 pool.
+ * @notice Vault extends the ERC4626 standard and is the entry point for users interacting with a V5 pool.
  *         Users deposit an underlying asset (i.e. USDC) in this contract and receive in exchange an ERC20 token
  *         representing their share of deposit in the vault.
  *         Underlying assets are then deposited in a YieldVault to generate yield.
- *         This yield is sold for reserve tokens (i.e. POOL) via the Liquidator and captured by the PrizePool to be awarded to depositors.
+ *         This yield is sold for prize tokens (i.e. POOL) via the Liquidator and captured by the PrizePool to be awarded to depositors.
  * @dev    Balances are stored in the TwabController contract.
  */
-contract PrizeVault is ERC4626, ILiquidationSource {
+contract Vault is ERC4626, ILiquidationSource, Ownable {
   using SafeERC20 for IERC20;
 
   /* ============ Events ============ */
 
   /**
-   * @notice Emitted when a new PrizeVault has been deployed
+   * @notice Emitted when a new Vault has been deployed.
    * @param asset Address of the underlying asset used by the vault
    * @param name Name of the ERC20 share minted by the vault
    * @param symbol Symbol of the ERC20 share minted by the vault
    * @param twabController Address of the TwabController used to keep track of balances
    * @param yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
-   * @param liquidationPair Address of the LiquidationPair used to liquidate yield for reserve token
+   * @param liquidationPair Address of the LiquidationPair used to liquidate yield for prize token
+   * @param prizePool Address of the PrizePool that computes prizes
+   * @param claimer Address of the claimer
+   * @param owner Address of the owner
    */
-  event NewPrizeVault(
+  event NewVault(
     IERC20 indexed asset,
     string name,
     string symbol,
     TwabController twabController,
     IERC4626 indexed yieldVault,
-    LiquidationPair indexed liquidationPair
+    LiquidationPair indexed liquidationPair,
+    PrizePool prizePool,
+    address claimer,
+    address owner
   );
 
   /**
-   * @notice Emitted when yield has been contributed to the PrizePool
-   * @param yield Amount of yield contributed
-   * @param reserveToken Amount of reserve token received by PrizePool
+   * @notice Emitted when auto claim has been disabled or activated by a user.
+   * @param user Address of the user for which auto claim was disabled or activated
+   * @param status Whether auto claim is disabled or not
    */
-  event YieldContributed(uint256 yield, uint256 reserveToken);
+  event AutoClaimDisabled(address user, bool status);
+
+  /**
+   * @notice Emitted when a new claimer has been set.
+   * @param previousClaimer Address of the previous claimer
+   * @param newClaimer Address of the new claimer
+   */
+  event ClaimerSet(address previousClaimer, address newClaimer);
 
   /* ============ Variables ============ */
 
-  /// @notice Address of the TwabController used to keep track of balances
+  /// @notice Address of the TwabController used to keep track of balances.
   TwabController private immutable _twabController;
 
-  /// @notice Address of the ERC4626 vault generating yield
+  /// @notice Address of the ERC4626 vault generating yield.
   IERC4626 private immutable _yieldVault;
 
-  /// @notice Address of the LiquidationPair used to liquidate yield for reserve token
+  /// @notice Address of the LiquidationPair used to liquidate yield for prize token.
   LiquidationPair private immutable _liquidationPair;
 
-  /// @notice Amount of underlying assets supplied to the YieldVault
+  /// @notice Address of the PrizePool that computes prizes.
+  PrizePool private immutable _prizePool;
+
+  /// @notice Address of the claimer.
+  address private _claimer;
+
+  /// @notice Amount of underlying assets supplied to the YieldVault.
   uint256 private _assetSupplyBalance;
 
+  /* ============ Mappings ============ */
+
+  /// @notice Mapping to keep track of users who disabled prize auto claiming.
+  mapping(address => bool) public autoClaimDisabled;
+
+  /* ============ Constructor ============ */
+
   /**
-   * @notice PrizeVault constructor
+   * @notice Vault constructor
+   * @dev `claimer` can be set to address zero if none is available yet.
    * @param _asset Address of the underlying asset used by the vault
    * @param _name Name of the ERC20 share minted by the vault
    * @param _symbol Symbol of the ERC20 share minted by the vault
    * @param twabController_ Address of the TwabController used to keep track of balances
    * @param yieldVault_ Address of the ERC4626 vault in which assets are deposited to generate yield
-   * @param liquidationPair_ Address of the LiquidationPair used to liquidate yield for reserve token
+   * @param liquidationPair_ Address of the LiquidationPair used to liquidate yield for prize token
+   * @param prizePool_ Address of the PrizePool that computes prizes
+   * @param claimer_ Address of the claimer
+   * @param _owner Address that will gain ownership of this contract
    */
   constructor(
     IERC20 _asset,
@@ -79,26 +111,48 @@ contract PrizeVault is ERC4626, ILiquidationSource {
     string memory _symbol,
     TwabController twabController_,
     IERC4626 yieldVault_,
-    LiquidationPair liquidationPair_
-  ) ERC4626(_asset) ERC20(_name, _symbol) {
-    require(address(twabController_) != address(0), "PV/twabCtrlr-not-zero-address");
-    require(address(yieldVault_) != address(0), "PV/yieldVault-not-zero-address");
-    require(address(liquidationPair_) != address(0), "PV/LP-not-zero-address");
+    LiquidationPair liquidationPair_,
+    PrizePool prizePool_,
+    address claimer_,
+    address _owner
+  ) ERC4626(_asset) ERC20(_name, _symbol) Ownable(_owner)  {
+    require(address(twabController_) != address(0), "Vault/twabCtrlr-not-zero-address");
+    require(address(yieldVault_) != address(0), "Vault/YV-not-zero-address");
+    require(address(liquidationPair_) != address(0), "Vault/LP-not-zero-address");
+    require(address(prizePool_) != address(0), "Vault/PP-not-zero-address");
+    require(address(_owner) != address(0), "Vault/owner-not-zero-address");
 
     /// TODO: yield needs to be exposed but also other yield farm tokens => need for ownership
 
     _twabController = twabController_;
     _yieldVault = yieldVault_;
     _liquidationPair = liquidationPair_;
+    _prizePool = prizePool_;
+    _claimer = claimer_;
 
     // Approve once for max amount
     _asset.safeApprove(address(yieldVault_), type(uint256).max);
     _asset.safeApprove(address(liquidationPair_), type(uint256).max);
 
-    emit NewPrizeVault(_asset, _name, _symbol, twabController_, yieldVault_, liquidationPair_);
+    emit NewVault(
+      _asset,
+      _name,
+      _symbol,
+      twabController_,
+      yieldVault_,
+      liquidationPair_,
+      prizePool_,
+      claimer_,
+      _owner
+    );
   }
 
   /* ============ External Functions ============ */
+
+  /// @inheritdoc ILiquidationSource
+  function availableBalanceOf(address _token) public view override returns (uint256) {
+    return _availableBalanceOf(_token);
+  }
 
   /// @inheritdoc ERC20
   function balanceOf(
@@ -161,43 +215,80 @@ contract PrizeVault is ERC4626, ILiquidationSource {
 
   /**
    * @inheritdoc ILiquidationSource
-   * @dev The available yield to liquidate is equal to the maximum amount of assets
-   *      that can be withdrawn from the YieldVault minus the total amount of assets managed by this vault
-   *      which is equal to the total amount supplied to the YieldVault + the amount living in this vault.
-   * @dev If `_totalAssets` is greater than `_withdrawableAssets`, it means that no yield has accrued
-   *      but there are assets living in this vault that are liquidatable.
+   * @dev User provides prize tokens and receives in exchange Vault shares.
    */
-  function availableBalanceOf(address _token) public view override returns (uint256) {
-    require(_token == address(this), "PV/token-not-vault-share");
+  function liquidate(
+    address _account,
+    address _tokenIn,
+    uint256 _amountIn,
+    address _tokenOut,
+    uint256 _amountOut
+  ) external override returns (bool) {
+    require(msg.sender == address(_liquidationPair), "Vault/caller-not-LP");
+    require(_tokenIn == address(_prizePool.prizeToken()), "Vault/tokenIn-not-prizeToken");
+    require(_tokenOut == address(this), "Vault/tokenOut-not-vaultShare");
 
-    uint256 _totalAssets = totalAssets();
-    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
+    uint256 _availableBalance = availableBalanceOf(_tokenOut);
+    require(_availableBalance >= _amountOut, "Vault/amount-gt-available-yield");
 
-    unchecked {
-      return
-        _totalAssets > _withdrawableAssets
-          ? _totalAssets - _withdrawableAssets
-          : _withdrawableAssets - _totalAssets;
-    }
+    _prizePool.contributePrizeTokens(address(this), _amountIn);
+    _mint(_account, _amountOut);
+
+    return true;
+  }
+
+  /// @inheritdoc ILiquidationSource
+  function targetOf(address _token) external view returns(address) {
+    require(_token == _liquidationPair.tokenIn(), "Vault/target-token-unsupported");
+    return address(_prizePool);
   }
 
   /**
-   * @inheritdoc ILiquidationSource
-   * @dev User provides reserve tokens and receives in exchange PrizeVault shares.
+   * @notice Claim prize for `_user`.
+   * @dev Only callable by `_claimer` if it has been set.
+   * @param _user Address of the user to claim prize for
+   * @param _tier Tier to claim prize for
    */
-  function liquidateTo(
-    address _token,
-    address _target,
-    uint256 _amount
-  ) external override returns (bool) {
-    require(msg.sender == address(_liquidationPair), "PV/caller-not-liquidation-pair");
+  function claimPrize(
+    address _user,
+    uint8 _tier
+  ) external returns (uint256) {
+    require(!autoClaimDisabled[_user], "Vault/auto-claim-disabled");
 
-    uint256 _availableBalance = availableBalanceOf(_token);
-    require(_availableBalance >= _amount, "PV/amount-gt-liquidatable-yield");
+    address _claimerAddress = address(_claimer);
 
-    _mint(_target, _amount);
+    if (_claimerAddress != address(0)) {
+      require(msg.sender == _claimerAddress, "Vault/caller-not-claimer");
+    }
 
-    return true;
+    return _prizePool.claimPrize(address(this), _user, _tier);
+  }
+
+  /**
+   * @notice Allow a user to disable or activate prize auto claiming.
+   * @dev Auto claim is active by default for all users.
+   * @param _disable Disable or activate auto claim for `msg.sender`
+   * @return bool New auto claim status
+   */
+  function disableAutoClaim(bool _disable) external returns (bool) {
+    autoClaimDisabled[msg.sender] = _disable;
+
+    emit AutoClaimDisabled(msg.sender, _disable);
+    return _disable;
+  }
+
+  /**
+   * @notice Set claimer address.
+   * @dev Claimer can only be set once.
+   * @param claimer_ New claimer address
+   * return address New claimer address
+   */
+  function setClaimer(address claimer_) external onlyOwner returns (address) {
+    address _previousClaimer = _claimer;
+    _claimer = claimer_;
+
+    emit ClaimerSet(_previousClaimer, claimer_);
+    return claimer_;
   }
 
   /**
@@ -217,14 +308,57 @@ contract PrizeVault is ERC4626, ILiquidationSource {
   }
 
   /**
-   * @notice Address of the LiquidationPair used to liquidate yield for reserve token.
+   * @notice Address of the LiquidationPair used to liquidate yield for prize token.
    * @return address LiquidationPair address
    */
   function liquidationPair() external view returns (address) {
     return address(_liquidationPair);
   }
 
+  /**
+   * @notice Address of the PrizePool that computes prizes.
+   * @return address PrizePool address
+   */
+  function prizePool() external view returns (address) {
+    return address(_prizePool);
+  }
+
+  /**
+   * @notice Address of the claimer.
+   * @return address Claimer address
+   */
+  function claimer() external view returns (address) {
+    return address(_claimer);
+  }
+
   /* ============ Internal Functions ============ */
+
+  /**
+   * @notice Get available yield that can be liquidated by minting vault shares.
+   * @param _token Address of the token to get available balance for
+   * @dev The available yield to liquidate is equal to the maximum amount of assets
+   *      that can be withdrawn from the YieldVault minus the total amount of assets managed by this vault
+   *      which is equal to the total amount supplied to the YieldVault + the amount living in this vault.
+   * @dev If `_totalAssets` is greater than `_withdrawableAssets`, it could mean that:
+   *      - assets are living in this vault
+   *      - this vault is now undercollateralized
+   *      In both cases, we should not mint more shares than underlying assets available,
+   *      so we return the amount of assets living in this vault
+   * @return uint256 Available amount of `_token`.
+   */
+  function _availableBalanceOf(address _token) internal view returns (uint256) {
+    require(_token == address(this), "Vault/token-not-vault-share");
+
+    uint256 _totalAssets = totalAssets();
+    uint256 _withdrawableAssets = _yieldVault.convertToAssets(_yieldVault.balanceOf(address(this)));
+
+    unchecked {
+      return
+        _withdrawableAssets >= _totalAssets
+          ? _withdrawableAssets - _totalAssets
+          : super.totalAssets(); // equivalent to `_asset.balanceOf(address(this))`
+    }
+  }
 
   /**
    * @notice Get balance of `_account`.
@@ -292,9 +426,9 @@ contract PrizeVault is ERC4626, ILiquidationSource {
    * @dev `_account` cannot be the zero address.
    */
   function _mint(address _account, uint256 _shares) internal virtual override {
-    require(_account != address(0), "PV/mint-to-zero-address");
+    require(_account != address(0), "Vault/mint-to-zero-address");
 
-    // TODO: we should still have to pass the PrizeVault address cause TwabController may not be called by a vault
+    // TODO: we should still have to pass the Vault address cause TwabController may not be called by a vault
     _twabController.twabMint(_account, _shares);
     emit Transfer(address(0), _account, _shares);
   }
@@ -306,12 +440,12 @@ contract PrizeVault is ERC4626, ILiquidationSource {
    * @dev `_account` must have at least `_shares` tokens.
    */
   function _burn(address _account, uint256 _shares) internal virtual override {
-    require(_account != address(0), "PV/burn-not-zero-address");
+    require(_account != address(0), "Vault/burn-not-zero-address");
 
     uint256 _accountBalance = _balanceOf(_account);
-    require(_accountBalance >= _shares, "PV/burn-amount-gt-balance");
+    require(_accountBalance >= _shares, "Vault/burn-amount-gt-balance");
 
-    // TODO: we should still have to pass the PrizeVault address cause TwabController may not be called by a vault
+    // TODO: we should still have to pass the Vault address cause TwabController may not be called by a vault
     _twabController.twabBurn(_account, _shares);
     emit Transfer(_account, address(0), _shares);
   }
@@ -323,13 +457,13 @@ contract PrizeVault is ERC4626, ILiquidationSource {
    * @dev `_from` must have a balance of at least `_shares`.
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
-    require(_from != address(0), "PV/from-not-zero-address");
-    require(_to != address(0), "PV/to-not-zero-address");
+    require(_from != address(0), "Vault/from-not-zero-address");
+    require(_to != address(0), "Vault/to-not-zero-address");
 
     uint256 _fromBalance = _balanceOf(_from);
-    require(_fromBalance >= _shares, "PV/transfer-amount-gt-balance");
+    require(_fromBalance >= _shares, "Vault/transfer-amount-gt-balance");
 
-    // TODO: we should still have to pass the PrizeVault address cause TwabController may not be called by a vault
+    // TODO: we should still have to pass the Vault address cause TwabController may not be called by a vault
     _twabController.twabTransfer(_from, _to, _shares);
     emit Transfer(_from, _to, _shares);
   }

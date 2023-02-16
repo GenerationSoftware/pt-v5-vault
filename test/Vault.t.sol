@@ -7,40 +7,53 @@ import { ERC4626Test, IMockERC20 } from "erc4626-tests/ERC4626.test.sol";
 import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { ERC20Mock, IERC20Metadata } from "openzeppelin/mocks/ERC20Mock.sol";
 
+import { ILiquidationSource } from "v5-liquidator/src/interfaces/ILiquidationSource.sol";
 import { LiquidationPair } from "v5-liquidator/src/LiquidationPair.sol";
 import { UFixed32x9 } from "v5-liquidator/src/libraries/FixedMathLib.sol";
 
-import { MockLiquidationPairYieldSource, ILiquidationSource } from "v5-liquidator/test/mocks/MockLiquidationPairYieldSource.sol";
-
+import { PrizePool, SD59x18 } from "v5-prize-pool/src/PrizePool.sol";
+import { ud2x18, sd1x18 } from "v5-prize-pool/test/PrizePool.t.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 
-import { PrizeVault } from "src/PrizeVault.sol";
+import { Vault } from "src/Vault.sol";
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
-contract PrizeVaultTest is ERC4626Test {
+contract VaultTest is ERC4626Test {
   /* ============ Events ============ */
 
-  event NewPrizeVault(
+  event NewVault(
     IERC20 indexed asset,
     string name,
     string symbol,
     TwabController twabController,
     IERC4626 indexed yieldVault,
-    LiquidationPair indexed liquidationPair
+    LiquidationPair indexed liquidationPair,
+    PrizePool prizePool,
+    address claimer,
+    address owner
   );
+
+  event AutoClaimDisabled(address user, bool status);
+
+  event ClaimerSet(address previousClaimer, address newClaimer);
 
   /* ============ Variables ============ */
 
-  string public prizeVaultName = "PoolTogether aEthDAI Prize Token (PTaEthDAI)";
-  string public prizeVaultSymbol = "PTaEthDAI";
+  Vault public vault;
+  string public vaultName = "PoolTogether aEthDAI Prize Token (PTaEthDAI)";
+  string public vaultSymbol = "PTaEthDAI";
 
   IERC4626 public yieldVault;
   ERC20Mock public underlyingToken;
-  ERC20Mock public reserveToken;
+  ERC20Mock public prizeToken;
 
   LiquidationPair public liquidationPair;
   address public liquidationPairTarget = 0xcbE704e38ddB2E6A8bA9f4d335f2637132C20113;
 
+  PrizePool public prizePool;
+
+  uint256 winningRandomNumber = 123456;
+  uint32 drawPeriodSeconds = 1 days;
   TwabController public twabController;
 
   /* ============ Setup ============ */
@@ -49,16 +62,12 @@ contract PrizeVaultTest is ERC4626Test {
     underlyingToken = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
     _underlying_ = address(underlyingToken);
 
-    reserveToken = new ERC20Mock("PoolTogether", "POOL", address(this), 0);
-
-    ILiquidationSource liquidationSource = new MockLiquidationPairYieldSource();
+    prizeToken = new ERC20Mock("PoolTogether", "POOL", address(this), 0);
 
     liquidationPair = new LiquidationPair(
-      msg.sender,
-      liquidationSource,
-      liquidationPairTarget,
-      underlyingToken,
-      reserveToken,
+      ILiquidationSource(vault),
+      address(prizeToken),
+      address(vault),
       UFixed32x9.wrap(0.3e9),
       UFixed32x9.wrap(0.02e9),
       100,
@@ -67,22 +76,39 @@ contract PrizeVaultTest is ERC4626Test {
 
     twabController = new TwabController();
 
+    prizePool = new PrizePool(
+      prizeToken,
+      twabController,
+      uint32(365), // 52 weeks = 1 year
+      drawPeriodSeconds, // drawPeriodSeconds
+      uint64(block.timestamp), // drawStartedAt
+      uint8(2), // minimum number of tiers
+      100e18,
+      10e18,
+      10e18,
+      ud2x18(0.9e18), // claim threshold of 90%
+      sd1x18(0.9e18) // alpha
+    );
+
     yieldVault = new YieldVault(
       underlyingToken,
       "PoolTogether aEthDAI Yield (PTaEthDAIY)",
       "PTaEthDAIY"
     );
 
-    _vault_ = address(
-      new PrizeVault(
-        underlyingToken,
-        prizeVaultName,
-        prizeVaultSymbol,
-        twabController,
-        yieldVault,
-        liquidationPair
-      )
+    vault = new Vault(
+      underlyingToken,
+      vaultName,
+      vaultSymbol,
+      twabController,
+      yieldVault,
+      liquidationPair,
+      prizePool,
+      address(this), // TODO: replace with claimer contract address
+      address(this)
     );
+
+    _vault_ = address(vault);
 
     _delta_ = 0;
     _vaultMayBeEmpty = false;
@@ -93,69 +119,119 @@ contract PrizeVaultTest is ERC4626Test {
 
   function testConstructor() public {
     vm.expectEmit(true, true, true, true);
-    emit NewPrizeVault(
+    emit NewVault(
       IERC20(_underlying_),
-      prizeVaultName,
-      prizeVaultSymbol,
+      vaultName,
+      vaultSymbol,
       twabController,
       yieldVault,
-      liquidationPair
+      liquidationPair,
+      prizePool,
+      address(this),
+      address(this)
     );
 
-    PrizeVault testPrizeVault = new PrizeVault(
+    Vault testVault = new Vault(
       IERC20(_underlying_),
-      prizeVaultName,
-      prizeVaultSymbol,
+      vaultName,
+      vaultSymbol,
       twabController,
       yieldVault,
-      liquidationPair
+      liquidationPair,
+      prizePool,
+      address(this),
+      address(this)
     );
 
-    assertEq(testPrizeVault.asset(), _underlying_);
-    assertEq(testPrizeVault.name(), prizeVaultName);
-    assertEq(testPrizeVault.symbol(), prizeVaultSymbol);
-    assertEq(testPrizeVault.decimals(), ERC20(_underlying_).decimals());
-    assertEq(testPrizeVault.twabController(), address(twabController));
-    assertEq(testPrizeVault.yieldVault(), address(yieldVault));
-    assertEq(testPrizeVault.liquidationPair(), address(liquidationPair));
+    assertEq(testVault.asset(), _underlying_);
+    assertEq(testVault.name(), vaultName);
+    assertEq(testVault.symbol(), vaultSymbol);
+    assertEq(testVault.decimals(), ERC20(_underlying_).decimals());
+    assertEq(testVault.twabController(), address(twabController));
+    assertEq(testVault.yieldVault(), address(yieldVault));
+    assertEq(testVault.liquidationPair(), address(liquidationPair));
+    assertEq(testVault.prizePool(), address(prizePool));
+    assertEq(testVault.claimer(), address(this));
+    assertEq(testVault.owner(), address(this));
   }
 
   function testConstructorTwabControllerZero() external {
-    vm.expectRevert(bytes("PV/twabCtrlr-not-zero-address"));
+    vm.expectRevert(bytes("Vault/twabCtrlr-not-zero-address"));
 
-    new PrizeVault(
+    new Vault(
       IERC20(_underlying_),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       TwabController(address(0)),
       yieldVault,
-      liquidationPair
+      liquidationPair,
+      prizePool,
+      address(this),
+      address(this)
     );
   }
 
   function testConstructorYieldVaultZero() external {
-    vm.expectRevert(bytes("PV/yieldVault-not-zero-address"));
+    vm.expectRevert(bytes("Vault/YV-not-zero-address"));
 
-    new PrizeVault(
+    new Vault(
       IERC20(_underlying_),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
       IERC4626(address(0)),
-      liquidationPair
+      liquidationPair,
+      prizePool,
+      address(this),
+      address(this)
     );
   }
 
   function testConstructorLiquidationPairZero() external {
-    vm.expectRevert(bytes("PV/LP-not-zero-address"));
+    vm.expectRevert(bytes("Vault/LP-not-zero-address"));
 
-    new PrizeVault(
+    new Vault(
       IERC20(_underlying_),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
       yieldVault,
-      LiquidationPair(address(0))
+      LiquidationPair(address(0)),
+      prizePool,
+      address(this),
+      address(this)
+    );
+  }
+
+  function testConstructorPrizePoolZero() external {
+    vm.expectRevert(bytes("Vault/PP-not-zero-address"));
+
+    new Vault(
+      IERC20(_underlying_),
+      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+      "PTaEthDAI",
+      twabController,
+      yieldVault,
+      liquidationPair,
+      PrizePool(address(0)),
+      address(this),
+      address(this)
+    );
+  }
+
+  function testConstructorOwnerZero() external {
+    vm.expectRevert(bytes("Vault/owner-not-zero-address"));
+
+    new Vault(
+      IERC20(_underlying_),
+      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+      "PTaEthDAI",
+      twabController,
+      yieldVault,
+      liquidationPair,
+      prizePool,
+      address(this),
+      address(0)
     );
   }
 
@@ -328,32 +404,104 @@ contract PrizeVaultTest is ERC4626Test {
   }
 
   /* ============ availableBalanceOf ============ */
-  function propAvailableBalanceOf(address caller, uint256 yield) public {
+  function propAvailableBalanceOf(address caller) public {
     vm.prank(caller);
 
     uint256 availableBalanceOf = _call_vault(
-      abi.encodeWithSelector(PrizeVault.availableBalanceOf.selector, _vault_)
+      abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_)
     );
 
-    uint256 totalAssets = _call_vault(abi.encodeWithSelector(PrizeVault.totalAssets.selector));
-    uint256 withdrawableAssets = yieldVault.maxWithdraw(_vault_);
+    uint256 totalAssets = _call_vault(abi.encodeWithSelector(Vault.totalAssets.selector));
+    uint256 withdrawableAssets = yieldVault.convertToAssets(yieldVault.balanceOf(_vault_));
 
-    if (totalAssets > withdrawableAssets) {
-      assertApproxEqAbs(availableBalanceOf, totalAssets - withdrawableAssets, _delta_, "yield");
-    } else {
+    if (withdrawableAssets >= totalAssets) {
       assertApproxEqAbs(availableBalanceOf, withdrawableAssets - totalAssets, _delta_, "yield");
+    } else {
+      assertApproxEqAbs(availableBalanceOf, underlyingToken.balanceOf(_vault_), _delta_, "yield");
     }
   }
 
-  function test_availableBalanceOf(Init memory init, uint shares, uint allowance) public virtual {
+  function test_availableBalanceOf(Init memory init, uint shares) public virtual {
     setUpVault(init);
 
     // We mint underlying assets to the YieldVault to generate yield
     uint256 yield = bound(shares, 0, 10000 * 1000);
     underlyingToken.mint(address(yieldVault), yield);
 
+    console2.log("yield", yield);
+
     address caller = init.user[0];
     shares = bound(shares, 0, _max_mint(caller));
-    propAvailableBalanceOf(caller, yield);
+    propAvailableBalanceOf(caller);
+  }
+
+  /* ============ targetOf ============ */
+  function testTargetOf() public {
+    address target = vault.targetOf(address(prizeToken));
+    assertEq(target, address(prizePool));
+  }
+
+  function testTargetOfFail() public {
+    vm.expectRevert(bytes("Vault/target-token-unsupported"));
+    vault.targetOf(address(underlyingToken));
+  }
+
+  /* ============ Claimer ============ */
+  /* ============ disableAutoClaim ============ */
+  function testDisableAutoClaimFalse() public {
+    bool disable = false;
+
+    vm.expectEmit(true, true, true, true);
+    emit AutoClaimDisabled(address(this), disable);
+
+    bool status = vault.disableAutoClaim(disable);
+
+    assertEq(status, disable);
+    assertEq(vault.autoClaimDisabled(address(this)), disable);
+  }
+
+  function testDisableAutoClaimTrue() public {
+    bool disable = true;
+
+    vm.expectEmit(true, true, true, true);
+    emit AutoClaimDisabled(address(this), disable);
+
+    bool status = vault.disableAutoClaim(disable);
+
+    assertEq(status, disable);
+    assertEq(vault.autoClaimDisabled(address(this)), disable);
+  }
+
+  /* ============ setClaimer ============ */
+  function testSetClaimer() public {
+    address newClaimer = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+
+    vm.expectEmit(true, true, true, true);
+    emit ClaimerSet(address(this), newClaimer);
+
+    address _newClaimer = vault.setClaimer(newClaimer);
+
+    assertEq(_newClaimer, newClaimer);
+  }
+
+  function testSetClaimerOnlyOwner() public {
+    address newClaimer = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+
+    vm.prank(newClaimer);
+
+    vm.expectRevert(bytes("Ownable/caller-not-owner"));
+    vault.setClaimer(newClaimer);
+
+    vm.stopPrank();
+  }
+
+  /* ============ claimPrize ============ */
+  function testClaimPrize() public {
+    vm.warp(prizePool.drawStartedAt() + drawPeriodSeconds);
+    prizePool.completeAndStartNextDraw(winningRandomNumber);
+
+    address user = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+
+    vault.claimPrize(user, uint8(1));
   }
 }
