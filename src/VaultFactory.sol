@@ -3,24 +3,22 @@ pragma solidity 0.8.17;
 
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
-import { LiquidationPair } from "v5-liquidator/src/LiquidationPair.sol";
-import { PrizePool } from "v5-prize-pool/src/PrizePool.sol";
+import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
+import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
+import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { Vault } from "./Vault.sol";
 
 contract VaultFactory {
-    /* ============ Events ============ */
+  /* ============ Events ============ */
 
   /**
    * @notice Emitted when a new Vault has been deployed by this factory.
    * @param vaultFactory Address of the VaultFactory that deployed `vault`
    * @param vault Address of the vault that was deployed
    */
-  event NewFactoryVault(
-    Vault indexed vault,
-    VaultFactory indexed vaultFactory
-  );
+  event NewFactoryVault(Vault indexed vault, VaultFactory indexed vaultFactory);
 
   /* ============ Variables ============ */
 
@@ -43,7 +41,6 @@ contract VaultFactory {
    * @param _symbol Symbol of the ERC20 share minted by the vault
    * @param _twabController Address of the TwabController used to keep track of balances
    * @param _yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
-   * @param _liquidationPair Address of the LiquidationPair used to liquidate yield for prize token
    * @param _prizePool Address of the PrizePool that computes prizes
    * @param _claimer Address of the claimer
    * @param _owner Address that will gain ownership of this contract
@@ -54,9 +51,8 @@ contract VaultFactory {
     string memory _symbol,
     TwabController _twabController,
     IERC4626 _yieldVault,
-    LiquidationPair _liquidationPair,
     PrizePool _prizePool,
-    address _claimer,
+    Claimer _claimer,
     address _owner
   ) external {
     Vault _vault = new Vault(
@@ -65,7 +61,6 @@ contract VaultFactory {
       _symbol,
       _twabController,
       _yieldVault,
-      _liquidationPair,
       _prizePool,
       _claimer,
       _owner
@@ -80,8 +75,8 @@ contract VaultFactory {
   /**
    * @notice Total number of vaults deployed by this factory.
    * @return Number of vaults deployed by this factory.
-  */
+   */
   function totalVaults() external view returns (uint256) {
-      return allVaults.length;
+    return allVaults.length;
   }
 }

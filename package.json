@@ -13,7 +13,7 @@
   "scripts": {
     "clean": "forge clean",
     "compile": "forge compile",
-    "coverage": "forge coverage --report lcov && lcov --remove lcov.info -o lcov.info 'test/contracts/mock/*' 'test/fork' 'test/unit' 'script/*' && genhtml lcov.info -o coverage",
+    "coverage": "forge coverage --report lcov && lcov --extract lcov.info -o lcov.info 'src/*' && genhtml lcov.info -o coverage",
     "format": "prettier --config .prettierrc --write \"**/*.{json,md,sol,yml}\"",
     "format:file": "prettier --config .prettierrc --write",
     "hint": "solhint --config \"./.solhint.json\" \"{src,test}/**/*.sol\"",
