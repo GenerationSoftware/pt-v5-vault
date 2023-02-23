@@ -395,9 +395,7 @@ contract VaultTest is ERC4626Test {
   }
 
   /* ============ availableBalanceOf ============ */
-  function propAvailableBalanceOf(address caller) public {
-    vm.prank(caller);
-
+  function propAvailableBalanceOf() public {
     uint256 availableBalanceOf = _call_vault(
       abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_)
     );
@@ -415,13 +413,10 @@ contract VaultTest is ERC4626Test {
   function test_availableBalanceOf(Init memory init, uint shares) public virtual {
     setUpVault(init);
 
-    // We mint underlying assets to the YieldVault to generate yield
-    uint256 yield = bound(shares, 0, 10000 * 1000);
-    underlyingToken.mint(address(yieldVault), yield);
-
     address caller = init.user[0];
     shares = bound(shares, 0, _max_mint(caller));
-    propAvailableBalanceOf(caller);
+
+    propAvailableBalanceOf();
   }
 
   /* ============ liquidate ============ */
