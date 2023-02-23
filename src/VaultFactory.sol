@@ -44,6 +44,7 @@ contract VaultFactory {
    * @param _prizePool Address of the PrizePool that computes prizes
    * @param _claimer Address of the claimer
    * @param _owner Address that will gain ownership of this contract
+   * @return address Address of the newly deployed Vault
    */
   function deployVault(
     IERC20 _asset,
@@ -54,7 +55,7 @@ contract VaultFactory {
     PrizePool _prizePool,
     Claimer _claimer,
     address _owner
-  ) external {
+  ) external returns (address) {
     Vault _vault = new Vault(
       _asset,
       _name,
@@ -70,6 +71,8 @@ contract VaultFactory {
     deployedVaults[_vault] = true;
 
     emit NewFactoryVault(_vault, VaultFactory(address(this)));
+
+    return address(_vault);
   }
 
   /**
