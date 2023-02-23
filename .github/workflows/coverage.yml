@@ -35,7 +35,7 @@ jobs:
         env:
           MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
         run: |
-          forge coverage --report lcov && lcov --remove lcov.info -o lcov.info 'test/contracts/mock/*' 'test/fork' 'test/unit' 'script/*'
+          forge coverage --report lcov && lcov --extract lcov.info -o lcov.info 'src/*'
         id: coverage
 
       - name: Report code coverage
