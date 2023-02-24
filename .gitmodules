@@ -1,4 +1,29 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-	branch = v1.3.0
+	branch = v1.4.0
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts
+	url = https://github.com/openzeppelin/openzeppelin-contracts
+	branch = v4.8.1
+[submodule "lib/erc4626-tests"]
+	path = lib/erc4626-tests
+	url = https://github.com/a16z/erc4626-tests
+[submodule "lib/v5-twab-controller"]
+	path = lib/v5-twab-controller
+	url = https://github.com/pooltogether/v5-twab-controller
+	branch = pool-2557-twabcontroller-tweaks
+[submodule "lib/v5-liquidator"]
+	path = lib/v5-liquidator
+	url = https://github.com/pooltogether/v5-liquidator
+[submodule "lib/v5-prize-pool"]
+	path = lib/v5-prize-pool
+	url = https://github.com/pooltogether/v5-prize-pool
+	branch = pool-2554-prize-pool
+[submodule "lib/owner-manager-contracts"]
+	path = lib/owner-manager-contracts
+	url = https://github.com/pooltogether/owner-manager-contracts
+	branch = v1.1.0
+[submodule "lib/v5-vrgda-claimer"]
+	path = lib/v5-vrgda-claimer
+	url = https://github.com/pooltogether/v5-vrgda-claimer

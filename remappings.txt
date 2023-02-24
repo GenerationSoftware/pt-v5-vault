@@ -1,2 +1,16 @@
+ds-test/=lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/erc4626-tests/
 forge-std/=lib/forge-std/src/
+
+openzeppelin/=lib/openzeppelin-contracts/contracts/
+owner-manager-contracts/=lib/owner-manager-contracts/contracts/
+
+v5-liquidator/=lib/v5-liquidator/src/
+v5-liquidator-interfaces/=lib/v5-liquidator/src/interfaces/
+v5-liquidator-libraries/=lib/v5-liquidator/src/libraries/
+v5-prize-pool/=lib/v5-prize-pool/src/
+v5-prize-pool-test/=lib/v5-prize-pool/test
+v5-twab-controller/=lib/v5-twab-controller/src/
+v5-vrgda-claimer/=lib/v5-vrgda-claimer/src/
+
 src/=src/
