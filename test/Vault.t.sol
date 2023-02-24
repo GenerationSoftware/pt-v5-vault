@@ -598,24 +598,9 @@ contract VaultTest is ERC4626Test {
 
   /* ============ claimPrize ============ */
   function testClaimPrize() public {
-    uint256 _amount = 100;
-
-    IMockERC20(_underlying_).mint(user, _amount);
-
-    vm.startPrank(user);
-
-    underlyingToken.approve(address(vault), type(uint256).max);
-    vault.deposit(_amount, user);
-
-    vm.stopPrank();
-
-    vm.warp(prizePool.nextDrawStartsAt() + 1);
-    prizePool.completeAndStartNextDraw(winningRandomNumber);
-
     vm.startPrank(address(claimer));
 
     mockPrizePoolClaimPrize(user, uint8(1), user, 1e18, address(claimer));
-
     vault.claimPrize(user, uint8(1), user, 1e18, address(claimer));
 
     vm.stopPrank();
@@ -624,45 +609,17 @@ contract VaultTest is ERC4626Test {
   function testClaimPrizeClaimerNotSet() public {
     vault.setClaimer(Claimer(address(0)));
 
-    uint256 _amount = 100;
     address _randomUser = address(0xFf107770b6a31261836307218997C66c34681B5A);
-
-    IMockERC20(_underlying_).mint(user, _amount);
-
-    vm.startPrank(user);
-
-    underlyingToken.approve(address(vault), type(uint256).max);
-    vault.deposit(_amount, user);
-
-    vm.stopPrank();
-
-    vm.warp(prizePool.nextDrawStartsAt() + 1);
-    prizePool.completeAndStartNextDraw(winningRandomNumber);
 
     vm.startPrank(_randomUser);
 
     mockPrizePoolClaimPrize(user, uint8(1), user, 0, address(0));
-
     vault.claimPrize(user, uint8(1), user, 0, address(0));
 
     vm.stopPrank();
   }
 
   function testClaimPrizeCallerNotClaimer() public {
-    uint256 _amount = 100;
-
-    IMockERC20(_underlying_).mint(user, _amount);
-
-    vm.startPrank(user);
-
-    underlyingToken.approve(address(vault), type(uint256).max);
-    vault.deposit(100, user);
-
-    vm.stopPrank();
-
-    vm.warp(prizePool.nextDrawStartsAt());
-    prizePool.completeAndStartNextDraw(winningRandomNumber);
-
     vm.startPrank(user);
 
     vm.expectRevert(bytes("Vault/caller-not-claimer"));
@@ -672,21 +629,11 @@ contract VaultTest is ERC4626Test {
   }
 
   function testClaimPrizeAutoClaimDisabled() public {
-    uint256 _amount = 100;
-
-    IMockERC20(_underlying_).mint(user, _amount);
-
     vm.startPrank(user);
 
     vault.disableAutoClaim(true);
 
-    underlyingToken.approve(address(vault), type(uint256).max);
-    vault.deposit(100, user);
-
     vm.stopPrank();
-
-    vm.warp(prizePool.nextDrawStartsAt() + 1);
-    prizePool.completeAndStartNextDraw(winningRandomNumber);
 
     vm.startPrank(address(claimer));
 
@@ -698,7 +645,6 @@ contract VaultTest is ERC4626Test {
     vm.startPrank(user);
 
     mockPrizePoolClaimPrize(user, uint8(1), user, 0, address(0));
-
     vault.claimPrize(user, uint8(1), user, 0, address(0));
 
     vm.stopPrank();
