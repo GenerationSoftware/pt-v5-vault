@@ -72,6 +72,15 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     LiquidationPair newLiquidationPair
   );
 
+  /**
+   * @notice Emitted when a user sponsor the Vault.
+   * @param caller Address that called the function
+   * @param receiver Address receiving the Vault shares
+   * @param assets Amount of assets deposited into the Vault
+   * @param shares Amount of shares minted to `receiver`
+   */
+  event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+
   /* ============ Variables ============ */
 
   /// @notice Address of the TwabController used to keep track of balances.
@@ -192,6 +201,26 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
    */
   function maxMint(address) public view virtual override returns (uint256) {
     return type(uint112).max;
+  }
+
+  /**
+   * @notice Deposit assets into the Vault and delegate to the sponsorship address.
+   * @param _assets Amount of assets to deposit
+   * @param _receiver Address of the receiver of the assets
+   * @return uint256 Amount of shares minted to `_receiver`.
+   */
+  function sponsor(uint256 _assets, address _receiver) external returns (uint256) {
+    uint256 _shares = super.deposit(_assets, _receiver);
+
+    if (
+      _twabController.delegateOf(address(this), _receiver) != _twabController.SPONSORSHIP_ADDRESS()
+    ) {
+      _twabController.sponsor(_receiver);
+    }
+
+    emit Sponsor(msg.sender, _receiver, _assets, _shares);
+
+    return _shares;
   }
 
   /// @inheritdoc ERC4626

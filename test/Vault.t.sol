@@ -45,6 +45,8 @@ contract VaultTest is ERC4626Test {
     LiquidationPair newLiquidationPair
   );
 
+  event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+
   /* ============ Variables ============ */
   address user = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
 
@@ -354,6 +356,39 @@ contract VaultTest is ERC4626Test {
     shares = bound(shares, 0, _max_mint(caller));
     _approve(_underlying_, caller, _vault_, allowance);
     propMint(caller, receiver, shares);
+  }
+
+  /* ============ Sponsor ============ */
+  function testSponsor() public {
+    vm.startPrank(_vault_);
+
+    uint256 _amount = 1000e18;
+    underlyingToken.mint(address(this), _amount);
+
+    changePrank(address(this));
+
+    vm.expectEmit(true, true, true, true);
+    emit Sponsor(address(this), address(this), _amount, _amount);
+
+    underlyingToken.approve(_vault_, _amount);
+    vault.sponsor(_amount, address(this));
+
+    assertEq(IERC20(vault).balanceOf(address(this)), _amount);
+    assertEq(vault.balanceOf(address(this)), _amount);
+
+    assertEq(twabController.balanceOf(_vault_, address(this)), _amount);
+    assertEq(twabController.delegateBalanceOf(_vault_, address(this)), 0);
+
+    address _sponsorshipAddress = twabController.SPONSORSHIP_ADDRESS();
+
+    assertEq(vault.balanceOf(_sponsorshipAddress), 0);
+    assertEq(twabController.delegateBalanceOf(_vault_, _sponsorshipAddress), 0);
+
+    assertEq(underlyingToken.balanceOf(address(yieldVault)), _amount);
+    assertEq(IERC20(yieldVault).balanceOf(_vault_), _amount);
+    assertEq(yieldVault.balanceOf(_vault_), _amount);
+
+    vm.stopPrank();
   }
 
   /* ============ Transfer ============ */
