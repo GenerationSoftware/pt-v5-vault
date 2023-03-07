@@ -1,7 +1,7 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-	branch = v1.4.0
+	branch = v1.5.0
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
@@ -12,14 +12,12 @@
 [submodule "lib/v5-twab-controller"]
 	path = lib/v5-twab-controller
 	url = https://github.com/pooltogether/v5-twab-controller
-	branch = pool-2557-twabcontroller-tweaks
 [submodule "lib/v5-liquidator"]
 	path = lib/v5-liquidator
 	url = https://github.com/pooltogether/v5-liquidator
 [submodule "lib/v5-prize-pool"]
 	path = lib/v5-prize-pool
 	url = https://github.com/pooltogether/v5-prize-pool
-	branch = pool-2554-prize-pool
 [submodule "lib/owner-manager-contracts"]
 	path = lib/owner-manager-contracts
 	url = https://github.com/pooltogether/owner-manager-contracts
