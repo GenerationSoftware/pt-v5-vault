@@ -164,13 +164,6 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     return _availableBalanceOf(_token);
   }
 
-  /// @inheritdoc ERC20
-  function balanceOf(
-    address _account
-  ) public view virtual override(ERC20, IERC20) returns (uint256) {
-    return _balanceOf(_account);
-  }
-
   /**
    * @inheritdoc ERC4626
    * @dev The total amount of assets managed by this vault is equal to
@@ -178,11 +171,6 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
    */
   function totalAssets() public view virtual override returns (uint256) {
     return _assetSupplyBalance + super.totalAssets();
-  }
-
-  /// @inheritdoc ERC20
-  function totalSupply() public view virtual override(ERC20, IERC20) returns (uint256) {
-    return _twabController.totalSupply(address(this));
   }
 
   /**
@@ -223,26 +211,6 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     return _shares;
   }
 
-  /// @inheritdoc ERC4626
-  function withdraw(
-    uint256 _assets,
-    address _receiver,
-    address _owner
-  ) public virtual override returns (uint256) {
-    _withdrawFromYieldVault(_assets);
-    return super.withdraw(_assets, _receiver, _owner);
-  }
-
-  /// @inheritdoc ERC4626
-  function redeem(
-    uint256 _shares,
-    address _receiver,
-    address _owner
-  ) public virtual override returns (uint256) {
-    _withdrawFromYieldVault(convertToAssets(_shares));
-    return super.redeem(_shares, _receiver, _owner);
-  }
-
   /**
    * @inheritdoc ILiquidationSource
    * @dev User provides prize tokens and receives in exchange Vault shares.
@@ -258,8 +226,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     require(_tokenIn == address(_prizePool.prizeToken()), "Vault/tokenIn-not-prizeToken");
     require(_tokenOut == address(this), "Vault/tokenOut-not-vaultShare");
 
-    uint256 _availableBalance = availableBalanceOf(_tokenOut);
-    require(_availableBalance >= _amountOut, "Vault/amount-gt-available-yield");
+    require(availableBalanceOf(_tokenOut) >= _amountOut, "Vault/amount-gt-available-yield");
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
     _mint(_account, _amountOut);
@@ -432,14 +399,6 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Get balance of `_account`.
-   * @param _account Address to retrieve the balance from
-   */
-  function _balanceOf(address _account) internal view returns (uint256) {
-    return _twabController.balanceOf(address(this), _account);
-  }
-
-  /**
    * @notice Deposit/mint common workflow.
    * @dev If there are currently some underlying assets in the vault,
    *      we only transfer the difference from the user wallet into the vault.
@@ -485,38 +444,61 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
       );
     }
 
-    _depositIntoYieldVault(_assets);
+    _yieldVault.deposit(_assets, address(this));
+    _assetSupplyBalance += _assets;
+
     _mint(_receiver, _shares);
 
     emit Deposit(_caller, _receiver, _assets, _shares);
   }
 
-  /**
-   * @notice Creates `_shares` tokens and assigns them to `_account`, increasing the total supply.
-   * @dev Emits a {Transfer} event with `from` set to the zero address.
-   * @dev `_account` cannot be the zero address.
-   */
-  function _mint(address _account, uint256 _shares) internal virtual override {
-    require(_account != address(0), "Vault/mint-to-zero-address");
+  /// @dev Withdraw/redeem common workflow.
+  function _withdraw(
+    address _caller,
+    address _receiver,
+    address _owner,
+    uint256 _assets,
+    uint256 _shares
+  ) internal virtual override {
+    if (_caller != _owner) {
+      _spendAllowance(_owner, _caller, _shares);
+    }
 
-    _twabController.twabMint(_account, uint112(_shares));
-    emit Transfer(address(0), _account, _shares);
+    // If _asset is ERC777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
+    // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
+    // calls the vault, which is assumed not malicious.
+    //
+    // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
+    // shares are burned and after the assets are transferred, which is a valid state.
+    _burn(_owner, _shares);
+
+    _yieldVault.withdraw(_assets, address(this), address(this));
+    _assetSupplyBalance -= _assets;
+
+    SafeERC20.safeTransfer(IERC20(asset()), _receiver, _assets);
+
+    emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
   }
 
   /**
-   * @notice Destroys `_shares` tokens from `_account`, reducing the total supply.
-   * @dev Emits a {Transfer} event with `to` set to the zero address.
-   * @dev `_account` cannot be the zero address.
-   * @dev `_account` must have at least `_shares` tokens.
+   * @notice Creates `_shares` tokens and assigns them to `_receiver`, increasing the total supply.
+   * @dev Emits a {Transfer} event with `from` set to the zero address.
+   * @dev `_receiver` cannot be the zero address.
    */
-  function _burn(address _account, uint256 _shares) internal virtual override {
-    require(_account != address(0), "Vault/burn-not-zero-address");
+  function _mint(address _receiver, uint256 _shares) internal virtual override {
+    _twabController.twabMint(_receiver, uint112(convertToAssets(_shares)));
+    super._mint(_receiver, _shares);
+  }
 
-    uint256 _accountBalance = _balanceOf(_account);
-    require(_accountBalance >= _shares, "Vault/burn-amount-gt-balance");
-
-    _twabController.twabBurn(_account, uint112(_shares));
-    emit Transfer(_account, address(0), _shares);
+  /**
+   * @notice Destroys `_shares` tokens from `_owner`, reducing the total supply.
+   * @dev Emits a {Transfer} event with `to` set to the zero address.
+   * @dev `_owner` cannot be the zero address.
+   * @dev `_owner` must have at least `_shares` tokens.
+   */
+  function _burn(address _owner, uint256 _shares) internal virtual override {
+    _twabController.twabBurn(_owner, uint112(convertToAssets(_shares)));
+    super._burn(_owner, _shares);
   }
 
   /**
@@ -526,31 +508,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
    * @dev `_from` must have a balance of at least `_shares`.
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
-    require(_from != address(0), "Vault/from-not-zero-address");
-    require(_to != address(0), "Vault/to-not-zero-address");
-
-    uint256 _fromBalance = _balanceOf(_from);
-    require(_fromBalance >= _shares, "Vault/transfer-amount-gt-balance");
-
-    _twabController.twabTransfer(_from, _to, uint112(_shares));
-    emit Transfer(_from, _to, _shares);
-  }
-
-  /**
-   * @notice Increase `_assetSupplyBalance` and deposit `_assets` into YieldVault
-   * @param _assets Amount of underlying assets to transfer
-   */
-  function _depositIntoYieldVault(uint256 _assets) internal {
-    _assetSupplyBalance += _assets;
-    _yieldVault.deposit(_assets, address(this));
-  }
-
-  /**
-   * @notice Decrease `_assetSupplyBalance` and withdraw `_assets` from YieldVault
-   * @param _assets Amount of underlying assets to withdraw
-   */
-  function _withdrawFromYieldVault(uint256 _assets) internal {
-    _assetSupplyBalance -= _assets;
-    _yieldVault.withdraw(_assets, address(this), address(this));
+    _twabController.twabTransfer(_from, _to, uint112(convertToAssets(_shares)));
+    super._transfer(_from, _to, _shares);
   }
 }

@@ -24,7 +24,6 @@ import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
 contract VaultTest is ERC4626Test {
   /* ============ Events ============ */
-
   event NewVault(
     IERC20 indexed asset,
     string name,
