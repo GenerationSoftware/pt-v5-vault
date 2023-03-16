@@ -221,7 +221,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     uint256 _amountIn,
     address _tokenOut,
     uint256 _amountOut
-  ) external override returns (bool) {
+  ) public virtual override returns (bool) {
     require(msg.sender == address(_liquidationPair), "Vault/caller-not-LP");
     require(_tokenIn == address(_prizePool.prizeToken()), "Vault/tokenIn-not-prizeToken");
     require(_tokenOut == address(this), "Vault/tokenOut-not-vaultShare");
@@ -333,7 +333,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
    * @notice Address of the TwabController keeping track of balances.
    * @return address TwabController address
    */
-  function twabController() external view returns (address) {
+  function twabController() public view returns (address) {
     return address(_twabController);
   }
 
@@ -341,7 +341,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
    * @notice Address of the ERC4626 vault generating yield.
    * @return address YieldVault address
    */
-  function yieldVault() external view returns (address) {
+  function yieldVault() public view returns (address) {
     return address(_yieldVault);
   }
 
@@ -349,7 +349,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
    * @notice Address of the LiquidationPair used to liquidate yield for prize token.
    * @return address LiquidationPair address
    */
-  function liquidationPair() external view returns (address) {
+  function liquidationPair() public view returns (address) {
     return address(_liquidationPair);
   }
 
@@ -357,7 +357,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
    * @notice Address of the PrizePool that computes prizes.
    * @return address PrizePool address
    */
-  function prizePool() external view returns (address) {
+  function prizePool() public view returns (address) {
     return address(_prizePool);
   }
 
@@ -365,7 +365,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
    * @notice Address of the claimer.
    * @return address Claimer address
    */
-  function claimer() external view returns (address) {
+  function claimer() public view returns (address) {
     return address(_claimer);
   }
 
