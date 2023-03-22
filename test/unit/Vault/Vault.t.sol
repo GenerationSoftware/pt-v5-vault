@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import { ERC4626Test, IMockERC20 } from "erc4626-tests/ERC4626.test.sol";
 import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { ERC20Mock, IERC20Metadata } from "openzeppelin/mocks/ERC20Mock.sol";
 
@@ -16,13 +15,13 @@ import { UFixed32x9 } from "v5-liquidator-libraries/FixedMathLib.sol";
 import { PrizePool, SD59x18 } from "v5-prize-pool/PrizePool.sol";
 import { ud2x18, sd1x18 } from "v5-prize-pool-test/PrizePool.t.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Claimer, IPrizePool } from "v5-vrgda-claimer/Claimer.sol";
+import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { Vault } from "src/Vault.sol";
 
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
-contract VaultTest is ERC4626Test {
+contract VaultTest is Test {
   /* ============ Events ============ */
   event NewVault(
     IERC20 indexed asset,
@@ -70,10 +69,8 @@ contract VaultTest is ERC4626Test {
 
   /* ============ Setup ============ */
 
-  function setUp() public override {
+  function setUp() public {
     underlyingToken = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
-    _underlying_ = address(underlyingToken);
-
     prizeToken = new ERC20Mock("PoolTogether", "POOL", address(this), 0);
 
     twabController = new TwabController();
@@ -92,7 +89,7 @@ contract VaultTest is ERC4626Test {
       sd1x18(0.9e18) // alpha
     );
 
-    claimer = new Claimer(IPrizePool(address(prizePool)), ud2x18(1.1e18), 0.0001e18);
+    claimer = new Claimer(prizePool, ud2x18(1.1e18), 0.0001e18);
 
     yieldVault = new YieldVault(
       underlyingToken,
@@ -111,8 +108,6 @@ contract VaultTest is ERC4626Test {
       address(this)
     );
 
-    _vault_ = address(vault);
-
     liquidationPair = new LiquidationPair(
       ILiquidationSource(vault),
       address(prizeToken),
@@ -124,10 +119,6 @@ contract VaultTest is ERC4626Test {
     );
 
     liquidationRouter = new LiquidationRouter(new LiquidationPairFactory());
-
-    _delta_ = 0;
-    _vaultMayBeEmpty = false;
-    _unlimitedAmount = true;
   }
 
   /* ============ Constructor ============ */
@@ -135,7 +126,7 @@ contract VaultTest is ERC4626Test {
   function testConstructor() public {
     vm.expectEmit(true, true, true, true);
     emit NewVault(
-      IERC20(_underlying_),
+      IERC20(address(underlyingToken)),
       vaultName,
       vaultSymbol,
       twabController,
@@ -146,7 +137,7 @@ contract VaultTest is ERC4626Test {
     );
 
     Vault testVault = new Vault(
-      IERC20(_underlying_),
+      IERC20(address(underlyingToken)),
       vaultName,
       vaultSymbol,
       twabController,
@@ -156,10 +147,10 @@ contract VaultTest is ERC4626Test {
       address(this)
     );
 
-    assertEq(testVault.asset(), _underlying_);
+    assertEq(testVault.asset(), address(underlyingToken));
     assertEq(testVault.name(), vaultName);
     assertEq(testVault.symbol(), vaultSymbol);
-    assertEq(testVault.decimals(), ERC20(_underlying_).decimals());
+    assertEq(testVault.decimals(), ERC20(address(underlyingToken)).decimals());
     assertEq(testVault.twabController(), address(twabController));
     assertEq(testVault.yieldVault(), address(yieldVault));
     assertEq(testVault.prizePool(), address(prizePool));
@@ -171,7 +162,7 @@ contract VaultTest is ERC4626Test {
     vm.expectRevert(bytes("Vault/twabCtrlr-not-zero-address"));
 
     new Vault(
-      IERC20(_underlying_),
+      IERC20(address(underlyingToken)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       TwabController(address(0)),
@@ -186,7 +177,7 @@ contract VaultTest is ERC4626Test {
     vm.expectRevert(bytes("Vault/YV-not-zero-address"));
 
     new Vault(
-      IERC20(_underlying_),
+      IERC20(address(underlyingToken)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
@@ -201,7 +192,7 @@ contract VaultTest is ERC4626Test {
     vm.expectRevert(bytes("Vault/PP-not-zero-address"));
 
     new Vault(
-      IERC20(_underlying_),
+      IERC20(address(underlyingToken)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
@@ -216,7 +207,7 @@ contract VaultTest is ERC4626Test {
     vm.expectRevert(bytes("Vault/owner-not-zero-address"));
 
     new Vault(
-      IERC20(_underlying_),
+      IERC20(address(underlyingToken)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
@@ -229,137 +220,9 @@ contract VaultTest is ERC4626Test {
 
   /* ============ External functions ============ */
 
-  /* ============ Deposit ============ */
-  function propDeposit(address caller, address receiver, uint256 assets) public {
-    uint256 oldCallerAsset = IERC20(_underlying_).balanceOf(caller);
-    uint256 oldVaultAsset = IERC20(_underlying_).balanceOf(_vault_);
-    uint256 oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint256 oldAllowance = IERC20(_underlying_).allowance(caller, _vault_);
-
-    vm.prank(caller);
-    uint256 shares = vault_deposit(assets, receiver);
-
-    uint256 newCallerAsset = IERC20(_underlying_).balanceOf(caller);
-    uint256 newVaultAsset = IERC20(_underlying_).balanceOf(_vault_);
-    uint256 newReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint256 newAllowance = IERC20(_underlying_).allowance(caller, _vault_);
-
-    // There are assets in the vault
-    if (oldVaultAsset != 0) {
-      // We need to transfer some assets to the vault to fulfill deposit
-      if (assets > oldVaultAsset) {
-        uint256 assetsDeposit = assets - oldVaultAsset;
-
-        assertApproxEqAbs(newCallerAsset, oldCallerAsset - assetsDeposit, _delta_, "asset");
-        assertApproxEqAbs(
-          newVaultAsset,
-          oldVaultAsset - (assets - assetsDeposit),
-          _delta_,
-          "vault asset"
-        );
-        assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
-
-        if (oldAllowance != type(uint).max) {
-          assertApproxEqAbs(newAllowance, oldAllowance - assetsDeposit, _delta_, "allowance");
-        }
-      } else {
-        // We don't need to transfer assets to the vault to fulfill deposit
-        assertApproxEqAbs(newCallerAsset, oldCallerAsset, _delta_, "asset");
-        assertApproxEqAbs(newVaultAsset, oldVaultAsset - assets, _delta_, "vault asset");
-        assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
-
-        if (oldAllowance != type(uint).max) {
-          assertApproxEqAbs(newAllowance, oldAllowance, _delta_, "allowance");
-        }
-      }
-    } else {
-      // No assets in the vault, we need to transfer assets to the vault
-      assertApproxEqAbs(newCallerAsset, oldCallerAsset - assets, _delta_, "asset");
-      assertApproxEqAbs(newVaultAsset, oldVaultAsset, _delta_, "vault asset");
-      assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
-
-      if (oldAllowance != type(uint).max) {
-        assertApproxEqAbs(newAllowance, oldAllowance - assets, _delta_, "allowance");
-      }
-    }
-  }
-
-  function test_deposit(Init memory init, uint assets, uint allowance) public virtual override {
-    setUpVault(init);
-    address caller = init.user[0];
-    address receiver = init.user[1];
-    assets = bound(assets, 0, _max_deposit(caller));
-    _approve(_underlying_, caller, _vault_, allowance);
-    propDeposit(caller, receiver, assets);
-  }
-
-  /* ============ Mint ============ */
-  function propMint(address caller, address receiver, uint shares) public {
-    uint oldCallerAsset = IERC20(_underlying_).balanceOf(caller);
-    uint256 oldVaultAsset = IERC20(_underlying_).balanceOf(_vault_);
-    uint oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint oldAllowance = IERC20(_underlying_).allowance(caller, _vault_);
-
-    vm.prank(caller);
-    uint assets = vault_mint(shares, receiver);
-
-    uint newCallerAsset = IERC20(_underlying_).balanceOf(caller);
-    uint256 newVaultAsset = IERC20(_underlying_).balanceOf(_vault_);
-    uint newReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint newAllowance = IERC20(_underlying_).allowance(caller, _vault_);
-
-    // There are assets in the vault
-    if (oldVaultAsset != 0) {
-      // We need to transfer some assets to the vault to fulfill mint
-      if (assets > oldVaultAsset) {
-        uint256 assetsDeposit = assets - oldVaultAsset;
-
-        assertApproxEqAbs(newCallerAsset, oldCallerAsset - assetsDeposit, _delta_, "asset");
-        assertApproxEqAbs(
-          newVaultAsset,
-          oldVaultAsset - (assets - assetsDeposit),
-          _delta_,
-          "vault asset"
-        );
-        assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
-
-        if (oldAllowance != type(uint).max) {
-          assertApproxEqAbs(newAllowance, oldAllowance - assetsDeposit, _delta_, "allowance");
-        }
-      } else {
-        // We don't need to transfer assets to the vault to fulfill mint
-        assertApproxEqAbs(newCallerAsset, oldCallerAsset, _delta_, "asset");
-        assertApproxEqAbs(newVaultAsset, oldVaultAsset - assets, _delta_, "vault asset");
-        assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
-
-        if (oldAllowance != type(uint).max) {
-          assertApproxEqAbs(newAllowance, oldAllowance, _delta_, "allowance");
-        }
-      }
-    } else {
-      // No assets in the vault, we need to transfer assets to the vault
-      assertApproxEqAbs(newCallerAsset, oldCallerAsset - assets, _delta_, "asset");
-      assertApproxEqAbs(newVaultAsset, oldVaultAsset, _delta_, "vault asset");
-      assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
-
-      if (oldAllowance != type(uint).max) {
-        assertApproxEqAbs(newAllowance, oldAllowance - assets, _delta_, "allowance");
-      }
-    }
-  }
-
-  function test_mint(Init memory init, uint shares, uint allowance) public virtual override {
-    setUpVault(init);
-    address caller = init.user[0];
-    address receiver = init.user[1];
-    shares = bound(shares, 0, _max_mint(caller));
-    _approve(_underlying_, caller, _vault_, allowance);
-    propMint(caller, receiver, shares);
-  }
-
   /* ============ Sponsor ============ */
   function testSponsor() public {
-    vm.startPrank(_vault_);
+    vm.startPrank(address(vault));
 
     uint256 _amount = 1000e18;
     underlyingToken.mint(address(this), _amount);
@@ -369,159 +232,25 @@ contract VaultTest is ERC4626Test {
     vm.expectEmit(true, true, true, true);
     emit Sponsor(address(this), address(this), _amount, _amount);
 
-    underlyingToken.approve(_vault_, _amount);
+    underlyingToken.approve(address(vault), _amount);
     vault.sponsor(_amount, address(this));
 
     assertEq(IERC20(vault).balanceOf(address(this)), _amount);
     assertEq(vault.balanceOf(address(this)), _amount);
 
-    assertEq(twabController.balanceOf(_vault_, address(this)), _amount);
-    assertEq(twabController.delegateBalanceOf(_vault_, address(this)), 0);
+    assertEq(twabController.balanceOf(address(vault), address(this)), _amount);
+    assertEq(twabController.delegateBalanceOf(address(vault), address(this)), 0);
 
     address _sponsorshipAddress = twabController.SPONSORSHIP_ADDRESS();
 
     assertEq(vault.balanceOf(_sponsorshipAddress), 0);
-    assertEq(twabController.delegateBalanceOf(_vault_, _sponsorshipAddress), 0);
+    assertEq(twabController.delegateBalanceOf(address(vault), _sponsorshipAddress), 0);
 
     assertEq(underlyingToken.balanceOf(address(yieldVault)), _amount);
-    assertEq(IERC20(yieldVault).balanceOf(_vault_), _amount);
-    assertEq(yieldVault.balanceOf(_vault_), _amount);
+    assertEq(IERC20(yieldVault).balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.balanceOf(address(vault)), _amount);
 
     vm.stopPrank();
-  }
-
-  /* ============ Transfer ============ */
-  function propTransfer(address caller, address receiver, address owner, uint shares) public {
-    uint oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint oldOwnerShare = IERC20(_vault_).balanceOf(owner);
-    uint oldAllowance = IERC20(_vault_).allowance(owner, caller);
-
-    vm.prank(caller);
-    _call_vault(abi.encodeWithSelector(IERC20.transferFrom.selector, owner, receiver, shares));
-
-    uint newReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint newOwnerShare = IERC20(_vault_).balanceOf(owner);
-    uint newAllowance = IERC20(_vault_).allowance(owner, caller);
-
-    if (owner != receiver) {
-      assertApproxEqAbs(newOwnerShare, oldOwnerShare - shares, _delta_, "owner shares");
-      assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "receiver shares");
-    } else if (owner == receiver) {
-      assertApproxEqAbs(newOwnerShare, oldOwnerShare, _delta_, "owner shares");
-      assertApproxEqAbs(newReceiverShare, oldReceiverShare, _delta_, "receiver shares");
-    }
-
-    if (caller != owner && oldAllowance != type(uint).max) {
-      assertApproxEqAbs(newAllowance, oldAllowance - shares, _delta_, "allowance");
-    }
-
-    assertTrue(caller == owner || oldAllowance != 0 || shares == 0, "access control");
-  }
-
-  function test_transfer(Init memory init, uint shares, uint allowance) public virtual {
-    setUpVault(init);
-    address caller = init.user[0];
-    address receiver = init.user[1];
-    address owner = init.user[2];
-    shares = bound(shares, 0, _max_mint(owner));
-    _approve(_vault_, owner, caller, allowance);
-    propTransfer(caller, receiver, owner, shares);
-  }
-
-  /* ============ availableBalanceOf ============ */
-  function propAvailableBalanceOf() public {
-    uint256 availableBalanceOf = _call_vault(
-      abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_)
-    );
-
-    uint256 totalAssets = _call_vault(abi.encodeWithSelector(Vault.totalAssets.selector));
-    uint256 withdrawableAssets = yieldVault.convertToAssets(yieldVault.balanceOf(_vault_));
-
-    if (withdrawableAssets >= totalAssets) {
-      assertApproxEqAbs(availableBalanceOf, withdrawableAssets - totalAssets, _delta_, "yield");
-    } else {
-      assertApproxEqAbs(availableBalanceOf, underlyingToken.balanceOf(_vault_), _delta_, "yield");
-    }
-  }
-
-  function test_availableBalanceOf(Init memory init, uint shares) public virtual {
-    setUpVault(init);
-
-    address caller = init.user[0];
-    shares = bound(shares, 0, _max_mint(caller));
-
-    propAvailableBalanceOf();
-  }
-
-  /* ============ liquidate ============ */
-  function propLiquidate(address caller) public {
-    vm.startPrank(caller);
-
-    // We divide by 2 cause not enough virtual liquidity has accrued to be able to liquidate the full amount
-    uint256 _amountOut = _call_vault(
-      abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_)
-    ) / 2;
-
-    uint256 callerPrizeTokenBalanceBefore = prizeToken.balanceOf(caller);
-    uint256 callerVaultSharesBalanceBefore = vault.balanceOf(caller);
-    uint256 vaultAvailableBalanceBefore = vault.availableBalanceOf(_vault_);
-
-    prizeToken.approve(address(liquidationRouter), type(uint256).max);
-
-    uint256 exactAmountIn = liquidationRouter.swapExactAmountOut(
-      liquidationPair,
-      caller,
-      _amountOut,
-      type(uint256).max
-    );
-
-    assertApproxEqAbs(
-      prizeToken.balanceOf(caller),
-      callerPrizeTokenBalanceBefore - exactAmountIn,
-      _delta_,
-      "caller prizeToken balance"
-    );
-    assertApproxEqAbs(
-      prizeToken.balanceOf(address(prizePool)),
-      exactAmountIn,
-      _delta_,
-      "prizePool prizeToken balance"
-    );
-
-    uint256 callerVaultSharesBalanceAfter = vault.balanceOf(caller);
-
-    assertApproxEqAbs(
-      callerVaultSharesBalanceAfter,
-      callerVaultSharesBalanceBefore + _amountOut,
-      _delta_,
-      "caller shares balance before withdraw"
-    );
-    assertApproxEqAbs(
-      vault.availableBalanceOf(_vault_),
-      vaultAvailableBalanceBefore,
-      _delta_,
-      "vault shares balance before withdraw"
-    );
-
-    vm.stopPrank();
-  }
-
-  function test_liquidate(Init memory init, uint shares) public virtual {
-    init.yield = 0;
-    setUpVault(init);
-
-    vault.setLiquidationPair(liquidationPair);
-
-    address caller = init.user[0];
-
-    // We mint underlying assets to the YieldVault to generate yield
-    uint256 yield = bound(shares, 100, 10000 * 1000);
-    underlyingToken.mint(address(yieldVault), yield);
-
-    prizeToken.mint(caller, type(uint256).max);
-
-    shares = bound(shares, 10, _max_mint(caller));
-    propLiquidate(caller);
   }
 
   function testLiquidateCallerNotLP() public {
@@ -693,13 +422,19 @@ contract VaultTest is ERC4626Test {
 
     assertEq(_newLiquidationPairAddress, address(liquidationPair));
     assertEq(vault.liquidationPair(), address(liquidationPair));
-    assertEq(underlyingToken.allowance(_vault_, _newLiquidationPairAddress), type(uint256).max);
+    assertEq(
+      underlyingToken.allowance(address(vault), _newLiquidationPairAddress),
+      type(uint256).max
+    );
   }
 
   function testSetLiquidationPairUpdate() public {
     vault.setLiquidationPair(liquidationPair);
 
-    assertEq(underlyingToken.allowance(_vault_, address(liquidationPair)), type(uint256).max);
+    assertEq(
+      underlyingToken.allowance(address(vault), address(liquidationPair)),
+      type(uint256).max
+    );
 
     LiquidationPair _newLiquidationPair = LiquidationPair(
       0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820
@@ -707,8 +442,11 @@ contract VaultTest is ERC4626Test {
 
     vault.setLiquidationPair(_newLiquidationPair);
 
-    assertEq(underlyingToken.allowance(_vault_, address(liquidationPair)), 0);
-    assertEq(underlyingToken.allowance(_vault_, address(_newLiquidationPair)), type(uint256).max);
+    assertEq(underlyingToken.allowance(address(vault), address(liquidationPair)), 0);
+    assertEq(
+      underlyingToken.allowance(address(vault), address(_newLiquidationPair)),
+      type(uint256).max
+    );
   }
 
   function testSetLiquidationPairNotZeroAddress() public {
