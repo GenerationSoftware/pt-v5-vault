@@ -22,7 +22,7 @@ contract VaultFuzzTest is ERC4626Test {
   Vault public vault;
 
   IERC4626 public yieldVault;
-  ERC20Mock public underlyingToken;
+  ERC20Mock public underlyingAsset;
   ERC20Mock public prizeToken;
 
   LiquidationRouterMock public liquidationRouter;
@@ -37,8 +37,8 @@ contract VaultFuzzTest is ERC4626Test {
   /* ============ Setup ============ */
 
   function setUp() public override {
-    underlyingToken = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
-    _underlying_ = address(underlyingToken);
+    underlyingAsset = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
+    _underlying_ = address(underlyingAsset);
 
     prizeToken = new ERC20Mock("PoolTogether", "POOL", address(this), 0);
 
@@ -47,13 +47,13 @@ contract VaultFuzzTest is ERC4626Test {
     prizePool = new PrizePoolMock(prizeToken);
 
     yieldVault = new YieldVault(
-      underlyingToken,
+      underlyingAsset,
       "PoolTogether aEthDAI Yield (PTaEthDAIY)",
       "PTaEthDAIY"
     );
 
     vault = new Vault(
-      underlyingToken,
+      underlyingAsset,
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
@@ -257,7 +257,7 @@ contract VaultFuzzTest is ERC4626Test {
     if (withdrawableAssets >= totalAssets) {
       assertApproxEqAbs(availableBalanceOf, withdrawableAssets - totalAssets, _delta_, "yield");
     } else {
-      assertApproxEqAbs(availableBalanceOf, underlyingToken.balanceOf(_vault_), _delta_, "yield");
+      assertApproxEqAbs(availableBalanceOf, underlyingAsset.balanceOf(_vault_), _delta_, "yield");
     }
   }
 
@@ -335,7 +335,7 @@ contract VaultFuzzTest is ERC4626Test {
 
     // We mint underlying assets to the YieldVault to generate yield
     uint256 yield = bound(shares, 100, 10000 * 1000);
-    underlyingToken.mint(address(yieldVault), yield);
+    underlyingAsset.mint(address(yieldVault), yield);
 
     prizeToken.mint(caller, type(uint256).max);
 

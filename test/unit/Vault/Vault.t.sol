@@ -1,35 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { Test } from "forge-std/Test.sol";
-
 import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
-import { ERC20Mock, IERC20Metadata } from "openzeppelin/mocks/ERC20Mock.sol";
 
-import { ILiquidationSource } from "v5-liquidator-interfaces/ILiquidationSource.sol";
 import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
-import { LiquidationPairFactory } from "v5-liquidator/LiquidationPairFactory.sol";
-import { LiquidationRouter } from "v5-liquidator/LiquidationRouter.sol";
-import { UFixed32x9 } from "v5-liquidator-libraries/FixedMathLib.sol";
 
-import { PrizePool, SD59x18 } from "v5-prize-pool/PrizePool.sol";
-import { ud2x18, sd1x18 } from "v5-prize-pool-test/PrizePool.t.sol";
+import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { Vault } from "src/Vault.sol";
 
+import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
+import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock.sol";
+import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
-contract VaultTest is Test {
+import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
+
+contract VaultTest is UnitBaseSetup {
   /* ============ Events ============ */
+
   event NewVault(
     IERC20 indexed asset,
     string name,
     string symbol,
     TwabController twabController,
     IERC4626 indexed yieldVault,
-    PrizePool indexed prizePool,
+    PrizePoolMock indexed prizePool,
     Claimer claimer,
     address owner
   );
@@ -43,90 +41,12 @@ contract VaultTest is Test {
     LiquidationPair newLiquidationPair
   );
 
-  event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
-
-  /* ============ Variables ============ */
-  address user = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
-
-  Vault public vault;
-  string public vaultName = "PoolTogether aEthDAI Prize Token (PTaEthDAI)";
-  string public vaultSymbol = "PTaEthDAI";
-
-  IERC4626 public yieldVault;
-  ERC20Mock public underlyingToken;
-  ERC20Mock public prizeToken;
-
-  LiquidationRouter public liquidationRouter;
-  LiquidationPair public liquidationPair;
-  address public liquidationPairTarget = 0xcbE704e38ddB2E6A8bA9f4d335f2637132C20113;
-
-  Claimer public claimer;
-  PrizePool public prizePool;
-
-  uint256 public winningRandomNumber = 123456;
-  uint32 public drawPeriodSeconds = 1 days;
-  TwabController public twabController;
-
-  /* ============ Setup ============ */
-
-  function setUp() public {
-    underlyingToken = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
-    prizeToken = new ERC20Mock("PoolTogether", "POOL", address(this), 0);
-
-    twabController = new TwabController();
-
-    prizePool = new PrizePool(
-      prizeToken,
-      twabController,
-      uint32(365), // 52 weeks = 1 year
-      drawPeriodSeconds, // drawPeriodSeconds
-      uint64(block.timestamp), // drawStartedAt
-      uint8(2), // minimum number of tiers
-      100e18,
-      10e18,
-      10e18,
-      ud2x18(0.9e18), // claim threshold of 90%
-      sd1x18(0.9e18) // alpha
-    );
-
-    claimer = new Claimer(prizePool, ud2x18(1.1e18), 0.0001e18);
-
-    yieldVault = new YieldVault(
-      underlyingToken,
-      "PoolTogether aEthDAI Yield (PTaEthDAIY)",
-      "PTaEthDAIY"
-    );
-
-    vault = new Vault(
-      underlyingToken,
-      vaultName,
-      vaultSymbol,
-      twabController,
-      yieldVault,
-      prizePool,
-      claimer,
-      address(this)
-    );
-
-    liquidationPair = new LiquidationPair(
-      ILiquidationSource(vault),
-      address(prizeToken),
-      address(vault),
-      UFixed32x9.wrap(0.3e9),
-      UFixed32x9.wrap(0.02e9),
-      100,
-      50
-    );
-
-    liquidationRouter = new LiquidationRouter(new LiquidationPairFactory());
-  }
-
   /* ============ Constructor ============ */
 
   function testConstructor() public {
     vm.expectEmit(true, true, true, true);
     emit NewVault(
-      IERC20(address(underlyingToken)),
+      IERC20(address(underlyingAsset)),
       vaultName,
       vaultSymbol,
       twabController,
@@ -137,20 +57,20 @@ contract VaultTest is Test {
     );
 
     Vault testVault = new Vault(
-      IERC20(address(underlyingToken)),
+      IERC20(address(underlyingAsset)),
       vaultName,
       vaultSymbol,
       twabController,
       yieldVault,
-      prizePool,
+      PrizePool(address(prizePool)),
       claimer,
       address(this)
     );
 
-    assertEq(testVault.asset(), address(underlyingToken));
+    assertEq(testVault.asset(), address(underlyingAsset));
     assertEq(testVault.name(), vaultName);
     assertEq(testVault.symbol(), vaultSymbol);
-    assertEq(testVault.decimals(), ERC20(address(underlyingToken)).decimals());
+    assertEq(testVault.decimals(), ERC20(address(underlyingAsset)).decimals());
     assertEq(testVault.twabController(), address(twabController));
     assertEq(testVault.yieldVault(), address(yieldVault));
     assertEq(testVault.prizePool(), address(prizePool));
@@ -162,12 +82,12 @@ contract VaultTest is Test {
     vm.expectRevert(bytes("Vault/twabCtrlr-not-zero-address"));
 
     new Vault(
-      IERC20(address(underlyingToken)),
+      IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       TwabController(address(0)),
       yieldVault,
-      prizePool,
+      PrizePool(address(prizePool)),
       claimer,
       address(this)
     );
@@ -177,12 +97,12 @@ contract VaultTest is Test {
     vm.expectRevert(bytes("Vault/YV-not-zero-address"));
 
     new Vault(
-      IERC20(address(underlyingToken)),
+      IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
       IERC4626(address(0)),
-      prizePool,
+      PrizePool(address(prizePool)),
       claimer,
       address(this)
     );
@@ -192,7 +112,7 @@ contract VaultTest is Test {
     vm.expectRevert(bytes("Vault/PP-not-zero-address"));
 
     new Vault(
-      IERC20(address(underlyingToken)),
+      IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
@@ -207,12 +127,12 @@ contract VaultTest is Test {
     vm.expectRevert(bytes("Vault/owner-not-zero-address"));
 
     new Vault(
-      IERC20(address(underlyingToken)),
+      IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
       twabController,
       yieldVault,
-      prizePool,
+      PrizePool(address(prizePool)),
       claimer,
       address(0)
     );
@@ -220,48 +140,15 @@ contract VaultTest is Test {
 
   /* ============ External functions ============ */
 
-  /* ============ Sponsor ============ */
-  function testSponsor() public {
-    vm.startPrank(address(vault));
-
-    uint256 _amount = 1000e18;
-    underlyingToken.mint(address(this), _amount);
-
-    changePrank(address(this));
-
-    vm.expectEmit(true, true, true, true);
-    emit Sponsor(address(this), address(this), _amount, _amount);
-
-    underlyingToken.approve(address(vault), _amount);
-    vault.sponsor(_amount, address(this));
-
-    assertEq(IERC20(vault).balanceOf(address(this)), _amount);
-    assertEq(vault.balanceOf(address(this)), _amount);
-
-    assertEq(twabController.balanceOf(address(vault), address(this)), _amount);
-    assertEq(twabController.delegateBalanceOf(address(vault), address(this)), 0);
-
-    address _sponsorshipAddress = twabController.SPONSORSHIP_ADDRESS();
-
-    assertEq(vault.balanceOf(_sponsorshipAddress), 0);
-    assertEq(twabController.delegateBalanceOf(address(vault), _sponsorshipAddress), 0);
-
-    assertEq(underlyingToken.balanceOf(address(yieldVault)), _amount);
-    assertEq(IERC20(yieldVault).balanceOf(address(vault)), _amount);
-    assertEq(yieldVault.balanceOf(address(vault)), _amount);
-
-    vm.stopPrank();
-  }
-
   function testLiquidateCallerNotLP() public {
-    vault.setLiquidationPair(liquidationPair);
+    _setLiquidationPair();
 
     vm.expectRevert(bytes("Vault/caller-not-LP"));
     vault.liquidate(address(this), address(prizeToken), 0, address(vault), 0);
   }
 
   function testLiquidateTokenInNotPrizeToken() public {
-    vault.setLiquidationPair(liquidationPair);
+    _setLiquidationPair();
 
     vm.startPrank(address(liquidationPair));
 
@@ -272,7 +159,7 @@ contract VaultTest is Test {
   }
 
   function testLiquidateTokenOutNotVaultShare() public {
-    vault.setLiquidationPair(liquidationPair);
+    _setLiquidationPair();
 
     vm.startPrank(address(liquidationPair));
 
@@ -283,7 +170,7 @@ contract VaultTest is Test {
   }
 
   function testLiquidateAmountGTAvailableYield() public {
-    vault.setLiquidationPair(liquidationPair);
+    _setLiquidationPair();
 
     vm.startPrank(address(liquidationPair));
 
@@ -295,17 +182,17 @@ contract VaultTest is Test {
 
   /* ============ targetOf ============ */
   function testTargetOf() public {
-    vault.setLiquidationPair(liquidationPair);
+    _setLiquidationPair();
 
     address target = vault.targetOf(address(prizeToken));
     assertEq(target, address(prizePool));
   }
 
   function testTargetOfFail() public {
-    vault.setLiquidationPair(liquidationPair);
+    _setLiquidationPair();
 
     vm.expectRevert(bytes("Vault/target-token-unsupported"));
-    vault.targetOf(address(underlyingToken));
+    vault.targetOf(address(underlyingAsset));
   }
 
   /* ============ Claimer ============ */
@@ -363,8 +250,8 @@ contract VaultTest is Test {
   function testClaimPrize() public {
     vm.startPrank(address(claimer));
 
-    mockPrizePoolClaimPrize(user, uint8(1), user, 1e18, address(claimer));
-    vault.claimPrize(user, uint8(1), user, 1e18, address(claimer));
+    mockPrizePoolClaimPrize(alice, uint8(1), alice, 1e18, address(claimer));
+    vault.claimPrize(alice, uint8(1), alice, 1e18, address(claimer));
 
     vm.stopPrank();
   }
@@ -376,23 +263,23 @@ contract VaultTest is Test {
 
     vm.startPrank(_randomUser);
 
-    mockPrizePoolClaimPrize(user, uint8(1), user, 0, address(0));
-    vault.claimPrize(user, uint8(1), user, 0, address(0));
+    mockPrizePoolClaimPrize(alice, uint8(1), alice, 0, address(0));
+    vault.claimPrize(alice, uint8(1), alice, 0, address(0));
 
     vm.stopPrank();
   }
 
   function testClaimPrizeCallerNotClaimer() public {
-    vm.startPrank(user);
+    vm.startPrank(alice);
 
     vm.expectRevert(bytes("Vault/caller-not-claimer"));
-    vault.claimPrize(user, uint8(1), user, 0, address(0));
+    vault.claimPrize(alice, uint8(1), alice, 0, address(0));
 
     vm.stopPrank();
   }
 
   function testClaimPrizeAutoClaimDisabled() public {
-    vm.startPrank(user);
+    vm.startPrank(alice);
 
     vault.disableAutoClaim(true);
 
@@ -401,14 +288,14 @@ contract VaultTest is Test {
     vm.startPrank(address(claimer));
 
     vm.expectRevert(bytes("Vault/auto-claim-disabled"));
-    vault.claimPrize(user, uint8(1), user, 1e18, address(this));
+    vault.claimPrize(alice, uint8(1), alice, 1e18, address(this));
 
     vm.stopPrank();
 
-    vm.startPrank(user);
+    vm.startPrank(alice);
 
-    mockPrizePoolClaimPrize(user, uint8(1), user, 0, address(0));
-    vault.claimPrize(user, uint8(1), user, 0, address(0));
+    mockPrizePoolClaimPrize(alice, uint8(1), alice, 0, address(0));
+    vault.claimPrize(alice, uint8(1), alice, 0, address(0));
 
     vm.stopPrank();
   }
@@ -416,23 +303,23 @@ contract VaultTest is Test {
   /* ============ setLiquidationPair ============ */
   function testSetLiquidationPair() public {
     vm.expectEmit(true, true, true, true);
-    emit LiquidationPairSet(LiquidationPair(address(0)), liquidationPair);
+    emit LiquidationPairSet(LiquidationPair(address(0)), LiquidationPair(address(liquidationPair)));
 
-    address _newLiquidationPairAddress = vault.setLiquidationPair(liquidationPair);
+    address _newLiquidationPairAddress = _setLiquidationPair();
 
     assertEq(_newLiquidationPairAddress, address(liquidationPair));
     assertEq(vault.liquidationPair(), address(liquidationPair));
     assertEq(
-      underlyingToken.allowance(address(vault), _newLiquidationPairAddress),
+      underlyingAsset.allowance(address(vault), _newLiquidationPairAddress),
       type(uint256).max
     );
   }
 
   function testSetLiquidationPairUpdate() public {
-    vault.setLiquidationPair(liquidationPair);
+    vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
 
     assertEq(
-      underlyingToken.allowance(address(vault), address(liquidationPair)),
+      underlyingAsset.allowance(address(vault), address(liquidationPair)),
       type(uint256).max
     );
 
@@ -442,9 +329,9 @@ contract VaultTest is Test {
 
     vault.setLiquidationPair(_newLiquidationPair);
 
-    assertEq(underlyingToken.allowance(address(vault), address(liquidationPair)), 0);
+    assertEq(underlyingAsset.allowance(address(vault), address(liquidationPair)), 0);
     assertEq(
-      underlyingToken.allowance(address(vault), address(_newLiquidationPair)),
+      underlyingAsset.allowance(address(vault), address(_newLiquidationPair)),
       type(uint256).max
     );
   }
@@ -466,6 +353,11 @@ contract VaultTest is Test {
     vault.setLiquidationPair(_newLiquidationPair);
 
     vm.stopPrank();
+  }
+
+  /* ============ helpers ============ */
+  function _setLiquidationPair() internal returns (address) {
+    return vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
   }
 
   /* ============ mocks ============ */

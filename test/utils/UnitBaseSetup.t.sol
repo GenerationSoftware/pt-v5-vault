@@ -2,33 +2,33 @@
 pragma solidity 0.8.17;
 
 import "forge-std/Test.sol";
-import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
-import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
+import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
-import { PrizePool, SD59x18 } from "v5-prize-pool/PrizePool.sol";
-import { ud2x18 } from "prb-math/UD2x18.sol";
-import { sd1x18 } from "prb-math/SD1x18.sol";
+import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Claimer, IVault } from "v5-vrgda-claimer/Claimer.sol";
-import { ILiquidationSource } from "v5-liquidator/interfaces/ILiquidationSource.sol";
-import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
-import { LiquidationPairFactory } from "v5-liquidator/LiquidationPairFactory.sol";
-import { LiquidationRouter } from "v5-liquidator/LiquidationRouter.sol";
-import { UFixed32x9 } from "v5-liquidator-libraries/FixedMathLib.sol";
+import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { Vault } from "src/Vault.sol";
+
+import { ERC20PermitMock } from "test/contracts/mock/ERC20PermitMock.sol";
+import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
+import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock.sol";
+import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
-import { Utils } from "test/utils/Utils.t.sol";
 
 contract UnitBaseSetup is Test {
   /* ============ Variables ============ */
-  Utils internal utils;
-
-  address payable[] internal users;
   address internal owner;
+  uint256 internal ownerPrivateKey;
+
   address internal manager;
+  uint256 internal managerPrivateKey;
+
   address internal alice;
+  uint256 internal alicePrivateKey;
+
   address internal bob;
+  uint256 internal bobPrivateKey;
 
   address public constant SPONSORSHIP_ADDRESS = address(1);
 
@@ -36,56 +36,36 @@ contract UnitBaseSetup is Test {
   string public vaultName = "PoolTogether aEthDAI Prize Token (PTaEthDAI)";
   string public vaultSymbol = "PTaEthDAI";
 
-  YieldVault public yieldVault;
-  ERC20Mock public underlyingAsset;
-  ERC20Mock public prizeToken;
-
-  LiquidationRouter public liquidationRouter;
-  LiquidationPair public liquidationPair;
+  IERC4626 public yieldVault;
+  ERC20PermitMock public underlyingAsset;
+  ERC20PermitMock public prizeToken;
+  LiquidationRouterMock public liquidationRouter;
+  LiquidationPairMock public liquidationPair;
+  address public liquidationPairTarget = 0xcbE704e38ddB2E6A8bA9f4d335f2637132C20113;
 
   Claimer public claimer;
-  PrizePool public prizePool;
+  PrizePoolMock public prizePool;
 
   uint256 public winningRandomNumber = 123456;
   uint32 public drawPeriodSeconds = 1 days;
   TwabController public twabController;
 
-  /* ============ setUp ============ */
-  function setUp() public virtual {
-    utils = new Utils();
+  /* ============ Setup ============ */
 
-    users = utils.createUsers(4);
-    owner = users[0];
-    manager = users[1];
-    alice = users[2];
-    bob = users[3];
+  function setUp() public {
+    (owner, ownerPrivateKey) = makeAddrAndKey("Owner");
+    (manager, managerPrivateKey) = makeAddrAndKey("Manager");
+    (alice, alicePrivateKey) = makeAddrAndKey("Alice");
+    (bob, bobPrivateKey) = makeAddrAndKey("Bob");
 
-    vm.label(owner, "Owner");
-    vm.label(manager, "Manager");
-    vm.label(alice, "Alice");
-    vm.label(bob, "Bob");
-
-    underlyingAsset = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
-
-    prizeToken = new ERC20Mock("PoolTogether", "POOL", address(this), 0);
+    underlyingAsset = new ERC20PermitMock("Dai Stablecoin", "DAI", address(this), 0);
+    prizeToken = new ERC20PermitMock("PoolTogether", "POOL", address(this), 0);
 
     twabController = new TwabController();
 
-    prizePool = new PrizePool(
-      prizeToken,
-      twabController,
-      uint32(365), // 52 weeks = 1 year
-      drawPeriodSeconds, // drawPeriodSeconds
-      uint64(block.timestamp), // drawStartedAt
-      uint8(2), // minimum number of tiers
-      100e18,
-      10e18,
-      10e18,
-      ud2x18(0.9e18), // claim threshold of 90%
-      sd1x18(0.9e18) // alpha
-    );
+    prizePool = new PrizePoolMock(prizeToken);
 
-    claimer = new Claimer(prizePool, ud2x18(1.1e18), 0.0001e18);
+    claimer = Claimer(address(0xe291d9169F0316272482dD82bF297BB0a11D267f));
 
     yieldVault = new YieldVault(
       underlyingAsset,
@@ -99,23 +79,18 @@ contract UnitBaseSetup is Test {
       vaultSymbol,
       twabController,
       yieldVault,
-      prizePool,
+      PrizePool(address(prizePool)),
       claimer,
       address(this)
     );
 
-    liquidationPair = new LiquidationPair(
-      ILiquidationSource(vault),
-      address(prizeToken),
+    liquidationPair = new LiquidationPairMock(
       address(vault),
-      UFixed32x9.wrap(0.3e9),
-      UFixed32x9.wrap(0.02e9),
-      100e18,
-      50e18
+      address(prizePool),
+      address(prizeToken),
+      address(vault)
     );
 
-    vault.setLiquidationPair(liquidationPair);
-
-    liquidationRouter = new LiquidationRouter(new LiquidationPairFactory());
+    liquidationRouter = new LiquidationRouterMock();
   }
 }

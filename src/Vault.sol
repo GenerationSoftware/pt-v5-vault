@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import { ERC4626, ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import { ERC20Permit, IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 import { Ownable } from "owner-manager-contracts/Ownable.sol";
@@ -21,7 +22,7 @@ import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
  *         This yield is sold for prize tokens (i.e. POOL) via the Liquidator and captured by the PrizePool to be awarded to depositors.
  * @dev    Balances are stored in the TwabController contract.
  */
-contract Vault is ERC4626, ILiquidationSource, Ownable {
+contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   using SafeERC20 for IERC20;
 
   /* ============ Events ============ */
@@ -129,7 +130,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     PrizePool prizePool_,
     Claimer claimer_,
     address _owner
-  ) ERC4626(_asset) ERC20(_name, _symbol) Ownable(_owner) {
+  ) ERC4626(_asset) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(_owner) {
     require(address(twabController_) != address(0), "Vault/twabCtrlr-not-zero-address");
     require(address(yieldVault_) != address(0), "Vault/YV-not-zero-address");
     require(address(prizePool_) != address(0), "Vault/PP-not-zero-address");
@@ -164,6 +165,11 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     return _availableBalanceOf(_token);
   }
 
+  /// @inheritdoc ERC4626
+  function decimals() public view virtual override(ERC4626, ERC20) returns (uint8) {
+    return super.decimals();
+  }
+
   /**
    * @inheritdoc ERC4626
    * @dev The total amount of assets managed by this vault is equal to
@@ -192,23 +198,84 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
   }
 
   /**
+   * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
+   * @param _assets Amount of assets to approve and deposit
+   * @param _receiver Address of the receiver of the vault shares
+   * @param _deadline Timestamp after which the approval is no longer valid
+   * @param _v V part of the secp256k1 signature
+   * @param _r R part of the secp256k1 signature
+   * @param _s S part of the secp256k1 signature
+   * @return uint256 Amount of Vault shares minted to `_receiver`.
+   */
+  function depositWithPermit(
+    uint256 _assets,
+    address _receiver,
+    uint256 _deadline,
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s
+  ) external returns (uint256) {
+    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
+    return super.deposit(_assets, _receiver);
+  }
+
+  /**
+   * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
+   * @param _shares Amount of shares to mint to `_receiver`
+   * @param _receiver Address of the receiver of the vault shares
+   * @param _deadline Timestamp after which the approval is no longer valid
+   * @param _v V part of the secp256k1 signature
+   * @param _r R part of the secp256k1 signature
+   * @param _s S part of the secp256k1 signature
+   * @return uint256 Amount of assets deposited into the Vault.
+   */
+  function mintWithPermit(
+    uint256 _shares,
+    address _receiver,
+    uint256 _deadline,
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s
+  ) external returns (uint256) {
+    require(_shares <= maxMint(_receiver), "ERC4626: mint more than max");
+    uint256 _assets = previewMint(_shares);
+
+    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
+    _deposit(_msgSender(), _receiver, _assets, _shares);
+
+    return _assets;
+  }
+
+  /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @param _assets Amount of assets to deposit
-   * @param _receiver Address of the receiver of the assets
+   * @param _receiver Address of the receiver of the vault shares
    * @return uint256 Amount of shares minted to `_receiver`.
    */
   function sponsor(uint256 _assets, address _receiver) external returns (uint256) {
-    uint256 _shares = super.deposit(_assets, _receiver);
+    return _sponsor(_assets, _receiver);
+  }
 
-    if (
-      _twabController.delegateOf(address(this), _receiver) != _twabController.SPONSORSHIP_ADDRESS()
-    ) {
-      _twabController.sponsor(_receiver);
-    }
-
-    emit Sponsor(msg.sender, _receiver, _assets, _shares);
-
-    return _shares;
+  /**
+   * @notice Deposit assets into the Vault and delegate to the sponsorship address.
+   * @param _assets Amount of assets to deposit
+   * @param _receiver Address of the receiver of the vault shares
+   * @param _deadline Timestamp after which the approval is no longer valid
+   * @param _v V part of the secp256k1 signature
+   * @param _r R part of the secp256k1 signature
+   * @param _s S part of the secp256k1 signature
+   * @return uint256 Amount of shares minted to `_receiver`.
+   */
+  function sponsorWithPermit(
+    uint256 _assets,
+    address _receiver,
+    uint256 _deadline,
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s
+  ) external returns (uint256) {
+    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
+    return _sponsor(_assets, _receiver);
   }
 
   /**
@@ -388,7 +455,7 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     require(_token == address(this), "Vault/token-not-vault-share");
 
     uint256 _totalAssets = totalAssets();
-    uint256 _withdrawableAssets = _yieldVault.convertToAssets(_yieldVault.balanceOf(address(this)));
+    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
 
     unchecked {
       return
@@ -396,6 +463,30 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
           ? _withdrawableAssets - _totalAssets
           : super.totalAssets(); // equivalent to `_asset.balanceOf(address(this))`
     }
+  }
+
+  /**
+   * @notice Approve `_spender` to spend `_assets` of `_owner`'s `_asset` via signature.
+   * @param _asset Address of the asset to approve
+   * @param _owner Address of the owner of the asset
+   * @param _spender Address of the spender of the asset
+   * @param _assets Amount of assets to approve
+   * @param _deadline Timestamp after which the approval is no longer valid
+   * @param _v V part of the secp256k1 signature
+   * @param _r R part of the secp256k1 signature
+   * @param _s S part of the secp256k1 signature
+   */
+  function _permit(
+    IERC20Permit _asset,
+    address _owner,
+    address _spender,
+    uint256 _assets,
+    uint256 _deadline,
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s
+  ) internal {
+    _asset.permit(_owner, _spender, _assets, _deadline, _v, _r, _s);
   }
 
   /**
@@ -435,7 +526,6 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
         }
       }
 
-      // slither-disable-next-line reentrancy-no-eth
       SafeERC20.safeTransferFrom(
         _asset,
         _caller,
@@ -450,6 +540,26 @@ contract Vault is ERC4626, ILiquidationSource, Ownable {
     _mint(_receiver, _shares);
 
     emit Deposit(_caller, _receiver, _assets, _shares);
+  }
+
+  /**
+   * @notice Deposit assets into the Vault and delegate to the sponsorship address.
+   * @param _assets Amount of assets to deposit
+   * @param _receiver Address of the receiver of the vault shares
+   * @return uint256 Amount of shares minted to `_receiver`.
+   */
+  function _sponsor(uint256 _assets, address _receiver) internal returns (uint256) {
+    uint256 _shares = super.deposit(_assets, _receiver);
+
+    if (
+      _twabController.delegateOf(address(this), _receiver) != _twabController.SPONSORSHIP_ADDRESS()
+    ) {
+      _twabController.sponsor(_receiver);
+    }
+
+    emit Sponsor(msg.sender, _receiver, _assets, _shares);
+
+    return _shares;
   }
 
   /// @dev Withdraw/redeem common workflow.
