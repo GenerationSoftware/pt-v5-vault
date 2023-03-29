@@ -165,6 +165,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return _availableBalanceOf(_token);
   }
 
+  /// @inheritdoc ERC20
+  function balanceOf(
+    address _account
+  ) public view virtual override(ERC20, IERC20) returns (uint256) {
+    return _twabController.balanceOf(address(this), _account);
+  }
+
   /// @inheritdoc ERC4626
   function decimals() public view virtual override(ERC4626, ERC20) returns (uint8) {
     return super.decimals();
@@ -177,6 +184,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function totalAssets() public view virtual override returns (uint256) {
     return _assetSupplyBalance + super.totalAssets();
+  }
+
+  /// @inheritdoc ERC20
+  function totalSupply() public view virtual override(ERC20, IERC20) returns (uint256) {
+    return _twabController.totalSupply(address(this));
   }
 
   /**
@@ -596,8 +608,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev `_receiver` cannot be the zero address.
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
-    _twabController.twabMint(_receiver, uint112(convertToAssets(_shares)));
-    super._mint(_receiver, _shares);
+    _twabController.twabMint(_receiver, uint112(_shares));
   }
 
   /**
@@ -607,8 +618,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev `_owner` must have at least `_shares` tokens.
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
-    _twabController.twabBurn(_owner, uint112(convertToAssets(_shares)));
-    super._burn(_owner, _shares);
+    _twabController.twabBurn(_owner, uint112(_shares));
   }
 
   /**
@@ -618,7 +628,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev `_from` must have a balance of at least `_shares`.
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
-    _twabController.twabTransfer(_from, _to, uint112(convertToAssets(_shares)));
-    super._transfer(_from, _to, _shares);
+    _twabController.twabTransfer(_from, _to, uint112(_shares));
   }
 }
