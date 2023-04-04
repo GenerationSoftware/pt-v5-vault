@@ -5,6 +5,7 @@ forge-std/=lib/forge-std/src/
 openzeppelin/=lib/openzeppelin-contracts/contracts/
 owner-manager-contracts/=lib/owner-manager-contracts/contracts/
 
+ring-buffer-lib/=lib/ring-buffer-lib/src/
 v5-liquidator/=lib/v5-liquidator/src/
 v5-liquidator-interfaces/=lib/v5-liquidator/src/interfaces/
 v5-liquidator-libraries/=lib/v5-liquidator/src/libraries/

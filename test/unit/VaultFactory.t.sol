@@ -20,7 +20,7 @@ contract VaultFactoryTest is Test {
   /* ============ Variables ============ */
   VaultFactory public vaultFactory;
 
-  ERC20Mock public asset = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
+  ERC20Mock public asset = new ERC20Mock();
   string public name = "PoolTogether aEthDAI Yield (PTaEthDAIY)";
   string public symbol = "PTaEthDAIY";
 
@@ -52,6 +52,8 @@ contract VaultFactoryTest is Test {
       yieldVault,
       prizePool,
       claimer,
+      address(this),
+      0,
       address(this)
     );
 

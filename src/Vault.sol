@@ -36,6 +36,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
    * @param prizePool Address of the PrizePool that computes prizes
    * @param claimer Address of the claimer
+   * @param yieldFeeRecipient Address of the yield fee recipient
+   * @param yieldFeePercentage Yield fee percentage
    * @param owner Address of the owner
    */
   event NewVault(
@@ -46,6 +48,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     IERC4626 indexed yieldVault,
     PrizePool indexed prizePool,
     Claimer claimer,
+    address yieldFeeRecipient,
+    uint256 yieldFeePercentage,
     address owner
   );
 
@@ -62,6 +66,20 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param newClaimer Address of the new claimer
    */
   event ClaimerSet(Claimer previousClaimer, Claimer newClaimer);
+
+  /**
+   * @notice Emitted when a new yield fee recipient has been set.
+   * @param previousYieldFeeRecipient Address of the previous yield fee recipient
+   * @param newYieldFeeRecipient Address of the new yield fee recipient
+   */
+  event YieldFeeRecipientSet(address previousYieldFeeRecipient, address newYieldFeeRecipient);
+
+  /**
+   * @notice Emitted when a new yield fee percentage has been set.
+   * @param previousYieldFeePercentage Previous yield fee percentage
+   * @param newYieldFeePercentage New yield fee percentage
+   */
+  event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
 
   /**
    * @notice Emitted when a new LiquidationPair has been set.
@@ -102,6 +120,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Amount of underlying assets supplied to the YieldVault.
   uint256 private _assetSupplyBalance;
 
+  /// @notice Yield fee percentage represented in 9 decimal places and in decimal notation (i.e. 10000000 = 0.01 = 1%).
+  uint256 private _yieldFeePercentage;
+
+  /// @notice Address of the yield fee recipient that receives the fee amount when yield is captured.
+  address private _yieldFeeRecipient;
+
+  /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
+  uint256 private constant FEE_PRECISION = 1e9;
+
   /* ============ Mappings ============ */
 
   /// @notice Mapping to keep track of users who disabled prize auto claiming.
@@ -119,6 +146,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param yieldVault_ Address of the ERC4626 vault in which assets are deposited to generate yield
    * @param prizePool_ Address of the PrizePool that computes prizes
    * @param claimer_ Address of the claimer
+   * @param yieldFeeRecipient_ Address of the yield fee recipient
+   * @param yieldFeePercentage_ Yield fee percentage
    * @param _owner Address that will gain ownership of this contract
    */
   constructor(
@@ -129,6 +158,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     IERC4626 yieldVault_,
     PrizePool prizePool_,
     Claimer claimer_,
+    address yieldFeeRecipient_,
+    uint256 yieldFeePercentage_,
     address _owner
   ) ERC4626(_asset) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(_owner) {
     require(address(twabController_) != address(0), "Vault/twabCtrlr-not-zero-address");
@@ -141,7 +172,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _twabController = twabController_;
     _yieldVault = yieldVault_;
     _prizePool = prizePool_;
-    _claimer = claimer_;
+
+    _setClaimer(claimer_);
+    _setYieldFeeRecipient(yieldFeeRecipient_);
+    _setYieldFeePercentage(yieldFeePercentage_);
 
     // Approve once for max amount
     _asset.safeApprove(address(yieldVault_), type(uint256).max);
@@ -154,6 +188,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       yieldVault_,
       prizePool_,
       claimer_,
+      yieldFeeRecipient_,
+      yieldFeePercentage_,
       _owner
     );
   }
@@ -163,6 +199,23 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @inheritdoc ILiquidationSource
   function availableBalanceOf(address _token) public view override returns (uint256) {
     return _availableBalanceOf(_token);
+  }
+
+  /**
+   * @notice Get the total available yield amount accrued by this vault.
+   * @dev This amount includes the liquidable yield + yield fee amount.
+   * @return uint256 Total yield amount
+   */
+  function availableYieldBalance() public view returns (uint256) {
+    return _getAvailableYieldBalance();
+  }
+
+  /**
+   * @notice Get the available yield fee amount accrued by this vault.
+   * @return uint256 Yield fee amount
+   */
+  function availableYieldFeeBalance() public view returns (uint256) {
+    return _getAvailableYieldFeeAmount(_getAvailableYieldBalance());
   }
 
   /// @inheritdoc ERC20
@@ -304,10 +357,24 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     require(msg.sender == address(_liquidationPair), "Vault/caller-not-LP");
     require(_tokenIn == address(_prizePool.prizeToken()), "Vault/tokenIn-not-prizeToken");
     require(_tokenOut == address(this), "Vault/tokenOut-not-vaultShare");
+    require(_amountOut != 0, "Vault/amountOut-not-zero");
 
-    require(availableBalanceOf(_tokenOut) >= _amountOut, "Vault/amount-gt-available-yield");
+    uint256 _liquidableYield = _availableBalanceOf(_tokenOut);
+    require(_liquidableYield >= _amountOut, "Vault/amount-gt-available-yield");
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
+
+    if (_yieldFeeRecipient != address(0) && _yieldFeePercentage != 0) {
+      // We get the percentage of liquidated yield and mint the equivalent amount in fees.
+      _mint(
+        _yieldFeeRecipient,
+        _getYieldFeeAmount(
+          _getAvailableYieldBalance(),
+          (_amountOut * _yieldFeePercentage) / _liquidableYield
+        )
+      );
+    }
+
     _mint(_account, _amountOut);
 
     return true;
@@ -329,15 +396,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _winner Address of the user to claim prize for
    * @param _tier Tier to claim prize for
    * @param _to Address of the recipient that will receive the prize
-   * @param _fee Amount in fees paid to `_feeRecipient`
-   * @param _feeRecipient Address that will receive the fee for claiming
+   * @param _claimFee Amount in fees paid to `_claimFeeRecipient`
+   * @param _claimFeeRecipient Address that will receive `_claimFee` amount
    */
   function claimPrize(
     address _winner,
     uint8 _tier,
     address _to,
-    uint96 _fee,
-    address _feeRecipient
+    uint96 _claimFee,
+    address _claimFeeRecipient
   ) external returns (uint256) {
     address _claimerAddress = address(_claimer);
 
@@ -349,7 +416,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       }
     }
 
-    return _prizePool.claimPrize(_winner, _tier, _to, _fee, _feeRecipient);
+    return _prizePool.claimPrize(_winner, _tier, _to, _claimFee, _claimFeeRecipient);
   }
 
   /* ============ Setter Functions ============ */
@@ -369,12 +436,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Set claimer.
-   * @param claimer_ New claimer address
+   * @param claimer_ Address of the claimer
    * return address New claimer address
    */
   function setClaimer(Claimer claimer_) external onlyOwner returns (address) {
     Claimer _previousClaimer = _claimer;
-    _claimer = claimer_;
+    _setClaimer(claimer_);
 
     emit ClaimerSet(_previousClaimer, claimer_);
     return address(claimer_);
@@ -404,6 +471,33 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     emit LiquidationPairSet(_previousLiquidationPair, liquidationPair_);
     return address(liquidationPair_);
+  }
+
+  /**
+   * @notice Set yield fee percentage.
+   * @dev Yield fee is represented in 9 decimals and can't exceed `1e9`.
+   * @param yieldFeePercentage_ Yield fee percentage
+   * return uint256 New yield fee percentage
+   */
+  function setYieldFeePercentage(uint256 yieldFeePercentage_) external onlyOwner returns (uint256) {
+    uint256 _previousYieldFeePercentage = _yieldFeePercentage;
+    _setYieldFeePercentage(yieldFeePercentage_);
+
+    emit YieldFeePercentageSet(_previousYieldFeePercentage, yieldFeePercentage_);
+    return yieldFeePercentage_;
+  }
+
+  /**
+   * @notice Set fee recipient.
+   * @param yieldFeeRecipient_ Address of the fee recipient
+   * return address New fee recipient address
+   */
+  function setYieldFeeRecipient(address yieldFeeRecipient_) external onlyOwner returns (address) {
+    address _previousYieldFeeRecipient = _yieldFeeRecipient;
+    _setYieldFeeRecipient(yieldFeeRecipient_);
+
+    emit YieldFeeRecipientSet(_previousYieldFeeRecipient, yieldFeeRecipient_);
+    return yieldFeeRecipient_;
   }
 
   /* ============ Getter Functions ============ */
@@ -448,12 +542,44 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return address(_claimer);
   }
 
+  /**
+   * @notice Address of the yield fee recipient.
+   * @return address Yield fee recipient address
+   */
+
+  function yieldFeeRecipient() public view returns (address) {
+    return _yieldFeeRecipient;
+  }
+
+  /**
+   * @notice Yield fee percentage.
+   * @return uint256 Yield fee percentage
+   */
+
+  function yieldFeePercentage() public view returns (uint256) {
+    return _yieldFeePercentage;
+  }
+
   /* ============ Internal Functions ============ */
 
   /**
-   * @notice Get available yield that can be liquidated by minting vault shares.
+   * @notice Return the yield amount (available yield minus fees) that can be liquidated by minting vault shares.
    * @param _token Address of the token to get available balance for
-   * @dev The available yield to liquidate is equal to the maximum amount of assets
+   * @return uint256 Available amount of `_token`
+   */
+  function _availableBalanceOf(address _token) internal view returns (uint256) {
+    require(_token == address(this), "Vault/token-not-vault-share");
+
+    uint256 _availableYield = _getAvailableYieldBalance();
+
+    unchecked {
+      return _availableYield -= _getAvailableYieldFeeAmount(_availableYield);
+    }
+  }
+
+  /**
+   * @notice Get the total yield amount accrued by this vault.
+   * @dev The available yield is equal to the maximum amount of assets
    *      that can be withdrawn from the YieldVault minus the total amount of assets managed by this vault
    *      which is equal to the total amount supplied to the YieldVault + the amount living in this vault.
    * @dev If `_totalAssets` is greater than `_withdrawableAssets`, it could mean that:
@@ -461,20 +587,43 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *      - this vault is now undercollateralized
    *      In both cases, we should not mint more shares than underlying assets available,
    *      so we return the amount of assets living in this vault
-   * @return uint256 Available amount of `_token`.
+   * @return uint256 Total yield amount
    */
-  function _availableBalanceOf(address _token) internal view returns (uint256) {
-    require(_token == address(this), "Vault/token-not-vault-share");
-
+  function _getAvailableYieldBalance() internal view returns (uint256) {
     uint256 _totalAssets = totalAssets();
     uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
 
-    unchecked {
-      return
-        _withdrawableAssets >= _totalAssets
-          ? _withdrawableAssets - _totalAssets
-          : super.totalAssets(); // equivalent to `_asset.balanceOf(address(this))`
+    return
+      _withdrawableAssets >= _totalAssets
+        ? _withdrawableAssets - _totalAssets
+        : super.totalAssets(); // equivalent to `_asset.balanceOf(address(this))`
+  }
+
+  /**
+   * @notice Get the yield fee amount.
+   * @dev Used to calculate the available yield fee amount and the yield fee amount to mint.
+   * @param _amount Yield amount
+   * @param _percentage Percentage in 9 decimal places
+   * @return uint256 Yield fee amount
+   */
+  function _getYieldFeeAmount(
+    uint256 _amount,
+    uint256 _percentage
+  ) internal pure returns (uint256) {
+    return (_amount * _percentage) / FEE_PRECISION;
+  }
+
+  /**
+   * @notice Get the yield fee amount accrued by this vault.
+   * @param _availableYield Total yield amount
+   * @return uint256 Yield fee amount
+   */
+  function _getAvailableYieldFeeAmount(uint256 _availableYield) internal view returns (uint256) {
+    if (_availableYield != 0 && _yieldFeePercentage != 0) {
+      return _getYieldFeeAmount(_availableYield, _yieldFeePercentage);
     }
+
+    return 0;
   }
 
   /**
@@ -547,7 +696,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     }
 
     _yieldVault.deposit(_assets, address(this));
-    _assetSupplyBalance += _assets;
 
     _mint(_receiver, _shares);
 
@@ -595,7 +743,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _burn(_owner, _shares);
 
     _yieldVault.withdraw(_assets, address(this), address(this));
-    _assetSupplyBalance -= _assets;
 
     SafeERC20.safeTransfer(IERC20(asset()), _receiver, _assets);
 
@@ -608,6 +755,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev `_receiver` cannot be the zero address.
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
+    _assetSupplyBalance += convertToAssets(_shares);
     _twabController.twabMint(_receiver, uint112(_shares));
   }
 
@@ -618,6 +766,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev `_owner` must have at least `_shares` tokens.
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
+    _assetSupplyBalance -= convertToAssets(_shares);
     _twabController.twabBurn(_owner, uint112(_shares));
   }
 
@@ -629,5 +778,31 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
     _twabController.twabTransfer(_from, _to, uint112(_shares));
+  }
+
+  /**
+   * @notice Set claimer address.
+   * @param claimer_ Address of the claimer
+   */
+  function _setClaimer(Claimer claimer_) internal {
+    _claimer = claimer_;
+  }
+
+  /**
+   * @notice Set yield fee percentage.
+   * @dev Yield fee is represented in 9 decimals and can't exceed `1e9`.
+   * @param yieldFeePercentage_ Yield fee percentage
+   */
+  function _setYieldFeePercentage(uint256 yieldFeePercentage_) internal {
+    require(yieldFeePercentage_ <= FEE_PRECISION, "Vault/yieldFeePercentage-gt-1e9");
+    _yieldFeePercentage = yieldFeePercentage_;
+  }
+
+  /**
+   * @notice Set yield fee recipient address.
+   * @param yieldFeeRecipient_ Address of the fee recipient
+   */
+  function _setYieldFeeRecipient(address yieldFeeRecipient_) internal {
+    _yieldFeeRecipient = yieldFeeRecipient_;
   }
 }

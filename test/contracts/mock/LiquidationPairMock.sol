@@ -22,14 +22,6 @@ contract LiquidationPairMock {
     _liquidatorLib = new MockLiquidatorLib();
   }
 
-  function accrueYield(address token, uint256 amount) external {
-    ERC20Mock(token).mint(address(this), amount);
-  }
-
-  function availableBalanceOf(address token) external view returns (uint256) {
-    return ERC20Mock(token).balanceOf(address(this));
-  }
-
   function _availableReserveOut() internal returns (uint256) {
     return ILiquidationSource(_source).availableBalanceOf(_tokenOut);
   }
@@ -52,22 +44,11 @@ contract LiquidationPairMock {
   function swapExactAmountOut(
     address _account,
     uint256 _amountOut,
-    uint256 /* _amountInMax */
+    uint256 _amountInMax
   ) external returns (uint256) {
-    uint256 _availableBalance = _availableReserveOut();
+    ILiquidationSource(_source).liquidate(_account, _tokenIn, _amountInMax, _tokenOut, _amountOut);
 
-    (, , uint256 _amountIn) = _liquidatorLib.swapExactAmountOut(
-      100,
-      50,
-      _availableBalance,
-      _amountOut,
-      UFixed32x9.wrap(0.3e9),
-      UFixed32x9.wrap(0.02e9)
-    );
-
-    ILiquidationSource(_source).liquidate(_account, _tokenIn, _amountIn, _tokenOut, _amountOut);
-
-    return _amountIn;
+    return _amountInMax;
   }
 
   function target() external view returns (address) {

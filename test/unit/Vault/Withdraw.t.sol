@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { IERC20 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import { UnitBaseSetup, IERC20 } from "test/utils/UnitBaseSetup.t.sol";
 
-import { Helpers } from "test/utils/Helpers.t.sol";
-import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
-
-contract VaultWithdrawTest is UnitBaseSetup, Helpers {
+contract VaultWithdrawTest is UnitBaseSetup {
   /* ============ Events ============ */
   event Withdraw(
     address indexed sender,
@@ -62,7 +59,7 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     assertEq(twabController.balanceOf(address(vault), alice), _halfAmount);
     assertEq(twabController.delegateBalanceOf(address(vault), alice), _halfAmount);
 
-    assertEq(yieldVault.balanceOf(address(vault)), _halfAmount);
+    assertEq(yieldVault.maxWithdraw(address(vault)), _halfAmount);
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _halfAmount);
 
     vm.stopPrank();
@@ -197,7 +194,7 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     assertEq(twabController.balanceOf(address(vault), alice), 0);
     assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
 
-    assertEq(yieldVault.convertToAssets(yieldVault.balanceOf(address(vault))), _yield);
+    assertEq(yieldVault.balanceOf(address(vault)), yieldVault.convertToShares(_yield));
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _yield);
 
     vm.stopPrank();

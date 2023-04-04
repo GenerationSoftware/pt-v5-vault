@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { Helpers } from "test/utils/Helpers.t.sol";
 import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
 
-contract VaultDepositTest is UnitBaseSetup, Helpers {
+contract VaultDepositTest is UnitBaseSetup {
   /* ============ Events ============ */
   event Deposit(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
 
