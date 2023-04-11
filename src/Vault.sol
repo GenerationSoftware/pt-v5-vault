@@ -757,6 +757,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function _mint(address _receiver, uint256 _shares) internal virtual override {
     _assetSupplyBalance += convertToAssets(_shares);
     _twabController.twabMint(_receiver, uint112(_shares));
+
+    emit Transfer(address(0), _receiver, _shares);
   }
 
   /**
@@ -768,6 +770,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function _burn(address _owner, uint256 _shares) internal virtual override {
     _assetSupplyBalance -= convertToAssets(_shares);
     _twabController.twabBurn(_owner, uint112(_shares));
+
+    emit Transfer(_owner, address(0), _shares);
   }
 
   /**
@@ -778,6 +782,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
     _twabController.twabTransfer(_from, _to, uint112(_shares));
+
+    emit Transfer(_from, _to, _shares);
   }
 
   /**

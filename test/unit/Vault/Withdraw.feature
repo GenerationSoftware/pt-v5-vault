@@ -8,6 +8,7 @@ Feature: Withdraw
     Then Alice `delegateBalance` must be equal to 0
     Then the Vault balance of YieldVault shares must be equal to 0
     Then the YieldVault balance of underlying assets must be equal to 0
+    Then the Vault `totalSupply` must be equal to 0
 
   Scenario: Alice withdraws half of her deposit
     Given Alice owns 1,000 Vault shares
@@ -18,6 +19,7 @@ Feature: Withdraw
     Then Alice `delegateBalance` must be equal to 500
     Then the Vault balance of YieldVault shares must decrease by half
     Then the YieldVault balance of underlying assets must decrease by half
+    Then the Vault `totalSupply` must decrease by half
 
   Scenario: Alice withdraws her full deposit after yield has accrued
     Given Alice owns 1,000 Vault shares and 10 underlying assets have accrued in the YieldVault
@@ -28,6 +30,7 @@ Feature: Withdraw
     Then Alice `delegateBalance` must be equal to 0
     Then the Vault balance of YieldVault shares must be equivalent to the amount of yield accrued
     Then the YieldVault balance of underlying assets must be equal to the amount of yield accrued
+    Then the Vault `totalSupply` must be equal to 0
 
   Scenario: Alice withdraws Bob full deposit on his behalf
     Given Bob owns 1,000 Vault shares and has approved Alice to spend his tokens
@@ -38,6 +41,7 @@ Feature: Withdraw
     Then Bob `delegateBalance` must be equal to 0
     Then the Vault balance of YieldVault shares must be equal to 0
     Then the YieldVault balance of underlying assets must be equal to 0
+    Then the Vault `totalSupply` must be equal to 0
 
   # Redeem
   Scenario: Alice redeems her full deposit
@@ -49,6 +53,7 @@ Feature: Withdraw
     Then Alice `delegateBalance` must be equal to 0
     Then the Vault balance of YieldVault shares must be equal to 0
     Then the YieldVault balance of underlying assets must be equal to 0
+    Then the Vault `totalSupply` must be equal to 0
 
   Scenario: Alice redeems half of her deposit
     Given Alice owns 1,000 Vault shares
@@ -59,6 +64,7 @@ Feature: Withdraw
     Then Alice `delegateBalance` must be equal to 500
     Then the Vault balance of YieldVault shares must decrease by half
     Then the YieldVault balance of underlying assets must decrease by half
+    Then the Vault `totalSupply` must decrease by half
 
   Scenario: Alice redeems her full deposit after yield has accrued
     Given Alice owns 1,000 Vault shares and 10 underlying assets have accrued in the YieldVault
@@ -69,6 +75,7 @@ Feature: Withdraw
     Then Alice `delegateBalance` must be equal to 0
     Then the Vault balance of YieldVault shares must be equivalent to the amount of yield accrued
     Then the YieldVault balance of underlying assets must be equal to the amount of yield accrued
+    Then the Vault `totalSupply` must be equal to 0
 
   Scenario: Alice redeems Bob full deposit on his behalf
     Given Bob owns 1,000 Vault shares and has approved Alice to spend his tokens
@@ -79,3 +86,4 @@ Feature: Withdraw
     Then Bob `delegateBalance` must be equal to 0
     Then the Vault balance of YieldVault shares must be equal to 0
     Then the YieldVault balance of underlying assets must be equal to 0
+    Then the Vault `totalSupply` must be equal to 0
