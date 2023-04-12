@@ -105,7 +105,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     assertEq(prizeToken.balanceOf(address(prizePool)), _prizeTokenContributed);
     assertEq(prizeToken.balanceOf(alice), _alicePrizeTokenBalanceBefore - _prizeTokenContributed);
 
-    uint256 _yieldFeeAmount = _getYieldFeeAmount(_yield, YIELD_FEE_PERCENTAGE);
+    uint256 _yieldFeeAmount = _getYieldFeeAmount(_liquidatedYield, YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
     assertEq(vault.balanceOf(address(this)), _amount + _yieldFeeAmount);
@@ -148,7 +148,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     assertEq(prizeToken.balanceOf(address(prizePool)), _prizeTokenContributed);
     assertEq(prizeToken.balanceOf(alice), _alicePrizeTokenBalanceBefore - _prizeTokenContributed);
 
-    uint256 _yieldFeeAmount = _getYieldFeeAmount(_yield, LOW_YIELD_FEE_PERCENTAGE);
+    uint256 _yieldFeeAmount = _getYieldFeeAmount(_liquidatedYield, LOW_YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
     assertEq(vault.balanceOf(address(this)), _amount + _yieldFeeAmount);
@@ -172,8 +172,6 @@ contract VaultLiquidateTest is UnitBaseSetup {
     _sponsor(underlyingAsset, vault, _amount, address(this));
 
     uint256 _yield = 10e18;
-    uint256 _yieldFeeAmount = _getYieldFeeAmount(_yield, YIELD_FEE_PERCENTAGE);
-    uint256 _liquidableYield = _yield - _yieldFeeAmount;
 
     _accrueYield(underlyingAsset, yieldVault, _yield);
 
@@ -181,7 +179,8 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     prizeToken.mint(alice, 1000e18);
 
-    uint256 _liquidatedYield = 2.5e18;
+    uint256 _liquidatedYield = vault.availableBalanceOf(address(vault)) / 4;
+
     (uint256 _alicePrizeTokenBalanceBefore, uint256 _prizeTokenContributed) = _liquidate(
       liquidationRouter,
       liquidationPair,
@@ -193,28 +192,23 @@ contract VaultLiquidateTest is UnitBaseSetup {
     assertEq(prizeToken.balanceOf(address(prizePool)), _prizeTokenContributed);
     assertEq(prizeToken.balanceOf(alice), _alicePrizeTokenBalanceBefore - _prizeTokenContributed);
 
-    uint256 _yieldFeeAmountLiquidated = _getYieldFeeAmountLiquidated(
-      _yield,
-      YIELD_FEE_PERCENTAGE,
-      _liquidatedYield,
-      _liquidableYield
-    );
+    uint256 _yieldFeeAmount = _getYieldFeeAmount(_liquidatedYield, YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
-    assertEq(vault.balanceOf(address(this)), _amount + _yieldFeeAmountLiquidated);
+    assertEq(vault.balanceOf(address(this)), _amount + _yieldFeeAmount);
 
-    uint256 _availableYieldBalance = _yield - (_liquidatedYield + _yieldFeeAmountLiquidated);
-    uint256 _availableYieldFeeBalance = _getYieldFeeAmount(
-      _availableYieldBalance,
-      YIELD_FEE_PERCENTAGE
-    );
+    uint256 _availableYieldBalance = _yield - (_liquidatedYield + _yieldFeeAmount);
 
     assertEq(
       vault.availableBalanceOf(address(vault)),
-      _availableYieldBalance - _availableYieldFeeBalance
+      _getAvailableBalanceOf(_availableYieldBalance, YIELD_FEE_PERCENTAGE)
     );
+
     assertEq(vault.availableYieldBalance(), _availableYieldBalance);
-    assertEq(vault.availableYieldFeeBalance(), _availableYieldFeeBalance);
+    assertEq(
+      vault.availableYieldFeeBalance(),
+      _getYieldFeeAmount(_availableYieldBalance, YIELD_FEE_PERCENTAGE)
+    );
 
     vm.stopPrank();
   }
@@ -230,8 +224,6 @@ contract VaultLiquidateTest is UnitBaseSetup {
     _sponsor(underlyingAsset, vault, _amount, address(this));
 
     uint256 _yield = 10e2;
-    uint256 _yieldFeeAmount = _getYieldFeeAmount(_yield, LOW_YIELD_FEE_PERCENTAGE);
-    uint256 _liquidableYield = _yield - _yieldFeeAmount;
 
     _accrueYield(underlyingAsset, yieldVault, _yield);
 
@@ -239,7 +231,8 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     prizeToken.mint(alice, 1000e2);
 
-    uint256 _liquidatedYield = 2.5e2;
+    uint256 _liquidatedYield = vault.availableBalanceOf(address(vault));
+
     (uint256 _alicePrizeTokenBalanceBefore, uint256 _prizeTokenContributed) = _liquidate(
       liquidationRouter,
       liquidationPair,
@@ -251,28 +244,23 @@ contract VaultLiquidateTest is UnitBaseSetup {
     assertEq(prizeToken.balanceOf(address(prizePool)), _prizeTokenContributed);
     assertEq(prizeToken.balanceOf(alice), _alicePrizeTokenBalanceBefore - _prizeTokenContributed);
 
-    uint256 _yieldFeeAmountLiquidated = _getYieldFeeAmountLiquidated(
-      _yield,
-      LOW_YIELD_FEE_PERCENTAGE,
-      _liquidatedYield,
-      _liquidableYield
-    );
+    uint256 _yieldFeeAmount = _getYieldFeeAmount(_liquidatedYield, LOW_YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
-    assertEq(vault.balanceOf(address(this)), _amount + _yieldFeeAmountLiquidated);
+    assertEq(vault.balanceOf(address(this)), _amount + _yieldFeeAmount);
 
-    uint256 _availableYieldBalance = _yield - (_liquidatedYield + _yieldFeeAmountLiquidated);
-    uint256 _availableYieldFeeBalance = _getYieldFeeAmount(
-      _availableYieldBalance,
-      LOW_YIELD_FEE_PERCENTAGE
-    );
+    uint256 _availableYieldBalance = _yield - (_liquidatedYield + _yieldFeeAmount);
 
     assertEq(
       vault.availableBalanceOf(address(vault)),
-      _availableYieldBalance - _availableYieldFeeBalance
+      _getAvailableBalanceOf(_availableYieldBalance, LOW_YIELD_FEE_PERCENTAGE)
     );
+
     assertEq(vault.availableYieldBalance(), _availableYieldBalance);
-    assertEq(vault.availableYieldFeeBalance(), _availableYieldFeeBalance);
+    assertEq(
+      vault.availableYieldFeeBalance(),
+      _getYieldFeeAmount(_availableYieldBalance, LOW_YIELD_FEE_PERCENTAGE)
+    );
 
     vm.stopPrank();
   }

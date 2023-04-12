@@ -215,7 +215,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Yield fee amount
    */
   function availableYieldFeeBalance() public view returns (uint256) {
-    return _getAvailableYieldFeeAmount(_getAvailableYieldBalance());
+    uint256 _availableYield = _getAvailableYieldBalance();
+
+    if (_availableYield != 0 && _yieldFeePercentage != 0) {
+      return _getYieldFeeAmount(_availableYield);
+    }
+
+    return 0;
   }
 
   /// @inheritdoc ERC20
@@ -366,13 +372,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     if (_yieldFeeRecipient != address(0) && _yieldFeePercentage != 0) {
       // We get the percentage of liquidated yield and mint the equivalent amount in fees.
-      _mint(
-        _yieldFeeRecipient,
-        _getYieldFeeAmount(
-          _getAvailableYieldBalance(),
-          (_amountOut * _yieldFeePercentage) / _liquidableYield
-        )
-      );
+      _mint(_yieldFeeRecipient, _getYieldFeeAmount(_amountOut));
     }
 
     _mint(_account, _amountOut);
@@ -573,7 +573,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _availableYield = _getAvailableYieldBalance();
 
     unchecked {
-      return _availableYield -= _getAvailableYieldFeeAmount(_availableYield);
+      return _availableYield -= (_availableYield * _yieldFeePercentage) / FEE_PRECISION;
     }
   }
 
@@ -601,29 +601,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Get the yield fee amount.
-   * @dev Used to calculate the available yield fee amount and the yield fee amount to mint.
+   * @dev Used to calculate the yield fee amount to mint.
    * @param _amount Yield amount
-   * @param _percentage Percentage in 9 decimal places
    * @return uint256 Yield fee amount
    */
-  function _getYieldFeeAmount(
-    uint256 _amount,
-    uint256 _percentage
-  ) internal pure returns (uint256) {
-    return (_amount * _percentage) / FEE_PRECISION;
-  }
-
-  /**
-   * @notice Get the yield fee amount accrued by this vault.
-   * @param _availableYield Total yield amount
-   * @return uint256 Yield fee amount
-   */
-  function _getAvailableYieldFeeAmount(uint256 _availableYield) internal view returns (uint256) {
-    if (_availableYield != 0 && _yieldFeePercentage != 0) {
-      return _getYieldFeeAmount(_availableYield, _yieldFeePercentage);
-    }
-
-    return 0;
+  function _getYieldFeeAmount(uint256 _amount) internal view returns (uint256) {
+    return (_amount * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amount;
   }
 
   /**

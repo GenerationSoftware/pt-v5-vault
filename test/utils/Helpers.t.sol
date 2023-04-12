@@ -22,6 +22,8 @@ contract Helpers is Test {
   bytes32 private constant _PERMIT_TYPEHASH =
     keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
+  uint256 public constant FEE_PRECISION = 1e9;
+
   uint256 public constant YIELD_FEE_PERCENTAGE = 100000000; // 0.1 = 10%
 
   /**
@@ -164,18 +166,16 @@ contract Helpers is Test {
 
   function _getYieldFeeAmount(
     uint256 _amount,
-    uint256 _percentage
+    uint256 _feePercentage
   ) internal pure returns (uint256) {
-    return (_amount * _percentage) / 1e9;
+    return (_amount * FEE_PRECISION) / (FEE_PRECISION - _feePercentage) - _amount;
   }
 
-  function _getYieldFeeAmountLiquidated(
-    uint256 _amount,
-    uint256 _percentage,
-    uint256 _amountLiquidated,
-    uint256 _amountLiquidable
+  function _getAvailableBalanceOf(
+    uint256 _availableYield,
+    uint256 _feePercentage
   ) internal pure returns (uint256) {
-    return _getYieldFeeAmount(_amount, (_amountLiquidated * _percentage) / _amountLiquidable);
+    return _availableYield -= (_availableYield * _feePercentage) / FEE_PRECISION;
   }
 
   /* ============ Claim ============ */
