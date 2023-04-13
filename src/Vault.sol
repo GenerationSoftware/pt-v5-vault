@@ -68,6 +68,24 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   event ClaimerSet(Claimer previousClaimer, Claimer newClaimer);
 
   /**
+   * @notice Emitted when a new LiquidationPair has been set.
+   * @param previousLiquidationPair Address of the previous liquidationPair
+   * @param newLiquidationPair Address of the new liquidationPair
+   */
+  event LiquidationPairSet(
+    LiquidationPair previousLiquidationPair,
+    LiquidationPair newLiquidationPair
+  );
+
+  /**
+   * @notice Emitted when yield fee is minted to the yield recipient.
+   * @param caller Address that called the function
+   * @param recipient Address receiving the Vault shares
+   * @param shares Amount of shares minted to `recipient`
+   */
+  event MintYieldFee(address indexed caller, address indexed recipient, uint256 shares);
+
+  /**
    * @notice Emitted when a new yield fee recipient has been set.
    * @param previousYieldFeeRecipient Address of the previous yield fee recipient
    * @param newYieldFeeRecipient Address of the new yield fee recipient
@@ -80,16 +98,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param newYieldFeePercentage New yield fee percentage
    */
   event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
-
-  /**
-   * @notice Emitted when a new LiquidationPair has been set.
-   * @param previousLiquidationPair Address of the previous liquidationPair
-   * @param newLiquidationPair Address of the new liquidationPair
-   */
-  event LiquidationPairSet(
-    LiquidationPair previousLiquidationPair,
-    LiquidationPair newLiquidationPair
-  );
 
   /**
    * @notice Emitted when a user sponsor the Vault.
@@ -126,6 +134,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Address of the yield fee recipient that receives the fee amount when yield is captured.
   address private _yieldFeeRecipient;
 
+  /// @notice Total supply of accrued yield fee.
+  uint256 private _yieldFeeTotalSupply;
+
   /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
   uint256 private constant FEE_PRECISION = 1e9;
 
@@ -133,6 +144,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @notice Mapping to keep track of users who disabled prize auto claiming.
   mapping(address => bool) public autoClaimDisabled;
+
+  /// @notice Mapping to keep track of the accrued yield fee per recipient.
+  mapping(address => uint256) private _yieldFeeBalances;
 
   /* ============ Constructor ============ */
 
@@ -166,8 +180,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     require(address(yieldVault_) != address(0), "Vault/YV-not-zero-address");
     require(address(prizePool_) != address(0), "Vault/PP-not-zero-address");
     require(address(_owner) != address(0), "Vault/owner-not-zero-address");
-
-    /// TODO: yield needs to be exposed but also other yield farm tokens => need for ownership
 
     _twabController = twabController_;
     _yieldVault = yieldVault_;
@@ -207,7 +219,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Total yield amount
    */
   function availableYieldBalance() public view returns (uint256) {
-    return _getAvailableYieldBalance();
+    return _availableYieldBalance();
   }
 
   /**
@@ -215,10 +227,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Yield fee amount
    */
   function availableYieldFeeBalance() public view returns (uint256) {
-    uint256 _availableYield = _getAvailableYieldBalance();
+    uint256 _availableYield = _availableYieldBalance();
 
     if (_availableYield != 0 && _yieldFeePercentage != 0) {
-      return _getYieldFeeAmount(_availableYield);
+      return _availableYieldFeeBalance(_availableYield);
     }
 
     return 0;
@@ -352,6 +364,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @inheritdoc ILiquidationSource
    * @dev User provides prize tokens and receives in exchange Vault shares.
+   * @dev If `_yieldFeeRecipient` is address zero, the yield fee can serve as a buffer
+   *      in case of undercollateralization of the Vault.
    */
   function liquidate(
     address _account,
@@ -370,14 +384,33 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
 
-    if (_yieldFeeRecipient != address(0) && _yieldFeePercentage != 0) {
-      // We get the percentage of liquidated yield and mint the equivalent amount in fees.
-      _mint(_yieldFeeRecipient, _getYieldFeeAmount(_amountOut));
+    if (_yieldFeePercentage != 0) {
+      uint256 _yieldFeeShares = (_amountOut * FEE_PRECISION) /
+        (FEE_PRECISION - _yieldFeePercentage) -
+        _amountOut;
+
+      _yieldFeeBalances[_yieldFeeRecipient] += _yieldFeeShares;
+      _yieldFeeTotalSupply += _yieldFeeShares;
     }
 
     _mint(_account, _amountOut);
 
     return true;
+  }
+
+  /**
+   * @notice Mint Vault shares to the yield fee `_recipient`.
+   * @param _shares Amount of shares to mint
+   * @param _recipient Address of the yield fee recipient
+   */
+  function mintYieldFee(uint256 _shares, address _recipient) external {
+    require(_shares <= _yieldFeeBalances[_recipient], "Vault/shares-gt-yieldFeeBalance");
+    _yieldFeeBalances[_recipient] -= _shares;
+    _yieldFeeTotalSupply -= _shares;
+
+    _mint(_recipient, _shares);
+
+    emit MintYieldFee(msg.sender, _recipient, _shares);
   }
 
   /// @inheritdoc ILiquidationSource
@@ -503,6 +536,42 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /* ============ Getter Functions ============ */
 
   /**
+   * @notice Address of the yield fee recipient.
+   * @return address Yield fee recipient address
+   */
+
+  function yieldFeeRecipient() public view returns (address) {
+    return _yieldFeeRecipient;
+  }
+
+  /**
+   * @notice Yield fee percentage.
+   * @return uint256 Yield fee percentage
+   */
+
+  function yieldFeePercentage() public view returns (uint256) {
+    return _yieldFeePercentage;
+  }
+
+  /**
+   * @notice Get yield fee balance accrued by `_owner`.
+   * @param _owner Address that accrued the yield fee
+   * @return uint256 Accrued yield fee balance
+   */
+  function yieldFeeBalance(address _owner) public view returns (uint256) {
+    return _yieldFeeBalances[_owner];
+  }
+
+  /**
+   * @notice Get total yield fee accrued by this Vault.
+   * @dev If the vault becomes underecollateralized, this total yield fee can be used to recollateralize it.
+   * @return uint256 Total accrued yield fee
+   */
+  function yieldFeeTotalSupply() public view returns (uint256) {
+    return _yieldFeeTotalSupply;
+  }
+
+  /**
    * @notice Address of the TwabController keeping track of balances.
    * @return address TwabController address
    */
@@ -542,24 +611,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return address(_claimer);
   }
 
-  /**
-   * @notice Address of the yield fee recipient.
-   * @return address Yield fee recipient address
-   */
-
-  function yieldFeeRecipient() public view returns (address) {
-    return _yieldFeeRecipient;
-  }
-
-  /**
-   * @notice Yield fee percentage.
-   * @return uint256 Yield fee percentage
-   */
-
-  function yieldFeePercentage() public view returns (uint256) {
-    return _yieldFeePercentage;
-  }
-
   /* ============ Internal Functions ============ */
 
   /**
@@ -570,18 +621,18 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function _availableBalanceOf(address _token) internal view returns (uint256) {
     require(_token == address(this), "Vault/token-not-vault-share");
 
-    uint256 _availableYield = _getAvailableYieldBalance();
+    uint256 _availableYield = _availableYieldBalance();
 
     unchecked {
-      return _availableYield -= (_availableYield * _yieldFeePercentage) / FEE_PRECISION;
+      return _availableYield -= _availableYieldFeeBalance(_availableYield);
     }
   }
 
   /**
-   * @notice Get the total yield amount accrued by this vault.
+   * @notice Total yield amount accrued by this vault.
    * @dev The available yield is equal to the maximum amount of assets
-   *      that can be withdrawn from the YieldVault minus the total amount of assets managed by this vault
-   *      which is equal to the total amount supplied to the YieldVault + the amount living in this vault.
+   *      that can be withdrawn from the YieldVault minus the total accrued yield fee
+   *      and the total amount of assets managed by this vault
    * @dev If `_totalAssets` is greater than `_withdrawableAssets`, it could mean that:
    *      - assets are living in this vault
    *      - this vault is now undercollateralized
@@ -589,9 +640,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *      so we return the amount of assets living in this vault
    * @return uint256 Total yield amount
    */
-  function _getAvailableYieldBalance() internal view returns (uint256) {
+  function _availableYieldBalance() internal view returns (uint256) {
     uint256 _totalAssets = totalAssets();
-    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
+    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this)) - _yieldFeeTotalSupply;
 
     return
       _withdrawableAssets >= _totalAssets
@@ -600,13 +651,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Get the yield fee amount.
-   * @dev Used to calculate the yield fee amount to mint.
-   * @param _amount Yield amount
-   * @return uint256 Yield fee amount
+   * @notice Available yield fee amount.
+   * @param _availableYield Total amount of yield fee available
+   * @return uint256 Available yield fee balance
    */
-  function _getYieldFeeAmount(uint256 _amount) internal view returns (uint256) {
-    return (_amount * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amount;
+  function _availableYieldFeeBalance(uint256 _availableYield) internal view returns (uint256) {
+    return (_availableYield * _yieldFeePercentage) / FEE_PRECISION;
   }
 
   /**

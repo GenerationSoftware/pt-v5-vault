@@ -164,11 +164,26 @@ contract Helpers is Test {
     _liquidationRouter.swapExactAmountOut(_liquidationPair, _user, _yield, prizeTokenContributed);
   }
 
-  function _getYieldFeeAmount(
+  function _getYieldFeeShares(
     uint256 _amount,
     uint256 _feePercentage
   ) internal pure returns (uint256) {
     return (_amount * FEE_PRECISION) / (FEE_PRECISION - _feePercentage) - _amount;
+  }
+
+  function _getAvailableYieldBalance(
+    uint256 _yield,
+    uint256 _liquidatedYield,
+    uint256 _yieldFeeShares
+  ) internal view returns (uint256) {
+    return _yield - (_liquidatedYield + _yieldFeeShares);
+  }
+
+  function _getAvailableYieldFeeBalance(
+    uint256 _availableYield,
+    uint256 _feePercentage
+  ) internal view returns (uint256) {
+    return (_availableYield * _feePercentage) / FEE_PRECISION;
   }
 
   function _getAvailableBalanceOf(
