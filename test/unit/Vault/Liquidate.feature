@@ -78,4 +78,4 @@ Feature: Liquidate
   Scenario: Bob mints an arbitrary amount of yield fee
     Given no yield fee has accrued
     When Bob mints 10 yield fee shares
-    Then the transaction reverts with the error `Vault/shares-gt-yieldFeeBalance`
+    Then the transaction reverts with the error `Vault/shares-gt-yieldFeeSupply`

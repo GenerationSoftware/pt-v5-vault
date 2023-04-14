@@ -111,7 +111,6 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
-    assertEq(vault.yieldFeeBalance(address(this)), _yieldFeeShares);
     assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
     assertEq(_yield, _liquidatedYield + _yieldFeeShares);
 
@@ -155,7 +154,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, LOW_YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
-    assertEq(vault.yieldFeeBalance(address(this)), _yieldFeeShares);
+    assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
     assertEq(_yield, _liquidatedYield + _yieldFeeShares);
 
     assertEq(vault.availableBalanceOf(address(vault)), 0);
@@ -199,7 +198,6 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
-    assertEq(vault.yieldFeeBalance(address(this)), _yieldFeeShares);
 
     uint256 _availableYieldBalance = _getAvailableYieldBalance(
       _yield,
@@ -255,7 +253,6 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, LOW_YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
-    assertEq(vault.yieldFeeBalance(address(this)), _yieldFeeShares);
 
     uint256 _availableYieldBalance = _getAvailableYieldBalance(
       _yield,
@@ -304,7 +301,6 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(bob), 0);
-    assertEq(vault.yieldFeeBalance(bob), _yieldFeeShares);
 
     assertEq(vault.totalSupply(), _amount + _liquidatedYield);
     assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
@@ -315,7 +311,6 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vault.mintYieldFee(_yieldFeeShares, bob);
 
     assertEq(vault.balanceOf(bob), _yieldFeeShares);
-    assertEq(vault.yieldFeeBalance(bob), 0);
 
     assertEq(vault.totalSupply(), _amount + _liquidatedYield + _yieldFeeShares);
     assertEq(vault.yieldFeeTotalSupply(), 0);
@@ -377,8 +372,8 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testMintYieldFeeGTYieldFeeBalance() public {
-    vm.expectRevert(bytes("Vault/shares-gt-yieldFeeBalance"));
+  function testMintYieldFeeGTYieldFeeSupply() public {
+    vm.expectRevert(bytes("Vault/shares-gt-yieldFeeSupply"));
     vault.mintYieldFee(10e18, bob);
   }
 }

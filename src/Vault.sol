@@ -141,9 +141,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Mapping to keep track of users who disabled prize auto claiming.
   mapping(address => bool) public autoClaimDisabled;
 
-  /// @notice Mapping to keep track of the accrued yield fee per recipient.
-  mapping(address => uint256) private _yieldFeeBalances;
-
   /* ============ Constructor ============ */
 
   /**
@@ -385,7 +382,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
         (FEE_PRECISION - _yieldFeePercentage) -
         _amountOut;
 
-      _yieldFeeBalances[_yieldFeeRecipient] += _yieldFeeShares;
       _yieldFeeTotalSupply += _yieldFeeShares;
     }
 
@@ -400,10 +396,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _recipient Address of the yield fee recipient
    */
   function mintYieldFee(uint256 _shares, address _recipient) external {
-    require(_shares <= _yieldFeeBalances[_recipient], "Vault/shares-gt-yieldFeeBalance");
-    _yieldFeeBalances[_recipient] -= _shares;
-    _yieldFeeTotalSupply -= _shares;
+    require(_shares <= _yieldFeeTotalSupply, "Vault/shares-gt-yieldFeeSupply");
 
+    _yieldFeeTotalSupply -= _shares;
     _mint(_recipient, _shares);
 
     emit MintYieldFee(msg.sender, _recipient, _shares);
@@ -547,15 +542,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   function yieldFeePercentage() public view returns (uint256) {
     return _yieldFeePercentage;
-  }
-
-  /**
-   * @notice Get yield fee balance accrued by `_owner`.
-   * @param _owner Address that accrued the yield fee
-   * @return uint256 Accrued yield fee balance
-   */
-  function yieldFeeBalance(address _owner) public view returns (uint256) {
-    return _yieldFeeBalances[_owner];
   }
 
   /**
