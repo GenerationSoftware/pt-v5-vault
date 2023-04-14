@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { ERC4626Mock, IERC20Metadata } from "openzeppelin/mocks/ERC4626Mock.sol";
+import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
+import { ERC4626Mock, IERC20, IERC20Metadata } from "openzeppelin/mocks/ERC4626Mock.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 
 contract YieldVault is ERC4626Mock {
   using Math for uint256;
 
   constructor(address _asset, string memory _name, string memory _symbol) ERC4626Mock(_asset) {}
+
+  function burnAssets(address _account, uint256 _assets) external {
+    ERC20Mock(asset()).burn(_account, _assets);
+  }
 
   /**
    * We override the virtual shares and assets implementation since this approach captures

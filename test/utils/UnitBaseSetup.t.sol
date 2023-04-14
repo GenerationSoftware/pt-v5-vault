@@ -9,12 +9,11 @@ import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
-import { Vault } from "src/Vault.sol";
-
 import { ERC20PermitMock } from "test/contracts/mock/ERC20PermitMock.sol";
 import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
 import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock.sol";
 import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
+import { VaultMock } from "test/contracts/mock/Vault.sol";
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
 import { Helpers } from "test/utils/Helpers.t.sol";
@@ -35,7 +34,7 @@ contract UnitBaseSetup is Test, Helpers {
 
   address public constant SPONSORSHIP_ADDRESS = address(1);
 
-  Vault public vault;
+  VaultMock public vault;
   string public vaultName = "PoolTogether aEthDAI Prize Token (PTaEthDAI)";
   string public vaultSymbol = "PTaEthDAI";
 
@@ -76,7 +75,7 @@ contract UnitBaseSetup is Test, Helpers {
       "PTaEthDAIY"
     );
 
-    vault = new Vault(
+    vault = new VaultMock(
       underlyingAsset,
       vaultName,
       vaultSymbol,

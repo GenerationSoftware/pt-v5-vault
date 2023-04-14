@@ -11,6 +11,7 @@ import { ILiquidationSource } from "v5-liquidator-interfaces/ILiquidationSource.
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
+import { console2 } from "forge-std/Test.sol";
 
 /**
  * @title  PoolTogether V5 Vault
@@ -256,13 +257,19 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
+   * @notice Check if the Vault is collateralized.
+   * @return bool True if the vault is collateralized, false otherwise
+   */
+  function isVaultCollateralized() public view returns (bool) {
+    return _isVaultCollateralized();
+  }
+
+  /**
    * @inheritdoc ERC4626
-   * @dev We check if vault is properly collateralized.
-   *      If yes, we return uint112 max value. Otherwise, we return 0.
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
   function maxDeposit(address) public view virtual override returns (uint256) {
-    return (totalAssets() > 0 || totalSupply() == 0) ? type(uint112).max : 0;
+    return type(uint112).max;
   }
 
   /**
@@ -378,11 +385,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _prizePool.contributePrizeTokens(address(this), _amountIn);
 
     if (_yieldFeePercentage != 0) {
-      uint256 _yieldFeeShares = (_amountOut * FEE_PRECISION) /
-        (FEE_PRECISION - _yieldFeePercentage) -
-        _amountOut;
-
-      _yieldFeeTotalSupply += _yieldFeeShares;
+      _increaseYieldFeeBalance(
+        (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut
+      );
     }
 
     _mint(_account, _amountOut);
@@ -392,13 +397,16 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Mint Vault shares to the yield fee `_recipient`.
+   * @dev Will revert if the Vault is undercollateralized
+   *      or if the `_shares` are greater than the accrued yield fee balance of `_recipient`.
    * @param _shares Amount of shares to mint
    * @param _recipient Address of the yield fee recipient
    */
   function mintYieldFee(uint256 _shares, address _recipient) external {
-    require(_shares <= _yieldFeeTotalSupply, "Vault/shares-gt-yieldFeeSupply");
+    require(_isVaultCollateralized(), "Vault/vault-undercollateralized");
+    require(_shares <= _yieldFeeTotalSupply, "Vault/shares-gt-yieldFeeBalance");
 
-    _yieldFeeTotalSupply -= _shares;
+    _decreaseYieldFeeBalance(_shares);
     _mint(_recipient, _shares);
 
     emit MintYieldFee(msg.sender, _recipient, _shares);
@@ -639,6 +647,34 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function _availableYieldFeeBalance(uint256 _availableYield) internal view returns (uint256) {
     return (_availableYield * _yieldFeePercentage) / FEE_PRECISION;
+  }
+
+  /**
+   * @notice Decrease yield fee balance accrued by `_yieldFeeRecipient`.
+   * @param _shares Amount of shares to decrease yield fee balance by
+   */
+  function _decreaseYieldFeeBalance(uint256 _shares) internal {
+    _yieldFeeTotalSupply -= _shares;
+  }
+
+  /**
+   * @notice Increase yield fee balance accrued by `_yieldFeeRecipient`.
+   * @param _shares Amount of shares to increase yield fee balance by
+   */
+  function _increaseYieldFeeBalance(uint256 _shares) internal {
+    _yieldFeeTotalSupply += _shares;
+  }
+
+  /**
+   * @notice Check if the Vault is collateralized.
+   * @dev The vault is collateralized if the total amount of underlying assets withdrawable from the YieldVault
+   *      is greater than or equal to the total amount of underlying assets managed by this vault.
+   * @return bool True if the vault is collateralized, false otherwise
+   */
+  function _isVaultCollateralized() internal view returns (bool) {
+    console2.log("totalAssets()", totalAssets());
+    console2.log("_yieldVault.maxWithdraw(address(this)", _yieldVault.maxWithdraw(address(this)));
+    return _yieldVault.maxWithdraw(address(this)) >= totalAssets();
   }
 
   /**
