@@ -23,10 +23,7 @@ contract VaultTest is UnitBaseSetup {
 
   event ClaimerSet(Claimer previousClaimer, Claimer newClaimer);
 
-  event LiquidationPairSet(
-    LiquidationPair previousLiquidationPair,
-    LiquidationPair newLiquidationPair
-  );
+  event LiquidationPairSet(LiquidationPair newLiquidationPair);
 
   event YieldFeeRecipientSet(address previousYieldFeeRecipient, address newYieldFeeRecipient);
 
@@ -299,7 +296,7 @@ contract VaultTest is UnitBaseSetup {
   /* ============ setLiquidationPair ============ */
   function testSetLiquidationPair() public {
     vm.expectEmit(true, true, true, true);
-    emit LiquidationPairSet(LiquidationPair(address(0)), LiquidationPair(address(liquidationPair)));
+    emit LiquidationPairSet(LiquidationPair(address(liquidationPair)));
 
     address _newLiquidationPairAddress = _setLiquidationPair();
 

@@ -69,13 +69,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Emitted when a new LiquidationPair has been set.
-   * @param previousLiquidationPair Address of the previous liquidationPair
    * @param newLiquidationPair Address of the new liquidationPair
    */
-  event LiquidationPairSet(
-    LiquidationPair previousLiquidationPair,
-    LiquidationPair newLiquidationPair
-  );
+  event LiquidationPairSet(LiquidationPair newLiquidationPair);
 
   /**
    * @notice Emitted when yield fee is minted to the yield recipient.
@@ -491,18 +487,18 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   ) external onlyOwner returns (address) {
     require(address(liquidationPair_) != address(0), "Vault/LP-not-zero-address");
 
-    LiquidationPair _previousLiquidationPair = _liquidationPair;
-    _liquidationPair = liquidationPair_;
-
     IERC20 _asset = IERC20(asset());
+    address _previousLiquidationPair = address(_liquidationPair);
 
-    if (address(_previousLiquidationPair) != address(0)) {
-      _asset.safeApprove(address(_previousLiquidationPair), 0);
+    if (_previousLiquidationPair != address(0)) {
+      _asset.safeApprove(_previousLiquidationPair, 0);
     }
 
     _asset.safeApprove(address(liquidationPair_), type(uint256).max);
 
-    emit LiquidationPairSet(_previousLiquidationPair, liquidationPair_);
+    _liquidationPair = liquidationPair_;
+
+    emit LiquidationPairSet(liquidationPair_);
     return address(liquidationPair_);
   }
 
