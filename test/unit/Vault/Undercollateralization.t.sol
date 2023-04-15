@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
-import { console2 } from "forge-std/Test.sol";
+
 import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
 
 contract VaultUndercollateralizationTest is UnitBaseSetup {
@@ -9,9 +9,13 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
   /* ============ Undercollateralization without yield fees accrued ============ */
   function testUndercollateralization() external {
     uint256 _aliceAmount = 15_000_000e18;
+    uint256 _aliceAmountUndercollateralized = 7_500_000e18;
+
     underlyingAsset.mint(alice, _aliceAmount);
 
     uint256 _bobAmount = 5_000_000e18;
+    uint256 _bobAmountUndercollateralized = 2_500_000e18;
+
     underlyingAsset.mint(bob, _bobAmount);
 
     vm.startPrank(alice);
@@ -33,25 +37,24 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     assertEq(vault.isVaultCollateralized(), false);
 
-    /**
-     * Vault shares are still collateralized by YieldVault shares,
-     * only the YieldVault shares are not collateralized by the correct amount of underlying assets.
-     * So `maxWithdraw` still "think" that Alice and Bob can withdraw their full deposit.
-     */
-    assertEq(vault.maxWithdraw(alice), _aliceAmount);
-    assertEq(vault.maxWithdraw(bob), _bobAmount);
+    assertEq(vault.maxWithdraw(alice), _aliceAmountUndercollateralized);
+    assertEq(vault.maxWithdraw(bob), _bobAmountUndercollateralized);
 
     vm.stopPrank();
 
     vm.startPrank(alice);
 
-    vault.withdraw(yieldVault.maxWithdraw(address(vault)), alice, alice);
-    assertEq(underlyingAsset.balanceOf(alice), 10_000_000e18);
+    vault.withdraw(vault.maxWithdraw(alice), alice, alice);
+    assertEq(underlyingAsset.balanceOf(alice), _aliceAmountUndercollateralized);
 
     vm.stopPrank();
 
-    // The Vault deposits are now backed by 0 underlying assets, so Bob can't withdraw
-    assertEq(yieldVault.maxWithdraw(address(vault)), 0);
+    vm.startPrank(bob);
+
+    vault.withdraw(vault.maxWithdraw(bob), bob, bob);
+    assertEq(underlyingAsset.balanceOf(bob), _bobAmountUndercollateralized);
+
+    vm.stopPrank();
   }
 
   /* ============ Undercollateralization with yield fees accrued ============ */
@@ -59,9 +62,13 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
 
     uint256 _aliceAmount = 15_000_000e18;
+    uint256 _aliceAmountUndercollateralized = 7_800_000e18;
+
     underlyingAsset.mint(alice, _aliceAmount);
 
     uint256 _bobAmount = 5_000_000e18;
+    uint256 _bobAmountUndercollateralized = 2_600_000e18;
+
     underlyingAsset.mint(bob, _bobAmount);
 
     vm.startPrank(alice);
@@ -82,25 +89,30 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     uint256 _yield = 400_000e18;
     _accrueYield(underlyingAsset, yieldVault, _yield);
 
-    // And mint yield fees
-    vault.mintYieldFees(_yield);
+    // And increase yield fee balance
+    vault.increaseYieldFeeBalance(_yield);
 
     underlyingAsset.burn(address(yieldVault), 10_000_000e18);
 
     assertEq(vault.isVaultCollateralized(), false);
 
-    assertEq(vault.maxWithdraw(alice), _aliceAmount);
-    assertEq(vault.maxWithdraw(bob), _bobAmount);
+    assertEq(vault.maxWithdraw(alice), _aliceAmountUndercollateralized);
+    assertEq(vault.maxWithdraw(bob), _bobAmountUndercollateralized);
 
     vm.stopPrank();
 
     vm.startPrank(alice);
 
-    vault.withdraw(yieldVault.maxWithdraw(address(vault)), alice, alice);
-    assertEq(underlyingAsset.balanceOf(alice), 10_000_000e18);
+    vault.withdraw(vault.maxWithdraw(alice), alice, alice);
+    assertEq(underlyingAsset.balanceOf(alice), _aliceAmountUndercollateralized);
 
     vm.stopPrank();
 
-    assertEq(yieldVault.maxWithdraw(address(vault)), 0);
+    vm.startPrank(bob);
+
+    vault.withdraw(vault.maxWithdraw(bob), bob, bob);
+    assertEq(underlyingAsset.balanceOf(bob), _bobAmountUndercollateralized);
+
+    vm.stopPrank();
   }
 }

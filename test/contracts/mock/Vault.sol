@@ -2,7 +2,6 @@
 pragma solidity 0.8.17;
 
 import { IERC20, IERC4626, Claimer, PrizePool, TwabController, Vault } from "src/Vault.sol";
-import { console2 } from "forge-std/Test.sol";
 
 contract VaultMock is Vault {
   constructor(
@@ -31,8 +30,7 @@ contract VaultMock is Vault {
     )
   {}
 
-  function mintYieldFees(uint256 _yield) external {
-    console2.log("_availableYieldFeeBalance(_yield)", _availableYieldFeeBalance(_yield));
+  function increaseYieldFeeBalance(uint256 _yield) external {
     _increaseYieldFeeBalance(_availableYieldFeeBalance(_yield));
   }
 }

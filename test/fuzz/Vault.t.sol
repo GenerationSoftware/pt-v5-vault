@@ -283,7 +283,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
     uint256 yield = _call_vault(abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_));
     uint256 callerVaultSharesBalanceBefore = vault.balanceOf(caller);
-    uint256 vaultAvailableBalanceBefore = vault.availableBalanceOf(_vault_);
+    uint256 vaultTotalAssetsBefore = vault.totalAssets();
 
     (uint256 callerPrizeTokenBalanceBefore, uint256 prizeTokenContributed) = _liquidate(
       liquidationRouter,
@@ -315,10 +315,17 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     );
 
     assertApproxEqAbs(
-      vault.availableBalanceOf(_vault_),
-      vaultAvailableBalanceBefore,
+      vault.totalAssets(),
+      vaultTotalAssetsBefore,
       _delta_,
-      "vault shares balance after liquidation"
+      "vault total assets after liquidation"
+    );
+
+    assertApproxEqAbs(
+      vault.availableBalanceOf(_vault_),
+      0,
+      _delta_,
+      "vault liquidatable balance after liquidation"
     );
 
     vm.stopPrank();

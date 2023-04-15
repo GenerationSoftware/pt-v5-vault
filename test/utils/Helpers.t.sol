@@ -70,6 +70,7 @@ contract Helpers is Test {
     return _vault.depositWithPermit(_assets, _user, block.timestamp, _v, _r, _s);
   }
 
+  /* ============ Deposit ============ */
   function _mint(
     IERC20 _underlyingAsset,
     Vault _vault,
@@ -145,6 +146,16 @@ contract Helpers is Test {
     return _vault.sponsorWithPermit(_assets, _user, block.timestamp, _v, _r, _s);
   }
 
+  /* ============ Undercollateralization ============ */
+  function _getUndercollateralizationAmount(
+    address _user,
+    Vault _vault,
+    YieldVault _yieldVault
+  ) internal view returns (uint256) {
+    return
+      (_vault.balanceOf(_user) * _yieldVault.maxWithdraw(address(_vault))) / _vault.totalSupply();
+  }
+
   /* ============ Liquidate ============ */
   function _accrueYield(ERC20Mock _underlyingAsset, IERC4626 _yieldVault, uint256 _yield) internal {
     _underlyingAsset.mint(address(_yieldVault), _yield);
@@ -175,14 +186,14 @@ contract Helpers is Test {
     uint256 _yield,
     uint256 _liquidatedYield,
     uint256 _yieldFeeShares
-  ) internal view returns (uint256) {
+  ) internal pure returns (uint256) {
     return _yield - (_liquidatedYield + _yieldFeeShares);
   }
 
   function _getAvailableYieldFeeBalance(
     uint256 _availableYield,
     uint256 _feePercentage
-  ) internal view returns (uint256) {
+  ) internal pure returns (uint256) {
     return (_availableYield * _feePercentage) / FEE_PRECISION;
   }
 

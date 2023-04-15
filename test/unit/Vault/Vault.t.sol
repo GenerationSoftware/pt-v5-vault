@@ -59,10 +59,13 @@ contract VaultTest is UnitBaseSetup {
       address(this)
     );
 
+    uint256 assetDecimals = ERC20(address(underlyingAsset)).decimals();
+
     assertEq(testVault.asset(), address(underlyingAsset));
     assertEq(testVault.name(), vaultName);
     assertEq(testVault.symbol(), vaultSymbol);
-    assertEq(testVault.decimals(), ERC20(address(underlyingAsset)).decimals());
+    assertEq(testVault.decimals(), assetDecimals);
+    assertEq(testVault.exchangeRate(), 10 ** assetDecimals);
     assertEq(testVault.twabController(), address(twabController));
     assertEq(testVault.yieldVault(), address(yieldVault));
     assertEq(testVault.prizePool(), address(prizePool));

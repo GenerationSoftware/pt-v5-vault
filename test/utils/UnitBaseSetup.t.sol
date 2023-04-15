@@ -38,7 +38,7 @@ contract UnitBaseSetup is Test, Helpers {
   string public vaultName = "PoolTogether aEthDAI Prize Token (PTaEthDAI)";
   string public vaultSymbol = "PTaEthDAI";
 
-  IERC4626 public yieldVault;
+  YieldVault public yieldVault;
   ERC20PermitMock public underlyingAsset;
   ERC20PermitMock public prizeToken;
   LiquidationRouterMock public liquidationRouter;
