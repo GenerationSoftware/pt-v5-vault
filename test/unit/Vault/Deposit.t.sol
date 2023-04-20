@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { Helpers } from "test/utils/Helpers.t.sol";
 import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
 
-contract VaultDepositTest is UnitBaseSetup, Helpers {
+contract VaultDepositTest is UnitBaseSetup {
   /* ============ Events ============ */
   event Deposit(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
 
   event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+
+  event Transfer(address indexed from, address indexed to, uint256 value);
 
   /* ============ Tests ============ */
 
@@ -19,7 +20,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
     _deposit(underlyingAsset, vault, _amount, alice);
@@ -31,6 +35,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -41,7 +46,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), bob, _amount);
+
+    vm.expectEmit();
     emit Deposit(alice, bob, _amount, _amount);
 
     _deposit(underlyingAsset, vault, _amount, bob);
@@ -57,6 +65,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -67,7 +76,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
     _depositWithPermit(underlyingAsset, vault, _amount, alice, alice, alicePrivateKey);
@@ -79,6 +91,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -89,7 +102,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), bob, _amount);
+
+    vm.expectEmit();
     emit Deposit(alice, bob, _amount, _amount);
 
     _depositWithPermit(underlyingAsset, vault, _amount, bob, alice, alicePrivateKey);
@@ -105,6 +121,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -116,7 +133,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
     _mint(underlyingAsset, vault, _amount, alice);
@@ -128,6 +148,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -138,7 +159,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), bob, _amount);
+
+    vm.expectEmit();
     emit Deposit(alice, bob, _amount, _amount);
 
     _mint(underlyingAsset, vault, _amount, bob);
@@ -154,6 +178,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -164,7 +189,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
     _mintWithPermit(underlyingAsset, vault, _amount, alice, alice, alicePrivateKey);
@@ -176,6 +204,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -186,7 +215,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), bob, _amount);
+
+    vm.expectEmit();
     emit Deposit(alice, bob, _amount, _amount);
 
     _mintWithPermit(underlyingAsset, vault, _amount, bob, alice, alicePrivateKey);
@@ -202,6 +234,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -213,7 +246,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
     emit Sponsor(alice, alice, _amount, _amount);
 
     _sponsor(underlyingAsset, vault, _amount, alice);
@@ -228,6 +264,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -238,7 +275,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), bob, _amount);
+
+    vm.expectEmit();
     emit Sponsor(alice, bob, _amount, _amount);
 
     _sponsor(underlyingAsset, vault, _amount, bob);
@@ -257,6 +297,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -267,7 +308,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
     emit Sponsor(alice, alice, _amount, _amount);
 
     _sponsorWithPermit(underlyingAsset, vault, _amount, alice, alice, alicePrivateKey);
@@ -282,6 +326,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -292,7 +337,10 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(address(0), bob, _amount);
+
+    vm.expectEmit();
     emit Sponsor(alice, bob, _amount, _amount);
 
     _sponsorWithPermit(underlyingAsset, vault, _amount, bob, alice, alicePrivateKey);
@@ -311,6 +359,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }
@@ -321,6 +370,12 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
+    emit Deposit(alice, alice, _amount, _amount);
 
     _deposit(underlyingAsset, vault, _amount, alice);
 
@@ -337,6 +392,7 @@ contract VaultDepositTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
   }

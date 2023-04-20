@@ -43,6 +43,8 @@ contract VaultFactory {
    * @param _yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
    * @param _prizePool Address of the PrizePool that computes prizes
    * @param _claimer Address of the claimer
+   * @param _yieldFeeRecipient Address of the yield fee recipient
+   * @param _yieldFeePercentage Yield fee percentage
    * @param _owner Address that will gain ownership of this contract
    * @return address Address of the newly deployed Vault
    */
@@ -54,6 +56,8 @@ contract VaultFactory {
     IERC4626 _yieldVault,
     PrizePool _prizePool,
     Claimer _claimer,
+    address _yieldFeeRecipient,
+    uint256 _yieldFeePercentage,
     address _owner
   ) external returns (address) {
     Vault _vault = new Vault(
@@ -64,6 +68,8 @@ contract VaultFactory {
       _yieldVault,
       _prizePool,
       _claimer,
+      _yieldFeeRecipient,
+      _yieldFeePercentage,
       _owner
     );
 

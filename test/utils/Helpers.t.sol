@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
@@ -12,11 +12,26 @@ import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 
 import { IERC4626, Vault } from "src/Vault.sol";
 
+import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
+import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock.sol";
+import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
 contract Helpers is Test {
+  /* ============ Variables ============ */
   bytes32 private constant _PERMIT_TYPEHASH =
     keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
+  uint256 public constant FEE_PRECISION = 1e9;
+
+  uint256 public constant YIELD_FEE_PERCENTAGE = 100000000; // 0.1 = 10%
+
+  /**
+   * For a token with 2 decimal places like gUSD, this is the minimum fee percentage that can be taken for a 2 figure yield.
+   * This is because Solidity will truncate down the result to 0 since it won't fit in 2 decimal places.
+   * i.e. 10 * 0.01% = 10 * 0.0001 = 1000 * 100000 / 1e9 = 0
+   */
+  uint256 public constant LOW_YIELD_FEE_PERCENTAGE = 1000000; // 0.001 = 0.1%
 
   /* ============ Deposit ============ */
   function _deposit(
@@ -133,6 +148,49 @@ contract Helpers is Test {
   /* ============ Liquidate ============ */
   function _accrueYield(ERC20Mock _underlyingAsset, IERC4626 _yieldVault, uint256 _yield) internal {
     _underlyingAsset.mint(address(_yieldVault), _yield);
+  }
+
+  function _liquidate(
+    LiquidationRouterMock _liquidationRouter,
+    LiquidationPairMock _liquidationPair,
+    IERC20 _prizeToken,
+    uint256 _yield,
+    address _user
+  ) internal returns (uint256 userPrizeTokenBalanceBeforeSwap, uint256 prizeTokenContributed) {
+    prizeTokenContributed = _liquidationPair.computeExactAmountIn(_yield);
+    userPrizeTokenBalanceBeforeSwap = _prizeToken.balanceOf(_user);
+
+    _prizeToken.approve(address(_liquidationRouter), prizeTokenContributed);
+    _liquidationRouter.swapExactAmountOut(_liquidationPair, _user, _yield, prizeTokenContributed);
+  }
+
+  function _getYieldFeeShares(
+    uint256 _amount,
+    uint256 _feePercentage
+  ) internal pure returns (uint256) {
+    return (_amount * FEE_PRECISION) / (FEE_PRECISION - _feePercentage) - _amount;
+  }
+
+  function _getAvailableYieldBalance(
+    uint256 _yield,
+    uint256 _liquidatedYield,
+    uint256 _yieldFeeShares
+  ) internal view returns (uint256) {
+    return _yield - (_liquidatedYield + _yieldFeeShares);
+  }
+
+  function _getAvailableYieldFeeBalance(
+    uint256 _availableYield,
+    uint256 _feePercentage
+  ) internal view returns (uint256) {
+    return (_availableYield * _feePercentage) / FEE_PRECISION;
+  }
+
+  function _getAvailableBalanceOf(
+    uint256 _availableYield,
+    uint256 _feePercentage
+  ) internal pure returns (uint256) {
+    return _availableYield -= (_availableYield * _feePercentage) / FEE_PRECISION;
   }
 
   /* ============ Claim ============ */

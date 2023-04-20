@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { ERC4626Test } from "erc4626-tests/ERC4626.test.sol";
-import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import { ERC4626Test, IMockERC20 } from "erc4626-tests/ERC4626.test.sol";
+
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
+import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import { Strings } from "openzeppelin/utils/Strings.sol";
 
 import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
@@ -12,12 +14,15 @@ import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { Vault } from "src/Vault.sol";
 
+import { ERC20PermitMock } from "test/contracts/mock/ERC20PermitMock.sol";
 import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
 import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock.sol";
 import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
-contract VaultFuzzTest is ERC4626Test {
+import { Helpers } from "test/utils/Helpers.t.sol";
+
+contract VaultFuzzTest is ERC4626Test, Helpers {
   /* ============ Variables ============ */
   Vault public vault;
 
@@ -37,17 +42,17 @@ contract VaultFuzzTest is ERC4626Test {
   /* ============ Setup ============ */
 
   function setUp() public override {
-    underlyingAsset = new ERC20Mock("Dai Stablecoin", "DAI", address(this), 0);
+    underlyingAsset = new ERC20Mock();
     _underlying_ = address(underlyingAsset);
 
-    prizeToken = new ERC20Mock("PoolTogether", "POOL", address(this), 0);
+    prizeToken = new ERC20Mock();
 
     twabController = new TwabController();
 
     prizePool = new PrizePoolMock(prizeToken);
 
     yieldVault = new YieldVault(
-      underlyingAsset,
+      _underlying_,
       "PoolTogether aEthDAI Yield (PTaEthDAIY)",
       "PTaEthDAIY"
     );
@@ -60,6 +65,8 @@ contract VaultFuzzTest is ERC4626Test {
       yieldVault,
       PrizePool(address(prizePool)),
       Claimer(address(0x2faD9255711A4d22C35a003b3E723D9271aeA51d)),
+      address(this),
+      0,
       address(this)
     );
 
@@ -270,76 +277,114 @@ contract VaultFuzzTest is ERC4626Test {
     propAvailableBalanceOf();
   }
 
-  /* ============ liquidate ============ */
+  /* ============ Liquidate ============ */
   function propLiquidate(address caller) public {
     vm.startPrank(caller);
 
-    // We divide by 2 cause not enough virtual liquidity has accrued to be able to liquidate the full amount
-    uint256 _amountOut = _call_vault(
-      abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_)
-    ) / 2;
-
-    uint256 callerPrizeTokenBalanceBefore = prizeToken.balanceOf(caller);
+    uint256 yield = _call_vault(abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_));
     uint256 callerVaultSharesBalanceBefore = vault.balanceOf(caller);
     uint256 vaultAvailableBalanceBefore = vault.availableBalanceOf(_vault_);
 
-    prizeToken.approve(address(liquidationRouter), type(uint256).max);
-
-    uint256 exactAmountIn = liquidationRouter.swapExactAmountOut(
+    (uint256 callerPrizeTokenBalanceBefore, uint256 prizeTokenContributed) = _liquidate(
+      liquidationRouter,
       liquidationPair,
-      caller,
-      _amountOut,
-      type(uint256).max
+      prizeToken,
+      yield,
+      caller
     );
 
     assertApproxEqAbs(
       prizeToken.balanceOf(caller),
-      callerPrizeTokenBalanceBefore - exactAmountIn,
+      callerPrizeTokenBalanceBefore - prizeTokenContributed,
       _delta_,
       "caller prizeToken balance"
     );
 
     assertApproxEqAbs(
       prizeToken.balanceOf(address(prizePool)),
-      exactAmountIn,
+      prizeTokenContributed,
       _delta_,
       "prizePool prizeToken balance"
     );
 
-    uint256 callerVaultSharesBalanceAfter = vault.balanceOf(caller);
-
     assertApproxEqAbs(
-      callerVaultSharesBalanceAfter,
-      callerVaultSharesBalanceBefore + _amountOut,
+      vault.balanceOf(caller),
+      callerVaultSharesBalanceBefore + yield,
       _delta_,
-      "caller shares balance before withdraw"
+      "caller shares balance after liquidation"
     );
 
     assertApproxEqAbs(
       vault.availableBalanceOf(_vault_),
       vaultAvailableBalanceBefore,
       _delta_,
-      "vault shares balance before withdraw"
+      "vault shares balance after liquidation"
     );
 
     vm.stopPrank();
   }
 
-  function test_liquidate(Init memory init, uint shares) public virtual {
-    init.yield = 0;
-    setUpVault(init);
+  function test_liquidate(Init memory init, uint256 shares) public virtual {
+    // We set the higher bound to uint104 to avoid overflowing above uint112
+    init.yield = int(bound(shares, 10e18, type(uint104).max));
 
+    setUpVault(init);
     vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
 
     address caller = init.user[0];
-
-    // We mint underlying assets to the YieldVault to generate yield
-    uint256 yield = bound(shares, 100, 10000 * 1000);
-    underlyingAsset.mint(address(yieldVault), yield);
-
     prizeToken.mint(caller, type(uint256).max);
 
-    shares = bound(shares, 10, _max_mint(caller));
     propLiquidate(caller);
+  }
+
+  /* ============ Override setup ============ */
+
+  // We set the higher bound to uint104 to avoid overflowing above uint112
+  function setUpVault(Init memory init) public virtual override {
+    for (uint i = 0; i < N; i++) {
+      init.user[i] = makeAddr(Strings.toString(i));
+      address user = init.user[i];
+
+      vm.assume(_isEOA(user));
+
+      uint shares = bound(init.share[i], 0, type(uint104).max);
+      try IMockERC20(_underlying_).mint(user, shares) {} catch {
+        vm.assume(false);
+      }
+
+      _approve(_underlying_, user, _vault_, shares);
+
+      vm.prank(user);
+      try IERC4626(_vault_).deposit(shares, user) {} catch {
+        vm.assume(false);
+      }
+
+      uint assets = bound(init.asset[i], 0, type(uint104).max);
+      try IMockERC20(_underlying_).mint(user, assets) {} catch {
+        vm.assume(false);
+      }
+    }
+
+    setUpYield(init);
+  }
+
+  function _max_deposit(address from) internal virtual override returns (uint) {
+    if (_unlimitedAmount) return type(uint104).max;
+    return uint104(IERC20(_underlying_).balanceOf(from));
+  }
+
+  function _max_mint(address from) internal virtual override returns (uint) {
+    if (_unlimitedAmount) return type(uint104).max;
+    return uint104(vault_convertToShares(IERC20(_underlying_).balanceOf(from)));
+  }
+
+  function _max_withdraw(address from) internal virtual override returns (uint) {
+    if (_unlimitedAmount) return type(uint104).max;
+    return uint104(vault_convertToAssets(IERC20(_vault_).balanceOf(from)));
+  }
+
+  function _max_redeem(address from) internal virtual override returns (uint) {
+    if (_unlimitedAmount) return type(uint104).max;
+    return uint104(IERC20(_vault_).balanceOf(from));
   }
 }

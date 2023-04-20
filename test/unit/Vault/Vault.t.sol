@@ -1,22 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
-
-import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
-
-import { PrizePool } from "v5-prize-pool/PrizePool.sol";
-import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
-
-import { Vault } from "src/Vault.sol";
-
-import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
-import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock.sol";
-import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
-import { YieldVault } from "test/contracts/mock/YieldVault.sol";
-
-import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
+import { UnitBaseSetup, Claimer, LiquidationPair, PrizePool, TwabController, Vault, ERC20, IERC20, IERC4626 } from "test/utils/UnitBaseSetup.t.sol";
 
 contract VaultTest is UnitBaseSetup {
   /* ============ Events ============ */
@@ -27,8 +12,10 @@ contract VaultTest is UnitBaseSetup {
     string symbol,
     TwabController twabController,
     IERC4626 indexed yieldVault,
-    PrizePoolMock indexed prizePool,
+    PrizePool indexed prizePool,
     Claimer claimer,
+    address yieldFeeRecipient,
+    uint256 yieldFeePercentage,
     address owner
   );
 
@@ -36,10 +23,11 @@ contract VaultTest is UnitBaseSetup {
 
   event ClaimerSet(Claimer previousClaimer, Claimer newClaimer);
 
-  event LiquidationPairSet(
-    LiquidationPair previousLiquidationPair,
-    LiquidationPair newLiquidationPair
-  );
+  event LiquidationPairSet(LiquidationPair newLiquidationPair);
+
+  event YieldFeeRecipientSet(address previousYieldFeeRecipient, address newYieldFeeRecipient);
+
+  event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
 
   /* ============ Constructor ============ */
 
@@ -51,8 +39,10 @@ contract VaultTest is UnitBaseSetup {
       vaultSymbol,
       twabController,
       yieldVault,
-      prizePool,
+      PrizePool(address(prizePool)),
       claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
       address(this)
     );
 
@@ -64,6 +54,8 @@ contract VaultTest is UnitBaseSetup {
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
       address(this)
     );
 
@@ -89,6 +81,8 @@ contract VaultTest is UnitBaseSetup {
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
       address(this)
     );
   }
@@ -104,6 +98,8 @@ contract VaultTest is UnitBaseSetup {
       IERC4626(address(0)),
       PrizePool(address(prizePool)),
       claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
       address(this)
     );
   }
@@ -119,6 +115,8 @@ contract VaultTest is UnitBaseSetup {
       yieldVault,
       PrizePool(address(0)),
       claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
       address(this)
     );
   }
@@ -134,51 +132,13 @@ contract VaultTest is UnitBaseSetup {
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
       address(0)
     );
   }
 
   /* ============ External functions ============ */
-
-  function testLiquidateCallerNotLP() public {
-    _setLiquidationPair();
-
-    vm.expectRevert(bytes("Vault/caller-not-LP"));
-    vault.liquidate(address(this), address(prizeToken), 0, address(vault), 0);
-  }
-
-  function testLiquidateTokenInNotPrizeToken() public {
-    _setLiquidationPair();
-
-    vm.startPrank(address(liquidationPair));
-
-    vm.expectRevert(bytes("Vault/tokenIn-not-prizeToken"));
-    vault.liquidate(address(this), address(0), 0, address(vault), 0);
-
-    vm.stopPrank();
-  }
-
-  function testLiquidateTokenOutNotVaultShare() public {
-    _setLiquidationPair();
-
-    vm.startPrank(address(liquidationPair));
-
-    vm.expectRevert(bytes("Vault/tokenOut-not-vaultShare"));
-    vault.liquidate(address(this), address(prizeToken), 0, address(0), 0);
-
-    vm.stopPrank();
-  }
-
-  function testLiquidateAmountGTAvailableYield() public {
-    _setLiquidationPair();
-
-    vm.startPrank(address(liquidationPair));
-
-    vm.expectRevert(bytes("Vault/amount-gt-available-yield"));
-    vault.liquidate(address(this), address(prizeToken), 0, address(vault), type(uint256).max);
-
-    vm.stopPrank();
-  }
 
   /* ============ targetOf ============ */
   function testTargetOf() public {
@@ -219,31 +179,6 @@ contract VaultTest is UnitBaseSetup {
 
     assertEq(status, disable);
     assertEq(vault.autoClaimDisabled(address(this)), disable);
-  }
-
-  /* ============ setClaimer ============ */
-  function testSetClaimer() public {
-    Claimer _newClaimer = Claimer(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
-
-    vm.expectEmit(true, true, true, true);
-    emit ClaimerSet(claimer, _newClaimer);
-
-    address _newClaimerAddress = vault.setClaimer(_newClaimer);
-
-    assertEq(_newClaimerAddress, address(_newClaimer));
-    assertEq(vault.claimer(), address(_newClaimer));
-  }
-
-  function testSetClaimerOnlyOwner() public {
-    address _caller = address(0xc6781d43c1499311291c8E5d3ab79613dc9e6d98);
-    Claimer _newClaimer = Claimer(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
-
-    vm.startPrank(_caller);
-
-    vm.expectRevert(bytes("Ownable/caller-not-owner"));
-    vault.setClaimer(_newClaimer);
-
-    vm.stopPrank();
   }
 
   /* ============ claimPrize ============ */
@@ -300,10 +235,68 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
+  /* ============ Getters ============ */
+  function testGetTwabController() external {
+    assertEq(vault.twabController(), address(twabController));
+  }
+
+  function testGetYieldVault() external {
+    assertEq(vault.yieldVault(), address(yieldVault));
+  }
+
+  function testGetLiquidationPair() external {
+    vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
+    assertEq(vault.liquidationPair(), address(liquidationPair));
+  }
+
+  function testGetPrizePool() external {
+    assertEq(vault.prizePool(), address(prizePool));
+  }
+
+  function testGetClaimer() external {
+    assertEq(vault.claimer(), address(claimer));
+  }
+
+  function testGetYieldFeeRecipient() external {
+    assertEq(vault.yieldFeeRecipient(), address(this));
+  }
+
+  function testGetYieldFeePercentage() external {
+    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+    assertEq(vault.yieldFeePercentage(), YIELD_FEE_PERCENTAGE);
+  }
+
+  /* ============ Setters ============ */
+
+  /* ============ setClaimer ============ */
+  function testSetClaimer() public {
+    Claimer _newClaimer = Claimer(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+
+    vm.expectEmit(true, true, true, true);
+    emit ClaimerSet(claimer, _newClaimer);
+
+    address _newClaimerAddress = vault.setClaimer(_newClaimer);
+
+    assertEq(_newClaimerAddress, address(_newClaimer));
+    assertEq(vault.claimer(), address(_newClaimer));
+  }
+
+  function testSetClaimerOnlyOwner() public {
+    address _caller = address(0xc6781d43c1499311291c8E5d3ab79613dc9e6d98);
+    Claimer _newClaimer = Claimer(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+
+    vm.startPrank(_caller);
+
+    vm.expectRevert(bytes("Ownable/caller-not-owner"));
+    vault.setClaimer(_newClaimer);
+
+    vm.stopPrank();
+  }
+
   /* ============ setLiquidationPair ============ */
   function testSetLiquidationPair() public {
     vm.expectEmit(true, true, true, true);
-    emit LiquidationPairSet(LiquidationPair(address(0)), LiquidationPair(address(liquidationPair)));
+    emit LiquidationPairSet(LiquidationPair(address(liquidationPair)));
 
     address _newLiquidationPairAddress = _setLiquidationPair();
 
@@ -342,12 +335,11 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetLiquidationPairOnlyOwner() public {
-    address _caller = address(0xc6781d43c1499311291c8E5d3ab79613dc9e6d98);
     LiquidationPair _newLiquidationPair = LiquidationPair(
       0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820
     );
 
-    vm.startPrank(_caller);
+    vm.startPrank(alice);
 
     vm.expectRevert(bytes("Ownable/caller-not-owner"));
     vault.setLiquidationPair(_newLiquidationPair);
@@ -355,9 +347,45 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  /* ============ helpers ============ */
-  function _setLiquidationPair() internal returns (address) {
-    return vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
+  /* ============ testSetYieldFeePercentage ============ */
+  function testSetYieldFeePercentage() public {
+    vm.expectEmit();
+    emit YieldFeePercentageSet(0, YIELD_FEE_PERCENTAGE);
+
+    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+    assertEq(vault.yieldFeePercentage(), YIELD_FEE_PERCENTAGE);
+  }
+
+  function testSetYieldFeePercentageGT1e9() public {
+    vm.expectRevert(bytes("Vault/yieldFeePercentage-gt-1e9"));
+    vault.setYieldFeePercentage(1e10);
+  }
+
+  function testSetYieldFeePercentageOnlyOwner() public {
+    vm.startPrank(alice);
+
+    vm.expectRevert(bytes("Ownable/caller-not-owner"));
+    vault.setYieldFeePercentage(1e9);
+
+    vm.stopPrank();
+  }
+
+  /* ============ setYieldFeeRecipient ============ */
+  function testSetYieldFeeRecipient() public {
+    vm.expectEmit(true, true, true, true);
+    emit YieldFeeRecipientSet(address(this), alice);
+
+    vault.setYieldFeeRecipient(alice);
+    assertEq(vault.yieldFeeRecipient(), alice);
+  }
+
+  function testSetYieldFeeRecipientOnlyOwner() public {
+    vm.startPrank(alice);
+
+    vm.expectRevert(bytes("Ownable/caller-not-owner"));
+    vault.setYieldFeeRecipient(bob);
+
+    vm.stopPrank();
   }
 
   /* ============ mocks ============ */

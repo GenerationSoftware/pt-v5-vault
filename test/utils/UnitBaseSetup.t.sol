@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import "forge-std/Test.sol";
-import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import { Test } from "forge-std/Test.sol";
+import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
+import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
@@ -16,7 +17,9 @@ import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock
 import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
-contract UnitBaseSetup is Test {
+import { Helpers } from "test/utils/Helpers.t.sol";
+
+contract UnitBaseSetup is Test, Helpers {
   /* ============ Variables ============ */
   address internal owner;
   uint256 internal ownerPrivateKey;
@@ -58,8 +61,8 @@ contract UnitBaseSetup is Test {
     (alice, alicePrivateKey) = makeAddrAndKey("Alice");
     (bob, bobPrivateKey) = makeAddrAndKey("Bob");
 
-    underlyingAsset = new ERC20PermitMock("Dai Stablecoin", "DAI", address(this), 0);
-    prizeToken = new ERC20PermitMock("PoolTogether", "POOL", address(this), 0);
+    underlyingAsset = new ERC20PermitMock("Dai Stablecoin");
+    prizeToken = new ERC20PermitMock("PoolTogether");
 
     twabController = new TwabController();
 
@@ -68,7 +71,7 @@ contract UnitBaseSetup is Test {
     claimer = Claimer(address(0xe291d9169F0316272482dD82bF297BB0a11D267f));
 
     yieldVault = new YieldVault(
-      underlyingAsset,
+      address(underlyingAsset),
       "PoolTogether aEthDAI Yield (PTaEthDAIY)",
       "PTaEthDAIY"
     );
@@ -81,6 +84,8 @@ contract UnitBaseSetup is Test {
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
+      address(this),
+      0,
       address(this)
     );
 
@@ -92,5 +97,10 @@ contract UnitBaseSetup is Test {
     );
 
     liquidationRouter = new LiquidationRouterMock();
+  }
+
+  /* ============ Helpers ============ */
+  function _setLiquidationPair() internal returns (address) {
+    return vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
   }
 }

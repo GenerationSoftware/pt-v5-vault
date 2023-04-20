@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { IERC20 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import { UnitBaseSetup, IERC20 } from "test/utils/UnitBaseSetup.t.sol";
 
-import { Helpers } from "test/utils/Helpers.t.sol";
-import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
-
-contract VaultWithdrawTest is UnitBaseSetup, Helpers {
+contract VaultWithdrawTest is UnitBaseSetup {
   /* ============ Events ============ */
   event Withdraw(
     address indexed sender,
@@ -15,6 +12,8 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     uint256 assets,
     uint256 shares
   );
+
+  event Transfer(address indexed from, address indexed to, uint256 value);
 
   /* ============ Tests ============ */
 
@@ -26,7 +25,10 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     underlyingAsset.mint(alice, _amount);
     _deposit(underlyingAsset, vault, _amount, alice);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(alice, address(0), _amount);
+
+    vm.expectEmit();
     emit Withdraw(alice, alice, alice, _amount, _amount);
 
     vault.withdraw(vault.maxWithdraw(alice), alice, alice);
@@ -39,6 +41,7 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     assertEq(yieldVault.balanceOf(address(vault)), 0);
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
+    assertEq(vault.totalSupply(), 0);
 
     vm.stopPrank();
   }
@@ -51,7 +54,10 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     underlyingAsset.mint(alice, _amount);
     _deposit(underlyingAsset, vault, _amount, alice);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(alice, address(0), _halfAmount);
+
+    vm.expectEmit();
     emit Withdraw(alice, alice, alice, _halfAmount, _halfAmount);
 
     vault.withdraw(_halfAmount, alice, alice);
@@ -62,8 +68,9 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     assertEq(twabController.balanceOf(address(vault), alice), _halfAmount);
     assertEq(twabController.delegateBalanceOf(address(vault), alice), _halfAmount);
 
-    assertEq(yieldVault.balanceOf(address(vault)), _halfAmount);
+    assertEq(yieldVault.maxWithdraw(address(vault)), _halfAmount);
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _halfAmount);
+    assertEq(vault.totalSupply(), _halfAmount);
 
     vm.stopPrank();
   }
@@ -83,7 +90,10 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     vm.startPrank(alice);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(alice, address(0), _amount);
+
+    vm.expectEmit();
     emit Withdraw(alice, alice, alice, _amount, _amount);
 
     vault.withdraw(vault.maxWithdraw(alice), alice, alice);
@@ -96,6 +106,7 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     assertEq(yieldVault.maxWithdraw(address(vault)), _yield);
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _yield);
+    assertEq(vault.totalSupply(), 0);
 
     vm.stopPrank();
   }
@@ -113,7 +124,10 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     vm.startPrank(alice);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(bob, address(0), _amount);
+
+    vm.expectEmit();
     emit Withdraw(alice, bob, bob, _amount, _amount);
 
     vault.withdraw(vault.maxWithdraw(bob), bob, bob);
@@ -126,6 +140,7 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     assertEq(yieldVault.balanceOf(address(vault)), 0);
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
+    assertEq(vault.totalSupply(), 0);
 
     vm.stopPrank();
   }
@@ -138,6 +153,13 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     underlyingAsset.mint(alice, _amount);
 
     _deposit(underlyingAsset, vault, _amount, alice);
+
+    vm.expectEmit();
+    emit Transfer(alice, address(0), _amount);
+
+    vm.expectEmit();
+    emit Withdraw(alice, alice, alice, _amount, _amount);
+
     vault.redeem(vault.maxRedeem(alice), alice, alice);
 
     assertEq(vault.balanceOf(alice), 0);
@@ -148,6 +170,7 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
     assertEq(yieldVault.balanceOf(address(vault)), 0);
+    assertEq(vault.totalSupply(), 0);
 
     vm.stopPrank();
   }
@@ -160,6 +183,13 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     underlyingAsset.mint(alice, _amount);
 
     uint256 _shares = _deposit(underlyingAsset, vault, _amount, alice);
+
+    vm.expectEmit();
+    emit Transfer(alice, address(0), _halfAmount);
+
+    vm.expectEmit();
+    emit Withdraw(alice, alice, alice, _halfAmount, _halfAmount);
+
     vault.redeem(_shares / 2, alice, alice);
 
     assertEq(vault.balanceOf(alice), _halfAmount);
@@ -170,6 +200,7 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _halfAmount);
     assertEq(yieldVault.balanceOf(address(vault)), _halfAmount);
+    assertEq(vault.totalSupply(), _halfAmount);
 
     vm.stopPrank();
   }
@@ -189,6 +220,12 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     vm.startPrank(alice);
 
+    vm.expectEmit();
+    emit Transfer(alice, address(0), _amount);
+
+    vm.expectEmit();
+    emit Withdraw(alice, alice, alice, _amount, _amount);
+
     vault.redeem(vault.maxRedeem(alice), alice, alice);
 
     assertEq(vault.balanceOf(alice), 0);
@@ -197,8 +234,9 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
     assertEq(twabController.balanceOf(address(vault), alice), 0);
     assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
 
-    assertEq(yieldVault.convertToAssets(yieldVault.balanceOf(address(vault))), _yield);
+    assertEq(yieldVault.balanceOf(address(vault)), yieldVault.convertToShares(_yield));
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _yield);
+    assertEq(vault.totalSupply(), 0);
 
     vm.stopPrank();
   }
@@ -216,7 +254,10 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     vm.startPrank(alice);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
+    emit Transfer(bob, address(0), _amount);
+
+    vm.expectEmit();
     emit Withdraw(alice, bob, bob, _amount, _amount);
 
     vault.redeem(vault.maxRedeem(bob), bob, bob);
@@ -229,6 +270,7 @@ contract VaultWithdrawTest is UnitBaseSetup, Helpers {
 
     assertEq(yieldVault.balanceOf(address(vault)), 0);
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
+    assertEq(vault.totalSupply(), 0);
 
     vm.stopPrank();
   }
