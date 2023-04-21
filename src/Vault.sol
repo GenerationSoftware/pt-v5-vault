@@ -984,6 +984,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       _lastRecordedExchangeRate,
       Math.Rounding.Down
     );
+
     uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
 
     if (_withdrawableAssets > _totalSupplyToAssets) {
