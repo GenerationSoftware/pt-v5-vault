@@ -30,7 +30,7 @@ contract VaultMock is Vault {
     )
   {}
 
-  function increaseYieldFeeBalance(uint256 _yield) external {
-    _increaseYieldFeeBalance(_availableYieldFeeBalance(_yield));
+  function totalShares() public view returns (uint256) {
+    return _totalShares();
   }
 }

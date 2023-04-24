@@ -992,7 +992,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     }
 
     if (_totalSupplyAmount != 0 && _withdrawableAssets != 0) {
-      return (_withdrawableAssets * _assetUnit) / _totalSupplyAmount;
+      return _withdrawableAssets.mulDiv(_assetUnit, _totalSupplyAmount, Math.Rounding.Down);
     }
 
     return _assetUnit;

@@ -6,6 +6,7 @@ import { Test } from "forge-std/Test.sol";
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
+import { Math } from "openzeppelin/utils/math/Math.sol";
 
 import { Claimer, IVault } from "v5-vrgda-claimer/Claimer.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
@@ -18,6 +19,8 @@ import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "test/contracts/mock/YieldVault.sol";
 
 contract Helpers is Test {
+  using Math for uint256;
+
   /* ============ Variables ============ */
   bytes32 private constant _PERMIT_TYPEHASH =
     keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
@@ -147,13 +150,17 @@ contract Helpers is Test {
   }
 
   /* ============ Undercollateralization ============ */
-  function _getUndercollateralizationAmount(
+  function _getMaxWithdraw(
     address _user,
     Vault _vault,
     YieldVault _yieldVault
   ) internal view returns (uint256) {
     return
-      (_vault.balanceOf(_user) * _yieldVault.maxWithdraw(address(_vault))) / _vault.totalSupply();
+      _vault.maxRedeem(_user).mulDiv(
+        _yieldVault.maxWithdraw(address(_vault)),
+        _vault.totalSupply(),
+        Math.Rounding.Down
+      );
   }
 
   /* ============ Liquidate ============ */
