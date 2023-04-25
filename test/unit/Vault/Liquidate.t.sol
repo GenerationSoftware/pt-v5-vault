@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
-import { console2 } from "forge-std/console2.sol";
+
 import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
 
 contract VaultLiquidateTest is UnitBaseSetup {

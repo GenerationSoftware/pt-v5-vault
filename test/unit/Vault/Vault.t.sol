@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { UnitBaseSetup, Claimer, LiquidationPair, PrizePool, TwabController, Vault, ERC20, IERC20, IERC4626 } from "test/utils/UnitBaseSetup.t.sol";
+import { UnitBaseSetup, Claimer, LiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "test/utils/UnitBaseSetup.t.sol";
 
 contract VaultTest is UnitBaseSetup {
   /* ============ Events ============ */
@@ -46,7 +46,7 @@ contract VaultTest is UnitBaseSetup {
       address(this)
     );
 
-    Vault testVault = new Vault(
+    VaultMock testVault = new VaultMock(
       IERC20(address(underlyingAsset)),
       vaultName,
       vaultSymbol,
@@ -59,10 +59,13 @@ contract VaultTest is UnitBaseSetup {
       address(this)
     );
 
+    uint256 assetDecimals = ERC20(address(underlyingAsset)).decimals();
+
     assertEq(testVault.asset(), address(underlyingAsset));
     assertEq(testVault.name(), vaultName);
     assertEq(testVault.symbol(), vaultSymbol);
-    assertEq(testVault.decimals(), ERC20(address(underlyingAsset)).decimals());
+    assertEq(testVault.decimals(), assetDecimals);
+    assertEq(testVault.exchangeRate(), 10 ** assetDecimals);
     assertEq(testVault.twabController(), address(twabController));
     assertEq(testVault.yieldVault(), address(yieldVault));
     assertEq(testVault.prizePool(), address(prizePool));
@@ -73,7 +76,7 @@ contract VaultTest is UnitBaseSetup {
   function testConstructorTwabControllerZero() external {
     vm.expectRevert(bytes("Vault/twabCtrlr-not-zero-address"));
 
-    new Vault(
+    new VaultMock(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
@@ -90,7 +93,7 @@ contract VaultTest is UnitBaseSetup {
   function testConstructorYieldVaultZero() external {
     vm.expectRevert(bytes("Vault/YV-not-zero-address"));
 
-    new Vault(
+    new VaultMock(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
@@ -107,7 +110,7 @@ contract VaultTest is UnitBaseSetup {
   function testConstructorPrizePoolZero() external {
     vm.expectRevert(bytes("Vault/PP-not-zero-address"));
 
-    new Vault(
+    new VaultMock(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
@@ -124,7 +127,7 @@ contract VaultTest is UnitBaseSetup {
   function testConstructorOwnerZero() external {
     vm.expectRevert(bytes("Vault/owner-not-zero-address"));
 
-    new Vault(
+    new VaultMock(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",

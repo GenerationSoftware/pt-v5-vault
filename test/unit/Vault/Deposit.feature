@@ -46,6 +46,18 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
 
+  # Deposit - Inflation attack
+  Scenario: Bob front runs Alice deposits into the Vault
+    Given Alice owns 0 Vault shares
+    When Alice deposits 10,000 underlying assets but Bob front run by depositing 1 wei of underlying assets and transferring 1,000 underlying assets to the Vault
+    Then Alice must receive an amount of Vault shares equivalent to her deposit
+    Then Alice `balance` must be equal to the amount of underlying assets deposited
+    Then Alice `delegateBalance` must be equal to the amount of underlying assets deposited
+    Then the YieldVault balance of underlying assets must be equal to 10,000 + 1 wei of underlying assets
+    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then Bob tries to performs his attack by witdrawing 1.99 shares => it reverts cause he can only withdraw 1 wei of underlying assets
+
   # Mint
   Scenario: Alice mints from the Vault
     Given Alice owns 0 Vault shares
