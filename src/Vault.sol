@@ -217,7 +217,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Total available yield amount accrued by this vault.
-   * @dev This amount includes the liquidable yield + yield fee amount.
+   * @dev This amount includes the liquidatable yield + yield fee amount.
    * @dev The available yield is equal to the total amount of assets managed by this Vault
    *      minus the total amount of assets supplied to the Vault and yield fees allocated to `_yieldFeeRecipient`.
    * @dev If `_sharesToAssets` is greater than `_assets`, it means that the Vault is undercollateralized.
@@ -465,7 +465,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     uint256 _vaultAssets = IERC20(asset()).balanceOf(address(this));
 
-    if (_amountOut >= _vaultAssets) {
+    if (_vaultAssets != 0 && _amountOut >= _vaultAssets) {
       _yieldVault.deposit(_vaultAssets, address(this));
     }
 

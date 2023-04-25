@@ -137,7 +137,7 @@ contract VaultDepositTest is UnitBaseSetup {
 
     _deposit(underlyingAsset, vault, _bobAmount, bob);
 
-    // Bob deposits 1,000 underlying assets into the Vault in the hope of manipulating the exchange rate
+    // Bob transfers 1,000 underlying assets into the Vault in the hope of manipulating the exchange rate
     underlyingAsset.transfer(address(vault), _attackAmount);
 
     assertEq(vault.totalSupply(), _bobAmount);
