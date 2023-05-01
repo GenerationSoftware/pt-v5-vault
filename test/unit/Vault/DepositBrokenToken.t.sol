@@ -7,15 +7,12 @@ contract VaultDepositBrokenTokenTest is UnitBrokenTokenBaseSetup {
   /* ============ Events ============ */
   event Deposit(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
 
-  event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
-
   event Transfer(address indexed from, address indexed to, uint256 value);
 
   function setUp() public pure override {
     return;
   }
 
-  /* ============ BrokenTokens ============ */
   function testDepositBrokenToken() public useBrokenToken {
     bytes32 brokenERC20Name = keccak256(bytes(brokenERC20_NAME));
 
