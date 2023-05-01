@@ -26,3 +26,6 @@
 [submodule "lib/ring-buffer-lib"]
 	path = lib/ring-buffer-lib
 	url = https://github.com/pooltogether/ring-buffer-lib
+[submodule "lib/brokentoken"]
+	path = lib/brokentoken
+	url = https://github.com/zeroknots/brokentoken

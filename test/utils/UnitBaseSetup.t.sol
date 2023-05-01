@@ -53,17 +53,20 @@ contract UnitBaseSetup is Test, Helpers {
   TwabController public twabController;
 
   /* ============ Setup ============ */
+  function setUpUnderlyingAsset() public virtual returns (ERC20PermitMock) {
+    return new ERC20PermitMock("Dai Stablecoin");
+  }
 
-  function setUp() public {
+  function setUp() public virtual {
     (owner, ownerPrivateKey) = makeAddrAndKey("Owner");
     (manager, managerPrivateKey) = makeAddrAndKey("Manager");
     (alice, alicePrivateKey) = makeAddrAndKey("Alice");
     (bob, bobPrivateKey) = makeAddrAndKey("Bob");
 
-    underlyingAsset = new ERC20PermitMock("Dai Stablecoin");
+    underlyingAsset = setUpUnderlyingAsset();
     prizeToken = new ERC20PermitMock("PoolTogether");
 
-    twabController = new TwabController();
+    twabController = new TwabController(drawPeriodSeconds);
 
     prizePool = new PrizePoolMock(prizeToken);
 

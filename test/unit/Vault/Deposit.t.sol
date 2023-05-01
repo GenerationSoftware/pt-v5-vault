@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { IERC20, UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
+import { BrokenToken } from "brokentoken/BrokenToken.sol";
 
-contract VaultDepositTest is UnitBaseSetup {
+import { IERC20, UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
+import { console2 } from "forge-std/Test.sol";
+
+contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
   event Deposit(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
 
