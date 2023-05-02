@@ -47,7 +47,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
     prizeToken = new ERC20Mock();
 
-    twabController = new TwabController();
+    twabController = new TwabController(drawPeriodSeconds);
 
     prizePool = new PrizePoolMock(prizeToken);
 
@@ -114,6 +114,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
           _delta_,
           "vault asset"
         );
+
         assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
 
         if (oldAllowance != type(uint).max) {

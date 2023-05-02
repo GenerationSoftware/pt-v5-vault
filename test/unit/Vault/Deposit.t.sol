@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { IERC20, UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
+import { BrokenToken } from "brokentoken/BrokenToken.sol";
 
-contract VaultDepositTest is UnitBaseSetup {
+import { IERC20, UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
+import { console2 } from "forge-std/Test.sol";
+
+contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
   event Deposit(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
 
@@ -34,6 +37,40 @@ contract VaultDepositTest is UnitBaseSetup {
     assertEq(twabController.delegateBalanceOf(address(vault), alice), _amount);
 
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
+    assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
+
+    vm.stopPrank();
+  }
+
+  function testDepositAssetsLivingInVault() external {
+    uint256 _vaultAmount = 500e18;
+    underlyingAsset.mint(address(vault), _vaultAmount);
+
+    assertEq(underlyingAsset.balanceOf(address(vault)), _vaultAmount);
+
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+    underlyingAsset.mint(alice, _amount);
+
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
+    emit Deposit(alice, alice, _amount, _amount);
+
+    _deposit(underlyingAsset, vault, _amount, alice);
+
+    assertEq(vault.balanceOf(alice), _amount);
+
+    assertEq(twabController.balanceOf(address(vault), alice), _amount);
+    assertEq(twabController.delegateBalanceOf(address(vault), alice), _amount);
+
+    assertEq(underlyingAsset.balanceOf(alice), _amount - _vaultAmount);
+    assertEq(underlyingAsset.balanceOf(address(vault)), 0);
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
+
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
     assertEq(yieldVault.totalSupply(), _amount);
 

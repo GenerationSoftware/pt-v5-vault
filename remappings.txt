@@ -2,6 +2,7 @@ ds-test/=lib/forge-std/lib/ds-test/src/
 erc4626-tests/=lib/erc4626-tests/
 forge-std/=lib/forge-std/src/
 
+brokentoken/=lib/brokentoken/src/
 openzeppelin/=lib/openzeppelin-contracts/contracts/
 owner-manager-contracts/=lib/owner-manager-contracts/contracts/
 

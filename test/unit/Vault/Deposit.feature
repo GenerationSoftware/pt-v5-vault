@@ -3,11 +3,22 @@ Feature: Deposit
     Given Alice owns 0 Vault shares
     When Alice deposits 1,000 underlying assets
     Then Alice must receive an amount of Vault shares equivalent to her deposit
-    Then Alice `balance` must be equal to the amount of underlying assets deposited
-    Then Alice `delegateBalance` must be equal to the amount of underlying assets deposited
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then Alice `balance` must be equal to 1,000
+    Then Alice `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
+
+  Scenario: Alice deposits into the Vault while underlying assets are in the Vault
+    Given Alice owns 0 Vault shares and 500 underlying assets are in the Vault
+    When Alice deposits 1,000 underlying assets
+    Then Alice must receive an amount of Vault shares equivalent to her deposit
+    Then Alice `balance` must be equal to 1,000
+    Then Alice `delegateBalance` must be equal to 1,000
+    Then Alice balance of underlying assets must be equal to 500
+    Then the YieldVault balance of underlying assets must increase by 1,000
+    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   Scenario: Alice deposits into the Vault on behalf of Bob
     Given Alice owns 0 Vault shares and Bob owns 0 Vault shares
@@ -16,22 +27,22 @@ Feature: Deposit
     Then Bob must receive an amount of Vault shares equivalent to Alice deposit
     Then Alice `balance` must be equal to 0
     Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to the amount of underlying assets deposited by Alice
-    Then Bob `delegateBalance` must be equal to the amount of underlying assets deposited by Alice
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then Bob `balance` must be equal to 1,000
+    Then Bob `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   # Deposit with permit
   Scenario: Alice deposits with permit into the Vault
     Given Alice owns 0 Vault shares
     When Alice signs her transaction and deposits 1,000 underlying assets
     Then Alice must receive an amount of Vault shares equivalent to her deposit
-    Then Alice `balance` must be equal to the amount of underlying assets deposited
-    Then Alice `delegateBalance` must be equal to the amount of underlying assets deposited
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then Alice `balance` must be equal to 1,000
+    Then Alice `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   Scenario: Alice deposits with permit into the Vault on behalf of Bob
     Given Alice owns 0 Vault shares and Bob owns 0 Vault shares
@@ -40,112 +51,112 @@ Feature: Deposit
     Then Alice must not receive any Vault shares
     Then Alice `balance` must be equal to 0
     Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to the amount of underlying assets deposited by Alice
-    Then Bob `delegateBalance` must be equal to the amount of underlying assets deposited by Alice
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then Bob `balance` must be equal to 1,000
+    Then Bob `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   # Deposit - Inflation attack
   Scenario: Bob front runs Alice deposits into the Vault
     Given Alice owns 0 Vault shares
     When Alice deposits 10,000 underlying assets but Bob front run by depositing 1 wei of underlying assets and transferring 1,000 underlying assets to the Vault
     Then Alice must receive an amount of Vault shares equivalent to her deposit
-    Then Alice `balance` must be equal to the amount of underlying assets deposited
-    Then Alice `delegateBalance` must be equal to the amount of underlying assets deposited
+    Then Alice `balance` must be equal to 10,000
+    Then Alice `delegateBalance` must be equal to 10,000
     Then the YieldVault balance of underlying assets must be equal to 10,000 + 1 wei of underlying assets
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
-    Then Bob tries to performs his attack by witdrawing 1.99 shares => it reverts cause he can only withdraw 1 wei of underlying assets
+    Then the Vault `totalSupply` must be equal to 10,000 + 1 wei
+    Then Bob tries to performs his attack by withdrawing 1.99 shares => it reverts cause he can only withdraw his deposit of 1 wei
 
   # Mint
   Scenario: Alice mints from the Vault
     Given Alice owns 0 Vault shares
-    When Alice mints 1,000 vault shares
-    Then Alice must receive the amount of Vault shares requested
-    Then Alice `balance` must be equal to the amount of underlying assets deposited
-    Then Alice `delegateBalance` must be equal to the amount of underlying assets deposited
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    When Alice mints 1,000 Vault shares
+    Then Alice must receive 1,000 Vault shares
+    Then Alice `balance` must be equal to 1,000
+    Then Alice `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   Scenario: Alice mints from the Vault on behalf of Bob
     Given Alice owns 0 Vault shares and Bob owns 0 Vault shares
-    When Alice mints 1,000 vault shares
+    When Alice mints 1,000 Vault shares
     Then Alice must not receive any Vault shares
-    Then Bob must receive the amount of Vault shares requested by Alice
+    Then Bob must receive 1,000 Vault shares
     Then Alice `balance` must be equal to 0
     Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to the amount of underlying assets deposited by Alice
-    Then Bob `delegateBalance` must be equal to the amount of underlying assets deposited by Alice
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then Bob `balance` must be equal to 1,000
+    Then Bob `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   # Mint with permit
   Scenario: Alice mints with permit from the Vault
     Given Alice owns 0 Vault shares
     When Alice signs her transaction and mints 1,000 underlying assets
     Then Alice must receive the amount of Vault shares requested
-    Then Alice `balance` must be equal to the amount of underlying assets deposited
-    Then Alice `delegateBalance` must be equal to the amount of underlying assets deposited
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then Alice `balance` must be equal to 1,000
+    Then Alice `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   Scenario: Alice mints with permit from the Vault on behalf of Bob
     Given Alice owns 0 Vault shares and Bob owns 0 Vault shares
     When Alice signs her transaction and mints 1,000 shares
-    Then Bob must receive the amount of Vault shares requested by Alice
+    Then Bob must receive 1,000 Vault shares
     Then Alice must not receive any Vault shares
     Then Alice `balance` must be equal to 0
     Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to the amount of underlying assets deposited by Alice
-    Then Bob `delegateBalance` must be equal to the amount of underlying assets deposited by Alice
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then Bob `balance` must be equal to 1,000
+    Then Bob `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   # Sponsor
   Scenario: Alice sponsors the Vault
     Given Alice owns 0 Vault shares and has not sponsored the Vault
     When Alice sponsors by depositing 1,000 underlying assets
     Then Alice must receive an amount of Vault shares equivalent to her deposit
-    Then Alice `balance` must be equal to the amount of underlying assets deposited
+    Then Alice `balance` must be equal to 1,000
     Then Alice `delegateBalance` must be equal to 0
     Then the `balance` of the sponsorship address must be 0
     Then the `delegateBalance` of the sponsorship address must be 0
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   Scenario: Alice sponsors the Vault on behalf of Bob
     Given Alice owns 0 Vault shares and has not sponsored the Vault, Bob owns 0 Vault shares
     When Alice sponsors by depositing 1,000 underlying assets
     Then Alice must not receive any Vault shares
-    Then Bob must receive an amount of Vault shares equivalent to Alice deposit
+    Then Bob must receive 1,000 Vault shares
     Then Alice `balance` must be equal to 0
     Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to the amount of underlying assets deposited
+    Then Bob `balance` must be equal to 1,000
     Then Bob `delegateBalance` must be equal to 0
     Then the `balance` of the sponsorship address must be 0
     Then the `delegateBalance` of the sponsorship address must be 0
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   # Sponsor with permit
   Scenario: Alice sponsors with permit the Vault
     Given Alice owns 0 Vault shares and has not sponsored the Vault
     When Alice signs her transaction and sponsors by depositing 1,000 underlying assets
     Then Alice must receive an amount of Vault shares equivalent to her deposit
-    Then Alice `balance` must be equal to the amount of underlying assets deposited
+    Then Alice `balance` must be equal to 1,000
     Then Alice `delegateBalance` must be equal to 0
     Then the `balance` of the sponsorship address must be 0
     Then the `delegateBalance` of the sponsorship address must be 0
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   Scenario: Alice sponsors with permit the Vault on behalf of Bob
     Given Alice owns 0 Vault shares and has not sponsored the Vault, Bob owns 0 Vault shares
@@ -154,22 +165,22 @@ Feature: Deposit
     Then Bob must receive an amount of Vault shares equivalent to Alice deposit
     Then Alice `balance` must be equal to 0
     Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to the amount of underlying assets deposited
+    Then Bob `balance` must be equal to 1,000
     Then Bob `delegateBalance` must be equal to 0
     Then the `balance` of the sponsorship address must be 0
     Then the `delegateBalance` of the sponsorship address must be 0
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
 
   # Delegate
   Scenario: Alice delegates to Bob
     Given Alice and Bob owns 0 Vault shares and have not delegated to another address
     When Alice deposits 1,000 underlying assets and delegates to Bob
-    Then Alice `balance` must be equal to the amount of underlying assets deposited
+    Then Alice `balance` must be equal to 1,000
     Then Alice `delegateBalance` must be equal to 0
     Then Bob `balance` must be equal to 0
-    Then Bob `delegateBalance` must be equal to the amount of underlying assets deposited by Alice
-    Then the YieldVault balance of underlying assets must increase by the same amount deposited
+    Then Bob `delegateBalance` must be equal to 1,000
+    Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 1,000
