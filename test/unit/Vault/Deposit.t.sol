@@ -43,6 +43,40 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
+  function testDepositAssetsLivingInVault() external {
+    uint256 _vaultAmount = 500e18;
+    underlyingAsset.mint(address(vault), _vaultAmount);
+
+    assertEq(underlyingAsset.balanceOf(address(vault)), _vaultAmount);
+
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+    underlyingAsset.mint(alice, _amount);
+
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
+    emit Deposit(alice, alice, _amount, _amount);
+
+    _deposit(underlyingAsset, vault, _amount, alice);
+
+    assertEq(vault.balanceOf(alice), _amount);
+
+    assertEq(twabController.balanceOf(address(vault), alice), _amount);
+    assertEq(twabController.delegateBalanceOf(address(vault), alice), _amount);
+
+    assertEq(underlyingAsset.balanceOf(alice), _amount - _vaultAmount);
+    assertEq(underlyingAsset.balanceOf(address(vault)), 0);
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
+
+    assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
+
+    vm.stopPrank();
+  }
+
   function testDepositOnBehalf() external {
     vm.startPrank(alice);
 
