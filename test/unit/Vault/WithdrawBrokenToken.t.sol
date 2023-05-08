@@ -35,7 +35,6 @@ contract VaultWithdrawBrokenTokenTest is UnitBrokenTokenBaseSetup {
       brokenERC20Name == keccak256(bytes("TransferFeeToken")) ||
       brokenERC20Name == keccak256(bytes("HighDecimalToken"))
     ) {
-      vm.stopPrank();
       return;
     }
 

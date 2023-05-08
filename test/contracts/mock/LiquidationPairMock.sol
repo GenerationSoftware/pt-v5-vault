@@ -22,8 +22,8 @@ contract LiquidationPairMock {
     _liquidatorLib = new MockLiquidatorLib();
   }
 
-  function _availableReserveOut() internal returns (uint256) {
-    return ILiquidationSource(_source).availableBalanceOf(_tokenOut);
+  function _availableReserveOut() internal view returns (uint256) {
+    return ILiquidationSource(_source).liquidatableBalanceOf(_tokenOut);
   }
 
   function liquidate(
@@ -37,7 +37,7 @@ contract LiquidationPairMock {
     return true;
   }
 
-  function computeExactAmountIn(uint256 _amountOut) external returns (uint256) {
+  function computeExactAmountIn(uint256 _amountOut) external view returns (uint256) {
     return _liquidatorLib.computeExactAmountIn(100, 50, _availableReserveOut(), _amountOut);
   }
 

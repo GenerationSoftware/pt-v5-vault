@@ -26,7 +26,6 @@ contract VaultDepositBrokenTokenTest is UnitBrokenTokenBaseSetup {
       brokenERC20Name == keccak256(bytes("MissingReturnToken")) ||
       brokenERC20Name == keccak256(bytes("TransferFeeToken"))
     ) {
-      vm.stopPrank();
       return;
     }
 

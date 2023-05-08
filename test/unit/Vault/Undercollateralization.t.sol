@@ -150,7 +150,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     // ...and liquidate it
     prizeToken.mint(address(this), type(uint256).max);
 
-    uint256 _liquidatedYield = vault.availableBalanceOf(address(vault));
+    uint256 _liquidatedYield = vault.liquidatableBalanceOf(address(vault));
 
     _liquidate(liquidationRouter, liquidationPair, prizeToken, _liquidatedYield, address(this));
 

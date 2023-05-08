@@ -253,36 +253,43 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     propTransfer(caller, receiver, owner, shares);
   }
 
-  /* ============ availableBalanceOf ============ */
-  function propAvailableBalanceOf() public {
-    uint256 availableBalanceOf = _call_vault(
-      abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_)
+  /* ============ liquidatableBalanceOf ============ */
+  function propLiquidatableBalanceOf() public {
+    uint256 liquidatableBalanceOf = _call_vault(
+      abi.encodeWithSelector(Vault.liquidatableBalanceOf.selector, _vault_)
     );
 
     uint256 totalAssets = _call_vault(abi.encodeWithSelector(Vault.totalAssets.selector));
     uint256 withdrawableAssets = yieldVault.convertToAssets(yieldVault.balanceOf(_vault_));
 
     if (withdrawableAssets >= totalAssets) {
-      assertApproxEqAbs(availableBalanceOf, withdrawableAssets - totalAssets, _delta_, "yield");
+      assertApproxEqAbs(liquidatableBalanceOf, withdrawableAssets - totalAssets, _delta_, "yield");
     } else {
-      assertApproxEqAbs(availableBalanceOf, underlyingAsset.balanceOf(_vault_), _delta_, "yield");
+      assertApproxEqAbs(
+        liquidatableBalanceOf,
+        underlyingAsset.balanceOf(_vault_),
+        _delta_,
+        "yield"
+      );
     }
   }
 
-  function test_availableBalanceOf(Init memory init, uint shares) public virtual {
+  function test_liquidatableBalanceOf(Init memory init, uint shares) public virtual {
     setUpVault(init);
 
     address caller = init.user[0];
     shares = bound(shares, 0, _max_mint(caller));
 
-    propAvailableBalanceOf();
+    propLiquidatableBalanceOf();
   }
 
   /* ============ Liquidate ============ */
   function propLiquidate(address caller) public {
     vm.startPrank(caller);
 
-    uint256 yield = _call_vault(abi.encodeWithSelector(Vault.availableBalanceOf.selector, _vault_));
+    uint256 yield = _call_vault(
+      abi.encodeWithSelector(Vault.liquidatableBalanceOf.selector, _vault_)
+    );
     uint256 callerVaultSharesBalanceBefore = vault.balanceOf(caller);
     uint256 vaultTotalAssetsBefore = vault.totalAssets();
 
@@ -323,7 +330,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     );
 
     assertApproxEqAbs(
-      vault.availableBalanceOf(_vault_),
+      vault.liquidatableBalanceOf(_vault_),
       0,
       _delta_,
       "vault liquidatable balance after liquidation"

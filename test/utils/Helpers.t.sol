@@ -204,7 +204,7 @@ contract Helpers is Test {
     return (_availableYield * _feePercentage) / FEE_PRECISION;
   }
 
-  function _getAvailableBalanceOf(
+  function _getLiquidatableBalanceOf(
     uint256 _availableYield,
     uint256 _feePercentage
   ) internal pure returns (uint256) {

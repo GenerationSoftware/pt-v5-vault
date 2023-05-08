@@ -11,7 +11,7 @@ import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
 
 contract UnitBrokenTokenBaseSetup is UnitBaseSetup, BrokenToken {
   /* ============ Setup ============ */
-  function setUpUnderlyingAsset() public override returns (ERC20PermitMock) {
+  function setUpUnderlyingAsset() public view override returns (ERC20PermitMock) {
     return ERC20PermitMock(address(brokenERC20));
   }
 }

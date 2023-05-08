@@ -211,8 +211,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /* ============ View Functions ============ */
 
   /// @inheritdoc ILiquidationSource
-  function availableBalanceOf(address _token) public view override returns (uint256) {
-    return _availableBalanceOf(_token);
+  function liquidatableBalanceOf(address _token) public view override returns (uint256) {
+    return _liquidatableBalanceOf(_token);
   }
 
   /**
@@ -452,7 +452,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     require(_tokenOut == address(this), "Vault/tokenOut-not-vaultShare");
     require(_amountOut != 0, "Vault/amountOut-not-zero");
 
-    uint256 _liquidableYield = _availableBalanceOf(_tokenOut);
+    uint256 _liquidableYield = _liquidatableBalanceOf(_tokenOut);
     require(_liquidableYield >= _amountOut, "Vault/amount-gt-available-yield");
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
@@ -718,7 +718,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _token Address of the token to get available balance for
    * @return uint256 Available amount of `_token`
    */
-  function _availableBalanceOf(address _token) internal view returns (uint256) {
+  function _liquidatableBalanceOf(address _token) internal view returns (uint256) {
     require(_token == address(this), "Vault/token-not-vault-share");
 
     uint256 _availableYield = availableYieldBalance();
