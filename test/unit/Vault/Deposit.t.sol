@@ -8,7 +8,7 @@ import { console2 } from "forge-std/Test.sol";
 
 contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
-  event Deposit(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+  event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
 
   event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
 
@@ -22,6 +22,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
@@ -29,7 +30,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
-    _deposit(underlyingAsset, vault, _amount, alice);
+    vault.deposit(_amount, alice);
 
     assertEq(vault.balanceOf(alice), _amount);
 
@@ -53,6 +54,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
@@ -60,7 +62,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
-    _deposit(underlyingAsset, vault, _amount, alice);
+    vault.deposit(_amount, alice);
 
     assertEq(vault.balanceOf(alice), _amount);
 
@@ -82,6 +84,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), bob, _amount);
@@ -89,7 +92,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Deposit(alice, bob, _amount, _amount);
 
-    _deposit(underlyingAsset, vault, _amount, bob);
+    vault.deposit(_amount, bob);
 
     assertEq(vault.balanceOf(alice), 0);
     assertEq(vault.balanceOf(bob), _amount);
@@ -186,6 +189,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 10_000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
@@ -193,7 +197,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
-    _deposit(underlyingAsset, vault, _amount, alice);
+    vault.deposit(_amount, alice);
 
     assertEq(vault.balanceOf(alice), _amount);
 
@@ -250,6 +254,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
@@ -257,7 +262,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
-    _mint(underlyingAsset, vault, _amount, alice);
+    vault.mint(_amount, alice);
 
     assertEq(vault.balanceOf(alice), _amount);
 
@@ -276,6 +281,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), bob, _amount);
@@ -283,7 +289,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Deposit(alice, bob, _amount, _amount);
 
-    _mint(underlyingAsset, vault, _amount, bob);
+    vault.mint(_amount, bob);
 
     assertEq(vault.balanceOf(alice), 0);
     assertEq(vault.balanceOf(bob), _amount);
@@ -363,6 +369,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
@@ -370,7 +377,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Sponsor(alice, alice, _amount, _amount);
 
-    _sponsor(underlyingAsset, vault, _amount, alice);
+    vault.sponsor(_amount, alice);
 
     assertEq(vault.balanceOf(alice), _amount);
 
@@ -392,6 +399,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), bob, _amount);
@@ -399,7 +407,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Sponsor(alice, bob, _amount, _amount);
 
-    _sponsor(underlyingAsset, vault, _amount, bob);
+    vault.sponsor(_amount, bob);
 
     assertEq(vault.balanceOf(alice), 0);
     assertEq(vault.balanceOf(bob), _amount);
@@ -488,6 +496,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
@@ -495,7 +504,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
-    _deposit(underlyingAsset, vault, _amount, alice);
+    vault.deposit(_amount, alice);
 
     twabController.delegate(address(vault), bob);
 
