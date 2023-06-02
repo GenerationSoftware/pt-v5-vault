@@ -5,6 +5,7 @@
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
+  branch = release-v4.9
 [submodule "lib/erc4626-tests"]
 	path = lib/erc4626-tests
 	url = https://github.com/a16z/erc4626-tests

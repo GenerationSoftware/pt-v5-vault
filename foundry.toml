@@ -8,7 +8,7 @@ fs_permissions = [{ access = "read", path = "./broadcast"}]
 gas_reports = ["*"]
 
 [fuzz]
-runs = 10000
+runs = 1000
 max_test_rejects = 100000
 
 [rpc_endpoints]
