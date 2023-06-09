@@ -188,8 +188,8 @@ contract VaultTest is UnitBaseSetup {
   function testClaimPrize() public {
     vm.startPrank(address(claimer));
 
-    mockPrizePoolClaimPrize(alice, uint8(1), alice, 1e18, address(claimer));
-    vault.claimPrize(alice, uint8(1), alice, 1e18, address(claimer));
+    mockPrizePoolClaimPrize(alice, uint8(1), 1e18, address(claimer));
+    vault.claimPrize(alice, uint8(1), 1e18, address(claimer));
 
     vm.stopPrank();
   }
@@ -201,8 +201,8 @@ contract VaultTest is UnitBaseSetup {
 
     vm.startPrank(_randomUser);
 
-    mockPrizePoolClaimPrize(alice, uint8(1), alice, 0, address(0));
-    vault.claimPrize(alice, uint8(1), alice, 0, address(0));
+    mockPrizePoolClaimPrize(alice, uint8(1), 0, address(0));
+    vault.claimPrize(alice, uint8(1), 0, address(0));
 
     vm.stopPrank();
   }
@@ -211,7 +211,7 @@ contract VaultTest is UnitBaseSetup {
     vm.startPrank(alice);
 
     vm.expectRevert(bytes("Vault/caller-not-claimer"));
-    vault.claimPrize(alice, uint8(1), alice, 0, address(0));
+    vault.claimPrize(alice, uint8(1), 0, address(0));
 
     vm.stopPrank();
   }
@@ -226,14 +226,14 @@ contract VaultTest is UnitBaseSetup {
     vm.startPrank(address(claimer));
 
     vm.expectRevert(bytes("Vault/auto-claim-disabled"));
-    vault.claimPrize(alice, uint8(1), alice, 1e18, address(this));
+    vault.claimPrize(alice, uint8(1), 1e18, address(this));
 
     vm.stopPrank();
 
     vm.startPrank(alice);
 
-    mockPrizePoolClaimPrize(alice, uint8(1), alice, 0, address(0));
-    vault.claimPrize(alice, uint8(1), alice, 0, address(0));
+    mockPrizePoolClaimPrize(alice, uint8(1), 0, address(0));
+    vault.claimPrize(alice, uint8(1), 0, address(0));
 
     vm.stopPrank();
   }
@@ -395,20 +395,12 @@ contract VaultTest is UnitBaseSetup {
   function mockPrizePoolClaimPrize(
     address _winner,
     uint8 _tier,
-    address _to,
     uint96 _fee,
     address _feeRecipient
   ) public {
     vm.mockCall(
       address(prizePool),
-      abi.encodeWithSelector(
-        PrizePool.claimPrize.selector,
-        _winner,
-        _tier,
-        _to,
-        _fee,
-        _feeRecipient
-      ),
+      abi.encodeWithSelector(PrizePool.claimPrize.selector, _winner, _tier, _fee, _feeRecipient),
       abi.encode(100)
     );
   }

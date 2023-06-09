@@ -491,14 +491,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *        - caller can be any address except claimer address
    * @param _winner Address of the user to claim prize for
    * @param _tier Tier to claim prize for
-   * @param _to Address of the recipient that will receive the prize
    * @param _claimFee Amount in fees paid to `_claimFeeRecipient`
    * @param _claimFeeRecipient Address that will receive `_claimFee` amount
    */
   function claimPrize(
     address _winner,
     uint8 _tier,
-    address _to,
     uint96 _claimFee,
     address _claimFeeRecipient
   ) external returns (uint256) {
@@ -512,7 +510,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       }
     }
 
-    return _prizePool.claimPrize(_winner, _tier, _to, _claimFee, _claimFeeRecipient);
+    return _prizePool.claimPrize(_winner, _tier, _claimFee, _claimFeeRecipient);
   }
 
   /**
