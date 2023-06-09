@@ -18,6 +18,7 @@
 [submodule "lib/v5-prize-pool"]
 	path = lib/v5-prize-pool
 	url = https://github.com/pooltogether/v5-prize-pool
+  branch = pool-2773-remove-to-from-prizepoolclaimprize-and-the-claimer
 [submodule "lib/owner-manager-contracts"]
 	path = lib/owner-manager-contracts
 	url = https://github.com/pooltogether/owner-manager-contracts
