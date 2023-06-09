@@ -5,7 +5,7 @@
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
-  branch = release-v4.9
+	branch = release-v4.9
 [submodule "lib/erc4626-tests"]
 	path = lib/erc4626-tests
 	url = https://github.com/a16z/erc4626-tests
@@ -18,7 +18,6 @@
 [submodule "lib/v5-prize-pool"]
 	path = lib/v5-prize-pool
 	url = https://github.com/pooltogether/v5-prize-pool
-  branch = pool-2773-remove-to-from-prizepoolclaimprize-and-the-claimer
 [submodule "lib/owner-manager-contracts"]
 	path = lib/owner-manager-contracts
 	url = https://github.com/pooltogether/owner-manager-contracts
