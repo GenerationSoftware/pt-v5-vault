@@ -159,37 +159,13 @@ contract VaultTest is UnitBaseSetup {
   }
 
   /* ============ Claimer ============ */
-  /* ============ disableAutoClaim ============ */
-  function testDisableAutoClaimFalse() public {
-    bool disable = false;
-
-    vm.expectEmit(true, true, true, true);
-    emit AutoClaimDisabled(address(this), disable);
-
-    bool status = vault.disableAutoClaim(disable);
-
-    assertEq(status, disable);
-    assertEq(vault.autoClaimDisabled(address(this)), disable);
-  }
-
-  function testDisableAutoClaimTrue() public {
-    bool disable = true;
-
-    vm.expectEmit(true, true, true, true);
-    emit AutoClaimDisabled(address(this), disable);
-
-    bool status = vault.disableAutoClaim(disable);
-
-    assertEq(status, disable);
-    assertEq(vault.autoClaimDisabled(address(this)), disable);
-  }
-
+  
   /* ============ claimPrize ============ */
   function testClaimPrize() public {
     vm.startPrank(address(claimer));
 
-    mockPrizePoolClaimPrize(alice, uint8(1), 1e18, address(claimer));
-    vault.claimPrize(alice, uint8(1), 1e18, address(claimer));
+    mockPrizePoolClaimPrize(uint8(1), alice, 0, 1e18, address(claimer));
+    claimPrize(uint8(1), alice, 0, 1e18, address(claimer));
 
     vm.stopPrank();
   }
@@ -201,8 +177,9 @@ contract VaultTest is UnitBaseSetup {
 
     vm.startPrank(_randomUser);
 
-    mockPrizePoolClaimPrize(alice, uint8(1), 0, address(0));
-    vault.claimPrize(alice, uint8(1), 0, address(0));
+    mockPrizePoolClaimPrize(uint8(1), alice, 0, 0, address(0));
+    vm.expectRevert(bytes("Vault/caller-not-claimer"));
+    claimPrize(uint8(1), alice, 0, 0, address(0));
 
     vm.stopPrank();
   }
@@ -211,29 +188,7 @@ contract VaultTest is UnitBaseSetup {
     vm.startPrank(alice);
 
     vm.expectRevert(bytes("Vault/caller-not-claimer"));
-    vault.claimPrize(alice, uint8(1), 0, address(0));
-
-    vm.stopPrank();
-  }
-
-  function testClaimPrizeAutoClaimDisabled() public {
-    vm.startPrank(alice);
-
-    vault.disableAutoClaim(true);
-
-    vm.stopPrank();
-
-    vm.startPrank(address(claimer));
-
-    vm.expectRevert(bytes("Vault/auto-claim-disabled"));
-    vault.claimPrize(alice, uint8(1), 1e18, address(this));
-
-    vm.stopPrank();
-
-    vm.startPrank(alice);
-
-    mockPrizePoolClaimPrize(alice, uint8(1), 0, address(0));
-    vault.claimPrize(alice, uint8(1), 0, address(0));
+    claimPrize(uint8(1), alice, 0, 0, address(0));
 
     vm.stopPrank();
   }
@@ -391,16 +346,31 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
+  function claimPrize(uint8 tier, address winner, uint32 prizeIndex, uint96 fee, address feeRecipient) public returns (uint256) {
+      address[] memory winners = new address[](1);
+      winners[0] = winner;
+      uint32[][] memory prizeIndices = new uint32[][](1);
+      prizeIndices[0] = new uint32[](1);
+      prizeIndices[0][0] = prizeIndex;
+      return vault.claimPrizes(tier, winners, prizeIndices, fee, feeRecipient);
+  }
+
   /* ============ mocks ============ */
   function mockPrizePoolClaimPrize(
-    address _winner,
     uint8 _tier,
+    address _winner,
+    uint32 _prizeIndex,
     uint96 _fee,
     address _feeRecipient
   ) public {
+    address[] memory winners = new address[](1);
+    winners[0] = _winner;
+    uint32[][] memory prizeIndices = new uint32[][](1);
+    prizeIndices[0] = new uint32[](1);
+    prizeIndices[0][0] = _prizeIndex;
     vm.mockCall(
       address(prizePool),
-      abi.encodeWithSelector(PrizePool.claimPrize.selector, _winner, _tier, _fee, _feeRecipient),
+      abi.encodeWithSelector(PrizePool.claimPrizes.selector, _tier, winners, prizeIndices, _fee, _feeRecipient),
       abi.encode(100)
     );
   }

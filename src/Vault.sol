@@ -141,11 +141,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
   uint256 private constant FEE_PRECISION = 1e9;
 
-  /* ============ Mappings ============ */
-
-  /// @notice Mapping to keep track of users who disabled prize auto claiming.
-  mapping(address => bool) public autoClaimDisabled;
-
   /* ============ Constructor ============ */
 
   /**
@@ -489,28 +484,22 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *      - caller needs to be claimer address
    *      - If auto claim is disabled for `_user`:
    *        - caller can be any address except claimer address
-   * @param _winner Address of the user to claim prize for
    * @param _tier Tier to claim prize for
+   * @param _winners Addresses of the winners to claim prizes
+   * @param _prizes The prizes to claim for each winner
    * @param _claimFee Amount in fees paid to `_claimFeeRecipient`
    * @param _claimFeeRecipient Address that will receive `_claimFee` amount
    */
-  function claimPrize(
-    address _winner,
+  function claimPrizes(
     uint8 _tier,
+    address[] calldata _winners,
+    uint32[][] calldata _prizes,
     uint96 _claimFee,
     address _claimFeeRecipient
   ) external returns (uint256) {
-    address _claimerAddress = address(_claimer);
+    require(msg.sender == address(_claimer), "Vault/caller-not-claimer");
 
-    if (_claimerAddress != address(0)) {
-      if (autoClaimDisabled[_winner]) {
-        require(msg.sender != _claimerAddress, "Vault/auto-claim-disabled");
-      } else {
-        require(msg.sender == _claimerAddress, "Vault/caller-not-claimer");
-      }
-    }
-
-    return _prizePool.claimPrize(_winner, _tier, _claimFee, _claimFeeRecipient);
+    return _prizePool.claimPrizes(_tier, _winners, _prizes, _claimFee, _claimFeeRecipient);
   }
 
   /**
@@ -531,19 +520,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /* ============ Setter Functions ============ */
-
-  /**
-   * @notice Allow a user to disable or activate prize auto claiming.
-   * @dev Auto claim is active by default for all users.
-   * @param _disable Disable or activate auto claim for `msg.sender`
-   * @return bool New auto claim status
-   */
-  function disableAutoClaim(bool _disable) external returns (bool) {
-    autoClaimDisabled[msg.sender] = _disable;
-
-    emit AutoClaimDisabled(msg.sender, _disable);
-    return _disable;
-  }
 
   /**
    * @notice Set claimer.
