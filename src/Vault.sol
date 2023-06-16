@@ -56,13 +56,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   );
 
   /**
-   * @notice Emitted when auto claim has been disabled or activated by a user.
-   * @param user Address of the user for which auto claim was disabled or activated
-   * @param status Whether auto claim is disabled or not
-   */
-  event AutoClaimDisabled(address user, bool status);
-
-  /**
    * @notice Emitted when a new claimer has been set.
    * @param previousClaimer Address of the previous claimer
    * @param newClaimer Address of the new claimer
@@ -487,19 +480,19 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _tier Tier to claim prize for
    * @param _winners Addresses of the winners to claim prizes
    * @param _prizes The prizes to claim for each winner
-   * @param _claimFee Amount in fees paid to `_claimFeeRecipient`
+   * @param _feePerClaim Fee to be charged per prize claim
    * @param _claimFeeRecipient Address that will receive `_claimFee` amount
    */
   function claimPrizes(
     uint8 _tier,
     address[] calldata _winners,
     uint32[][] calldata _prizes,
-    uint96 _claimFee,
+    uint96 _feePerClaim,
     address _claimFeeRecipient
   ) external returns (uint256) {
     require(msg.sender == address(_claimer), "Vault/caller-not-claimer");
 
-    return _prizePool.claimPrizes(_tier, _winners, _prizes, _claimFee, _claimFeeRecipient);
+    return _prizePool.claimPrizes(_tier, _winners, _prizes, _feePerClaim, _claimFeeRecipient);
   }
 
   /**

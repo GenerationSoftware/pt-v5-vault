@@ -19,8 +19,6 @@ contract VaultTest is UnitBaseSetup {
     address owner
   );
 
-  event AutoClaimDisabled(address user, bool status);
-
   event ClaimerSet(Claimer previousClaimer, Claimer newClaimer);
 
   event LiquidationPairSet(LiquidationPair newLiquidationPair);
