@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
+import "src/Vault.sol";
 
 contract VaultLiquidateTest is UnitBaseSetup {
   /* ============ Events ============ */
@@ -322,7 +323,9 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(bob);
 
-    vm.expectRevert(bytes("Vault/caller-not-LP"));
+    vm.expectRevert(
+      abi.encodeWithSelector(LiquidationCallerNotLP.selector, bob, address(liquidationPair))
+    );
     vault.liquidate(address(this), address(prizeToken), 0, address(vault), 0);
 
     vm.stopPrank();
@@ -333,7 +336,13 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(bytes("Vault/tokenIn-not-prizeToken"));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        LiquidationTokenInNotPrizeToken.selector,
+        address(0),
+        address(prizeToken)
+      )
+    );
     vault.liquidate(address(this), address(0), 0, address(vault), 0);
 
     vm.stopPrank();
@@ -344,7 +353,9 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(bytes("Vault/tokenOut-not-vaultShare"));
+    vm.expectRevert(
+      abi.encodeWithSelector(LiquidationTokenOutNotVaultShare.selector, address(0), address(vault))
+    );
     vault.liquidate(address(this), address(prizeToken), 0, address(0), 0);
 
     vm.stopPrank();
@@ -355,7 +366,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(bytes("Vault/amountOut-not-zero"));
+    vm.expectRevert(abi.encodeWithSelector(LiquidationAmountOutZero.selector));
     vault.liquidate(address(this), address(prizeToken), 0, address(vault), 0);
 
     vm.stopPrank();
@@ -366,14 +377,16 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(bytes("Vault/amount-gt-available-yield"));
+    vm.expectRevert(
+      abi.encodeWithSelector(LiquidationAmountOutGTYield.selector, type(uint256).max, 0)
+    );
     vault.liquidate(address(this), address(prizeToken), 0, address(vault), type(uint256).max);
 
     vm.stopPrank();
   }
 
   function testMintYieldFeeGTYieldFeeSupply() public {
-    vm.expectRevert(bytes("Vault/shares-gt-yieldFeeSupply"));
+    vm.expectRevert(abi.encodeWithSelector(YieldFeeGTAvailable.selector, 10e18, 0));
     vault.mintYieldFee(10e18, bob);
   }
 }

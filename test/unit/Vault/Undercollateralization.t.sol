@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
+import "src/Vault.sol";
 
 contract VaultUndercollateralizationTest is UnitBaseSetup {
   /* ============ Tests ============ */
@@ -165,7 +166,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     uint256 _yieldFeeShares = vault.yieldFeeTotalSupply();
 
-    vm.expectRevert(bytes("Vault/vault-undercollateralized"));
+    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
     vault.mintYieldFee(_yieldFeeShares, address(this));
 
     vm.startPrank(bob);
