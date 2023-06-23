@@ -13,6 +13,90 @@ import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
+/// @notice Emitted when the TWAB controller is set to the zero address
+error TwabControllerZeroAddress();
+
+/// @notice Emitted when the Yield Vault is set to the zero address
+error YieldVaultZeroAddress();
+
+/// @notice Emitted when the Prize Pool is set to the zero address
+error PrizePoolZeroAddress();
+
+/// @notice Emitted when the Owner is set to the zero address
+error OwnerZeroAddress();
+
+/// @notice Emitted when the amount being deposited for the receiver is greater than the max amount allowed
+/// @param receiver The receiver of the deposit
+/// @param amount The amount to deposit
+/// @param max The max deposit amount allowed
+error DepositMoreThanMax(address receiver, uint256 amount, uint256 max);
+
+/// @notice Emitted when the amount being withdrawn for the owner is greater than the max amount allowed
+/// @param owner The owner of the assets
+/// @param amount The amount to withdraw
+/// @param max The max withdrawable amount
+error WithdrawMoreThanMax(address owner, uint256 amount, uint256 max);
+
+/// @notice Emitted when the amount being redeemed for owner is greater than the max allowed amount
+/// @param owner The owner of the assets
+/// @param amount The amount to redeem
+/// @param max The max redeemable amount
+error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
+
+/// @notice Emitted during the liquidation process when the caller is not the liquidation pair contract
+/// @param caller The caller address
+/// @param liquidationPair The LP address
+error LiquidationCallerNotLP(address caller, address liquidationPair);
+
+/// @notice Emitted during the liquidation process when the token in is not the prize token
+/// @param tokenIn The provided tokenIn address
+/// @param prizeToken The prize token address
+error LiquidationTokenInNotPrizeToken(address tokenIn, address prizeToken);
+
+/// @notice Emitted during the liquidation process when the token out is not the vault share token
+/// @param tokenOut The provided tokenOut address
+/// @param vaultShare The vault share token address
+error LiquidationTokenOutNotVaultShare(address tokenOut, address vaultShare);
+
+/// @notice Emitted during the liquidation process when the liquidation amount out is zero
+error LiquidationAmountOutZero();
+
+/// @notice Emitted during the liquidation process if the amount out is greater than the available yield
+/// @param amountOut The amount out
+/// @param availableYield The available yield
+error LiquidationAmountOutGTYield(uint256 amountOut, uint256 availableYield);
+
+/// @notice Emitted when the vault is under-collateralized
+error VaultUnderCollateralized();
+
+/// @notice Emitted when the target token is not supported for a given token address
+/// @param token The unsupported token address
+error TargetTokenNotSupported(address token);
+
+/// @notice Emitted when the caller is not the prize claimer
+/// @param caller The caller address
+/// @param claimer The claimer address
+error CallerNotClaimer(address caller, address claimer);
+
+/// @notice Emitted when the minted yield exceeds the yield fee supply
+/// @param shares The shares to mint
+/// @param yieldFeeTotalSupply The accrued yield fee available
+error YieldFeeGTAvailable(uint256 shares, uint256 yieldFeeTotalSupply);
+
+/// @notice Emitted when the Liquidation Pair being set is the zero address
+error LPZeroAddress();
+
+/// @notice Emitted when the amount of shares being minted to receiver is greater than the max amount allowed
+/// @param shares The shares being minted
+/// @param receiver The receiver address
+/// @param max The max amount of shares that can be minted to the receiver
+error MintGTMax(uint256 shares, address receiver, uint256 max);
+
+/// @notice Emitted when the yield fee percentage being set is greater than the fee precision
+/// @param yieldFeePercentage The yield fee percentage in integer format
+/// @param feePrecision The fee precision
+error YieldFeePercentageGTPrecision(uint256 yieldFeePercentage, uint256 feePrecision);
+
 /**
  * @title  PoolTogether V5 Vault
  * @author PoolTogether Inc Team
@@ -162,10 +246,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 yieldFeePercentage_,
     address _owner
   ) ERC4626(_asset) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(_owner) {
-    require(address(twabController_) != address(0), "Vault/twabCtrlr-not-zero-address");
-    require(address(yieldVault_) != address(0), "Vault/YV-not-zero-address");
-    require(address(prizePool_) != address(0), "Vault/PP-not-zero-address");
-    require(address(_owner) != address(0), "Vault/owner-not-zero-address");
+    if (address(twabController_) == address(0)) revert TwabControllerZeroAddress();
+    if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
+    if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
+    if (address(_owner) == address(0)) revert OwnerZeroAddress();
 
     _twabController = twabController_;
     _yieldVault = yieldVault_;
@@ -292,7 +376,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @inheritdoc ERC4626
   function deposit(uint256 _assets, address _receiver) public virtual override returns (uint256) {
-    require(_assets <= maxDeposit(_receiver), "Vault/deposit-more-than-max");
+    if (_assets > maxDeposit(_receiver))
+      revert DepositMoreThanMax(_receiver, _assets, maxDeposit(_receiver));
 
     uint256 _shares = _convertToShares(_assets, Math.Rounding.Down);
     _deposit(msg.sender, _receiver, _assets, _shares);
@@ -397,7 +482,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     address _receiver,
     address _owner
   ) public virtual override returns (uint256) {
-    require(_assets <= maxWithdraw(_owner), "Vault/withdraw-more-than-max");
+    if (_assets > maxWithdraw(_owner))
+      revert WithdrawMoreThanMax(_owner, _assets, maxWithdraw(_owner));
 
     uint256 _shares = _convertToShares(_assets, Math.Rounding.Up);
     _withdraw(msg.sender, _receiver, _owner, _assets, _shares);
@@ -411,7 +497,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     address _receiver,
     address _owner
   ) public virtual override returns (uint256) {
-    require(_shares <= maxRedeem(_owner), "Vault/redeem-more-than-max");
+    if (_shares > maxRedeem(_owner)) revert RedeemMoreThanMax(_owner, _shares, maxRedeem(_owner));
 
     uint256 _assets = _convertToAssets(_shares, Math.Rounding.Down);
     _withdraw(msg.sender, _receiver, _owner, _assets, _shares);
@@ -435,13 +521,17 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _amountOut
   ) public virtual override returns (bool) {
     _requireVaultCollateralized();
-    require(msg.sender == address(_liquidationPair), "Vault/caller-not-LP");
-    require(_tokenIn == address(_prizePool.prizeToken()), "Vault/tokenIn-not-prizeToken");
-    require(_tokenOut == address(this), "Vault/tokenOut-not-vaultShare");
-    require(_amountOut != 0, "Vault/amountOut-not-zero");
+    if (msg.sender != address(_liquidationPair))
+      revert LiquidationCallerNotLP(msg.sender, address(_liquidationPair));
+    if (_tokenIn != address(_prizePool.prizeToken()))
+      revert LiquidationTokenInNotPrizeToken(_tokenIn, address(_prizePool.prizeToken()));
+    if (_tokenOut != address(this))
+      revert LiquidationTokenOutNotVaultShare(_tokenOut, address(this));
+    if (_amountOut == 0) revert LiquidationAmountOutZero();
 
     uint256 _liquidableYield = _liquidatableBalanceOf(_tokenOut);
-    require(_liquidableYield >= _amountOut, "Vault/amount-gt-available-yield");
+    if (_amountOut > _liquidableYield)
+      revert LiquidationAmountOutGTYield(_amountOut, _liquidableYield);
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
 
@@ -464,7 +554,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @inheritdoc ILiquidationSource
   function targetOf(address _token) external view returns (address) {
-    require(_token == _liquidationPair.tokenIn(), "Vault/target-token-unsupported");
+    if (_token != _liquidationPair.tokenIn()) revert TargetTokenNotSupported(_token);
     return address(_prizePool);
   }
 
@@ -490,7 +580,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint96 _feePerClaim,
     address _claimFeeRecipient
   ) external returns (uint256) {
-    require(msg.sender == address(_claimer), "Vault/caller-not-claimer");
+    if (msg.sender != address(_claimer)) revert CallerNotClaimer(msg.sender, address(_claimer));
 
     return _prizePool.claimPrizes(_tier, _winners, _prizes, _feePerClaim, _claimFeeRecipient);
   }
@@ -504,7 +594,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function mintYieldFee(uint256 _shares, address _recipient) external {
     _requireVaultCollateralized();
-    require(_shares <= _yieldFeeTotalSupply, "Vault/shares-gt-yieldFeeSupply");
+    if (_shares > _yieldFeeTotalSupply) revert YieldFeeGTAvailable(_shares, _yieldFeeTotalSupply);
 
     _yieldFeeTotalSupply -= _shares;
     _mint(_recipient, _shares);
@@ -536,7 +626,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function setLiquidationPair(
     LiquidationPair liquidationPair_
   ) external onlyOwner returns (address) {
-    require(address(liquidationPair_) != address(0), "Vault/LP-not-zero-address");
+    if (address(liquidationPair_) == address(0)) revert LPZeroAddress();
 
     IERC20 _asset = IERC20(asset());
     address _previousLiquidationPair = address(_liquidationPair);
@@ -686,7 +776,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Available amount of `_token`
    */
   function _liquidatableBalanceOf(address _token) internal view returns (uint256) {
-    require(_token == address(this), "Vault/token-not-vault-share");
+    if (_token != address(this)) revert LiquidationTokenOutNotVaultShare(_token, address(this));
 
     uint256 _availableYield = availableYieldBalance();
 
@@ -812,7 +902,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Amount of assets to deposit.
    */
   function _beforeMint(uint256 _shares, address _receiver) internal view returns (uint256) {
-    require(_shares <= maxMint(_receiver), "Vault/mint-more-than-max");
+    if (_shares > maxMint(_receiver)) revert MintGTMax(_shares, _receiver, maxMint(_receiver));
     return _convertToAssets(_shares, Math.Rounding.Up);
   }
 
@@ -974,9 +1064,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return _currentExchangeRate() >= _assetUnit;
   }
 
-  /// @notice Require reverting if the vault is undercollateralized.
+  /// @notice Require reverting if the vault is under-collateralized.
   function _requireVaultCollateralized() internal view {
-    require(_isVaultCollateralized(), "Vault/vault-undercollateralized");
+    if (!_isVaultCollateralized()) revert VaultUnderCollateralized();
   }
 
   /* ============ Setter Functions ============ */
@@ -995,7 +1085,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param yieldFeePercentage_ Yield fee percentage
    */
   function _setYieldFeePercentage(uint256 yieldFeePercentage_) internal {
-    require(yieldFeePercentage_ <= FEE_PRECISION, "Vault/yieldFeePercentage-gt-1e9");
+    if (yieldFeePercentage_ > FEE_PRECISION)
+      revert YieldFeePercentageGTPrecision(yieldFeePercentage_, FEE_PRECISION);
     _yieldFeePercentage = yieldFeePercentage_;
   }
 

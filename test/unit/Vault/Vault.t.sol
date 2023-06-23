@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import { UnitBaseSetup, Claimer, LiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "test/utils/UnitBaseSetup.t.sol";
+import "src/Vault.sol";
 
 contract VaultTest is UnitBaseSetup {
   /* ============ Events ============ */
@@ -72,7 +73,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testConstructorTwabControllerZero() external {
-    vm.expectRevert(bytes("Vault/twabCtrlr-not-zero-address"));
+    vm.expectRevert(abi.encodeWithSelector(TwabControllerZeroAddress.selector));
 
     new VaultMock(
       IERC20(address(underlyingAsset)),
@@ -89,7 +90,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testConstructorYieldVaultZero() external {
-    vm.expectRevert(bytes("Vault/YV-not-zero-address"));
+    vm.expectRevert(abi.encodeWithSelector(YieldVaultZeroAddress.selector));
 
     new VaultMock(
       IERC20(address(underlyingAsset)),
@@ -106,7 +107,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testConstructorPrizePoolZero() external {
-    vm.expectRevert(bytes("Vault/PP-not-zero-address"));
+    vm.expectRevert(abi.encodeWithSelector(PrizePoolZeroAddress.selector));
 
     new VaultMock(
       IERC20(address(underlyingAsset)),
@@ -123,7 +124,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testConstructorOwnerZero() external {
-    vm.expectRevert(bytes("Vault/owner-not-zero-address"));
+    vm.expectRevert(abi.encodeWithSelector(OwnerZeroAddress.selector));
 
     new VaultMock(
       IERC20(address(underlyingAsset)),
@@ -152,12 +153,14 @@ contract VaultTest is UnitBaseSetup {
   function testTargetOfFail() public {
     _setLiquidationPair();
 
-    vm.expectRevert(bytes("Vault/target-token-unsupported"));
+    vm.expectRevert(
+      abi.encodeWithSelector(TargetTokenNotSupported.selector, address(underlyingAsset))
+    );
     vault.targetOf(address(underlyingAsset));
   }
 
   /* ============ Claimer ============ */
-  
+
   /* ============ claimPrize ============ */
   function testClaimPrize() public {
     vm.startPrank(address(claimer));
@@ -176,7 +179,7 @@ contract VaultTest is UnitBaseSetup {
     vm.startPrank(_randomUser);
 
     mockPrizePoolClaimPrize(uint8(1), alice, 0, 0, address(0));
-    vm.expectRevert(bytes("Vault/caller-not-claimer"));
+    vm.expectRevert(abi.encodeWithSelector(CallerNotClaimer.selector, _randomUser, address(0)));
     claimPrize(uint8(1), alice, 0, 0, address(0));
 
     vm.stopPrank();
@@ -185,7 +188,7 @@ contract VaultTest is UnitBaseSetup {
   function testClaimPrizeCallerNotClaimer() public {
     vm.startPrank(alice);
 
-    vm.expectRevert(bytes("Vault/caller-not-claimer"));
+    vm.expectRevert(abi.encodeWithSelector(CallerNotClaimer.selector, alice, claimer));
     claimPrize(uint8(1), alice, 0, 0, address(0));
 
     vm.stopPrank();
@@ -286,7 +289,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetLiquidationPairNotZeroAddress() public {
-    vm.expectRevert(bytes("Vault/LP-not-zero-address"));
+    vm.expectRevert(abi.encodeWithSelector(LPZeroAddress.selector));
     vault.setLiquidationPair(LiquidationPair(address(0)));
   }
 
@@ -313,7 +316,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetYieldFeePercentageGT1e9() public {
-    vm.expectRevert(bytes("Vault/yieldFeePercentage-gt-1e9"));
+    vm.expectRevert(abi.encodeWithSelector(YieldFeePercentageGTPrecision.selector, 1e10, 1e9));
     vault.setYieldFeePercentage(1e10);
   }
 
@@ -344,13 +347,19 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function claimPrize(uint8 tier, address winner, uint32 prizeIndex, uint96 fee, address feeRecipient) public returns (uint256) {
-      address[] memory winners = new address[](1);
-      winners[0] = winner;
-      uint32[][] memory prizeIndices = new uint32[][](1);
-      prizeIndices[0] = new uint32[](1);
-      prizeIndices[0][0] = prizeIndex;
-      return vault.claimPrizes(tier, winners, prizeIndices, fee, feeRecipient);
+  function claimPrize(
+    uint8 tier,
+    address winner,
+    uint32 prizeIndex,
+    uint96 fee,
+    address feeRecipient
+  ) public returns (uint256) {
+    address[] memory winners = new address[](1);
+    winners[0] = winner;
+    uint32[][] memory prizeIndices = new uint32[][](1);
+    prizeIndices[0] = new uint32[](1);
+    prizeIndices[0][0] = prizeIndex;
+    return vault.claimPrizes(tier, winners, prizeIndices, fee, feeRecipient);
   }
 
   /* ============ mocks ============ */
@@ -368,7 +377,14 @@ contract VaultTest is UnitBaseSetup {
     prizeIndices[0][0] = _prizeIndex;
     vm.mockCall(
       address(prizePool),
-      abi.encodeWithSelector(PrizePool.claimPrizes.selector, _tier, winners, prizeIndices, _fee, _feeRecipient),
+      abi.encodeWithSelector(
+        PrizePool.claimPrizes.selector,
+        _tier,
+        winners,
+        prizeIndices,
+        _fee,
+        _feeRecipient
+      ),
       abi.encode(100)
     );
   }
