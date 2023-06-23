@@ -25,22 +25,22 @@ error PrizePoolZeroAddress();
 /// @notice Emitted when the Owner is set to the zero address
 error OwnerZeroAddress();
 
-/// @notice Emitted when the amount to deposit is greater than the max available for the receiver
+/// @notice Emitted when the amount being deposited for the receiver is greater than the max amount allowed
 /// @param receiver The receiver of the deposit
 /// @param amount The amount to deposit
-/// @param max The max deposit available for the receiver
+/// @param max The max deposit amount allowed
 error DepositMoreThanMax(address receiver, uint256 amount, uint256 max);
 
-/// @notice Emitted when the amount to withdraw is greater than the max available for the owner
+/// @notice Emitted when the amount being withdrawn for the owner is greater than the max amount allowed
 /// @param owner The owner of the assets
 /// @param amount The amount to withdraw
-/// @param max The max available to withdraw for the owner
+/// @param max The max withdrawable amount
 error WithdrawMoreThanMax(address owner, uint256 amount, uint256 max);
 
-/// @notice Emitted when the amount to redeem is greater than the max available for the owner
+/// @notice Emitted when the amount being redeemed for owner is greater than the max allowed amount
 /// @param owner The owner of the assets
 /// @param amount The amount to redeem
-/// @param max The max available to redeem for the owner
+/// @param max The max redeemable amount
 error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
 
 /// @notice Emitted during the liquidation process when the caller is not the liquidation pair contract
@@ -86,10 +86,10 @@ error YieldFeeGTAvailable(uint256 shares, uint256 yieldFeeTotalSupply);
 /// @notice Emitted when the Liquidation Pair being set is the zero address
 error LPZeroAddress();
 
-/// @notice Emitted when the shares to be minted is greater than the max for the receiver
+/// @notice Emitted when the amount of shares being minted to receiver is greater than the max amount allowed
 /// @param shares The shares being minted
 /// @param receiver The receiver address
-/// @param max The max shares that can be minted to the receiver
+/// @param max The max amount of shares that can be minted to the receiver
 error MintGTMax(uint256 shares, address receiver, uint256 max);
 
 /// @notice Emitted when the yield fee percentage being set is greater than the fee precision
