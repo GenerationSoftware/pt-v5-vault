@@ -1,16 +1,27 @@
-# Foundry template
+<p align="center">
+  <a href="https://github.com/pooltogether/pooltogether--brand-assets">
+    <img src="https://github.com/pooltogether/pooltogether--brand-assets/blob/977e03604c49c63314450b5d432fe57d34747c66/logo/pooltogether-logo--purple-gradient.png?raw=true" alt="PoolTogether Brand" style="max-width:100%;" width="400">
+  </a>
+</p>
 
-Template to kickstart a Foundry project.
+# PoolTogether V5 Vault
 
-## Getting started
+[![Code Coverage](https://github.com/pooltogether/v5-vault/actions/workflows/coverage.yml/badge.svg)](https://github.com/pooltogether/v5-vault/actions/workflows/coverage.yml)
+[![built-with openzeppelin](https://img.shields.io/badge/built%20with-OpenZeppelin-3677FF)](https://docs.openzeppelin.com/)
+[![GPLv3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
 
-The easiest way to get started is by clicking the [Use this template](https://github.com/pooltogether/foundry-template/generate) button at the top right of this page.
+<strong>Have questions or want the latest news?</strong>
+<br/>Join the PoolTogether Discord or follow us on Twitter:
 
-If you prefer to go the CLI way:
+[![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://pooltogether.com/discord)
+[![Twitter](https://badgen.net/badge/icon/twitter?icon=twitter&label)](https://twitter.com/PoolTogether_)
 
-```
-forge init my-project --template https://github.com/pooltogether/foundry-template
-```
+## Overview
+
+In PoolTogether V5 deposits are held in Vaults. Vaults are [ERC4626](https://eips.ethereum.org/EIPS/eip-4626) compatible. Vaults are the entry point for users interacting with the PoolTogether protocol. Users deposit an underlying asset (i.e. USDC) in this contract which is then funnelled to a yield source and in exchange users receive an ERC20 token representing their share of deposits in the vault.
+
+- Balances are stored in a TWAB Controller.
+- Yield is forwarded to the Liquidator to be sold.
 
 ## Development
 
@@ -79,6 +90,10 @@ npm run format
 ```
 npm run hint
 ```
+
+### Tests
+
+Test names including `SLOW` will be skipped on default test runs and need to be explicitly run.
 
 ### CI
 
