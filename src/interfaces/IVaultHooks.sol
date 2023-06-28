@@ -3,9 +3,9 @@ pragma solidity 0.8.17;
 
 struct Hook {
     /// @notice If true, the vault will call the beforeClaimPrize fxn on the hook.
-    bool useBeforeClaimHook;
+    bool useBeforeClaimPrize;
     /// @notice If true, the vault will call the afterClaimPrize on the hook
-    bool useAfterClaimHook;
+    bool useAfterClaimPrize;
     /// @notice The address of the smart contarct implementing the hooks
     IVaultHooks hooks;
 }
@@ -26,5 +26,5 @@ interface IVaultHooks {
     /// @param prizeIndex The index of the prize
     /// @param payout The amount of tokens paid out to the recipient
     /// @param recipient The recipient of the prize
-    function afterClaimPrize(address winner, uint8 tier, uint32 prizeIndex, uint256 payout, address recipient) external;
+    function afterClaimPrize(address winner, uint8 tier, uint32 prizeIndex, uint256 payout, address recipient) external returns (bool);
 }

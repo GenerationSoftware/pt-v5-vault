@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { UnitBaseSetup, Claimer, LiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "test/utils/UnitBaseSetup.t.sol";
+import { UnitBaseSetup, LiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "test/utils/UnitBaseSetup.t.sol";
+import { IVaultHooks, Hook } from "src/interfaces/IVaultHooks.sol";
 import "src/Vault.sol";
 
 contract VaultTest is UnitBaseSetup {
@@ -14,19 +15,21 @@ contract VaultTest is UnitBaseSetup {
     TwabController twabController,
     IERC4626 indexed yieldVault,
     PrizePool indexed prizePool,
-    Claimer claimer,
+    address claimer,
     address yieldFeeRecipient,
     uint256 yieldFeePercentage,
     address owner
   );
 
-  event ClaimerSet(Claimer previousClaimer, Claimer newClaimer);
+  event ClaimerSet(address previousClaimer, address newClaimer);
 
   event LiquidationPairSet(LiquidationPair newLiquidationPair);
 
   event YieldFeeRecipientSet(address previousYieldFeeRecipient, address newYieldFeeRecipient);
 
   event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
+  
+  event HookSet(address account, Hook hook);
 
   /* ============ Constructor ============ */
 
@@ -171,8 +174,49 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
+  function testClaimPrize_beforeHook() public {
+    vm.startPrank(alice);
+    Hook memory hooks = Hook({
+      useBeforeClaimPrize: true,
+      useAfterClaimPrize: false,
+      hooks: IVaultHooks(makeAddr("hooks"))
+    });
+    vault.setHooks(hooks);
+    vm.stopPrank();
+
+    vm.mockCall(address(hooks.hooks), abi.encodeWithSelector(IVaultHooks.beforeClaimPrize.selector, alice, 1, 0), abi.encode(bob));
+
+    vm.startPrank(address(claimer));
+
+    mockPrizePoolClaimPrize(uint8(1), alice, 0, bob, 1e18, address(claimer));
+    claimPrize(uint8(1), alice, 0, 1e18, address(claimer));
+
+    vm.stopPrank();
+  }
+
+  function testClaimPrize_afterHook() public {
+    vm.startPrank(alice);
+    Hook memory hooks = Hook({
+      useBeforeClaimPrize: true,
+      useAfterClaimPrize: true,
+      hooks: IVaultHooks(makeAddr("hooks"))
+    });
+    vault.setHooks(hooks);
+    vm.stopPrank();
+
+    vm.mockCall(address(hooks.hooks), abi.encodeWithSelector(IVaultHooks.beforeClaimPrize.selector, alice, 1, 0), abi.encode(bob));
+    vm.mockCall(address(hooks.hooks), abi.encodeWithSelector(IVaultHooks.afterClaimPrize.selector, alice, 1, 0, 78, bob), abi.encode(true));
+
+    vm.startPrank(address(claimer));
+
+    mockPrizePoolClaimPrize(uint8(1), alice, 0, bob, 22, address(claimer));
+    claimPrize(uint8(1), alice, 0, 22, address(claimer));
+
+    vm.stopPrank();
+  }
+
   function testClaimPrizeClaimerNotSet() public {
-    vault.setClaimer(Claimer(address(0)));
+    vault.setClaimer(address(0));
 
     address _randomUser = address(0xFf107770b6a31261836307218997C66c34681B5A);
 
@@ -229,7 +273,7 @@ contract VaultTest is UnitBaseSetup {
 
   /* ============ setClaimer ============ */
   function testSetClaimer() public {
-    Claimer _newClaimer = Claimer(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+    address _newClaimer = makeAddr("claimer");
 
     vm.expectEmit(true, true, true, true);
     emit ClaimerSet(claimer, _newClaimer);
@@ -242,7 +286,7 @@ contract VaultTest is UnitBaseSetup {
 
   function testSetClaimerOnlyOwner() public {
     address _caller = address(0xc6781d43c1499311291c8E5d3ab79613dc9e6d98);
-    Claimer _newClaimer = Claimer(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+    address _newClaimer = makeAddr("newClaimer");
 
     vm.startPrank(_caller);
 
@@ -338,6 +382,27 @@ contract VaultTest is UnitBaseSetup {
     assertEq(vault.yieldFeeRecipient(), alice);
   }
 
+  function testSetHooks() public {
+    vm.startPrank(bob);
+
+    Hook memory hooks = Hook({
+      useBeforeClaimPrize: true,
+      useAfterClaimPrize: true,
+      hooks: IVaultHooks(makeAddr("hooks"))
+    });
+
+    vm.expectEmit(true, true, true, true);
+    emit HookSet(bob, hooks);
+    vault.setHooks(hooks);
+
+    Hook memory result = vault.getHooks(bob);
+    assertEq(result.useBeforeClaimPrize, hooks.useBeforeClaimPrize);
+    assertEq(result.useAfterClaimPrize, hooks.useAfterClaimPrize);
+    assertEq(address(result.hooks), address(hooks.hooks));
+
+    vm.stopPrank();
+  }
+
   function testSetYieldFeeRecipientOnlyOwner() public {
     vm.startPrank(alice);
 
@@ -370,18 +435,37 @@ contract VaultTest is UnitBaseSetup {
     uint96 _fee,
     address _feeRecipient
   ) public {
-    address[] memory winners = new address[](1);
-    winners[0] = _winner;
-    uint32[][] memory prizeIndices = new uint32[][](1);
-    prizeIndices[0] = new uint32[](1);
-    prizeIndices[0][0] = _prizeIndex;
     vm.mockCall(
       address(prizePool),
       abi.encodeWithSelector(
-        PrizePool.claimPrizes.selector,
+        PrizePool.claimPrize.selector,
+        _winner,
         _tier,
-        winners,
-        prizeIndices,
+        _prizeIndex,
+        _winner,
+        _fee,
+        _feeRecipient
+      ),
+      abi.encode(100)
+    );
+  }
+
+  function mockPrizePoolClaimPrize(
+    uint8 _tier,
+    address _winner,
+    uint32 _prizeIndex,
+    address _recipient,
+    uint96 _fee,
+    address _feeRecipient
+  ) public {
+    vm.mockCall(
+      address(prizePool),
+      abi.encodeWithSelector(
+        PrizePool.claimPrize.selector,
+        _winner,
+        _tier,
+        _prizeIndex,
+        _recipient,
         _fee,
         _feeRecipient
       ),

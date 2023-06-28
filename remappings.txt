@@ -13,7 +13,6 @@ v5-liquidator-libraries/=lib/v5-liquidator/src/libraries/
 v5-liquidator-test/=lib/v5-liquidator/test/
 v5-prize-pool/=lib/v5-prize-pool/src/
 v5-twab-controller/=lib/v5-twab-controller/src/
-v5-vrgda-claimer/=lib/v5-vrgda-claimer/src/
 
 src/=src/
 test/=test/

@@ -8,7 +8,6 @@ import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 
-import { Claim, Claimer, IVault } from "v5-vrgda-claimer/Claimer.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 
 import { IERC4626, Vault } from "src/Vault.sol";
@@ -213,27 +212,39 @@ contract Helpers is Test {
 
   /* ============ Claim ============ */
   function _claim(
-    Claimer _claimer,
+    address _claimer,
     Vault _vault,
     PrizePool _prizePool,
     address _user,
     uint8[] memory _tiers
   ) internal returns (uint256) {
-    Claim[] memory claims = new Claim[](1);
-    claims[0] = Claim({ vault: IVault(address(_vault)), winner: _user, tier: _tiers[0] });
+    // Claim[] memory claims = new Claim[](1);
+    // claims[0] = Claim({ vault: IVault(address(_vault)), winner: _user, tier: _tiers[0] });
 
-    uint32 _drawPeriodSeconds = _prizePool.drawPeriodSeconds();
+    // uint32 _drawPeriodSeconds = _prizePool.drawPeriodSeconds();
 
-    vm.warp(
-      _drawPeriodSeconds /
-        _prizePool.estimatedPrizeCount() +
-        _prizePool.lastCompletedDrawStartedAt() +
-        _drawPeriodSeconds +
-        10
-    );
+    // vm.warp(
+    //   _drawPeriodSeconds /
+    //     _prizePool.estimatedPrizeCount() +
+    //     _prizePool.lastCompletedDrawStartedAt() +
+    //     _drawPeriodSeconds +
+    //     10
+    // );
 
-    (, uint256 _totalFees) = _claimer.claimPrizes(0, claims, address(this));
+    // vm.startPrank(_claimer);
+    // _vault.claimPrizes(
 
-    return _totalFees;
+    // )
+
+    // (, uint256 _totalFees) = _claimer.claimPrizes(0, claims, address(this));
+
+
+    // uint8 _tier,
+    // address[] calldata _winners,
+    // uint32[][] calldata _prizeIndices,
+    // uint96 _feePerClaim,
+    // address _claimFeeRecipient
+
+    // return _totalFees;
   }
 }

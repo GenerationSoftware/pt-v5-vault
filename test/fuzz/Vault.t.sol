@@ -10,7 +10,6 @@ import { Strings } from "openzeppelin/utils/Strings.sol";
 import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { Vault } from "src/Vault.sol";
 
@@ -64,7 +63,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
       twabController,
       yieldVault,
       PrizePool(address(prizePool)),
-      Claimer(address(0x2faD9255711A4d22C35a003b3E723D9271aeA51d)),
+      address(0x2faD9255711A4d22C35a003b3E723D9271aeA51d),
       address(this),
       0,
       address(this)

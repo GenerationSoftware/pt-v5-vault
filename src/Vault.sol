@@ -147,6 +147,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   event ClaimerSet(address previousClaimer, address newClaimer);
 
   /**
+   * @notice Emitted when an account sets a new hook
+   * @param account The account whose hooks are being configured
+   * @param hook The hook being set
+   */
+  event HookSet(address account, Hook hook);
+
+  /**
    * @notice Emitted when a new LiquidationPair has been set.
    * @param newLiquidationPair Address of the new liquidationPair
    */
@@ -219,7 +226,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   uint256 private constant FEE_PRECISION = 1e9;
 
   /// @notice Allows users to add hooks that execute code when prizes are won
-  mapping(address => Hook) public hooks;
+  mapping(address => Hook) internal _hooks;
 
   /* ============ Constructor ============ */
 
@@ -585,26 +592,30 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   ) external returns (uint256) {
     if (msg.sender != address(_claimer)) revert CallerNotClaimer(msg.sender, address(_claimer));
 
+    uint totalPrizes;
+
     for (uint w = 0; w < _winners.length; w++) {
       uint prizeIndicesLength = _prizeIndices[w].length;
       for (uint p = 0; p < prizeIndicesLength; p++) {
-        _claimPrize(w, _tier, _prizeIndices[w][p], _feePerClaim, _claimFeeRecipient);
+        totalPrizes += _claimPrize(_winners[w], _tier, _prizeIndices[w][p], _feePerClaim, _claimFeeRecipient);
       }
     }
+
+    return totalPrizes;
   }
 
-  function _claimPrize(address _winner, uint8 _tier, uint32 _prizeIndex, uint96 _fee, address _feeRecipient) internal {
-    Hook memory hook = hooks[_winner];
+  function _claimPrize(address _winner, uint8 _tier, uint32 _prizeIndex, uint96 _fee, address _feeRecipient) internal returns (uint256) {
+    Hook memory hook = _hooks[_winner];
     address recipient;
-    if (hook.useBeforeClaimHook) {
+    if (hook.useBeforeClaimPrize) {
       recipient = hook.hooks.beforeClaimPrize(_winner, _tier, _prizeIndex);
     } else {
       recipient = _winner;
     }
 
-    uint prizeTotal = _prizePool.claimPrizes(_winner, _tier, _prizeIndex, _fee, _feeRecipient);
+    uint prizeTotal = _prizePool.claimPrize(_winner, _tier, _prizeIndex, recipient, _fee, _feeRecipient);
 
-    if (hook.useAfterClaimHook) {
+    if (hook.useAfterClaimPrize) {
       hook.hooks.afterClaimPrize(_winner, _tier, _prizeIndex, prizeTotal - _fee, recipient);
     }
 
@@ -641,6 +652,25 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     emit ClaimerSet(_previousClaimer, claimer_);
     return address(claimer_);
+  }
+
+  /**
+   * @notice Sets the hooks for a winner
+   * @param hook The hook to set.
+   */
+  function setHooks(Hook memory hook) external {
+    _hooks[msg.sender] = hook;
+
+    emit HookSet(msg.sender, hook);
+  }
+
+  /**
+   * @notice Gets the hooks for the given user
+   * @param _account The user to retrieve the hooks for
+   * @return The hooks for the given user
+   */
+  function getHooks(address _account) external view returns (Hook memory) {
+    return _hooks[_account];
   }
 
   /**

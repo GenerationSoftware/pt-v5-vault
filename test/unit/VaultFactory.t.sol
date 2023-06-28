@@ -7,7 +7,6 @@ import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { VaultFactory } from "src/VaultFactory.sol";
 import { Vault } from "src/Vault.sol";
@@ -29,7 +28,7 @@ contract VaultFactoryTest is Test {
 
   YieldVault public yieldVault = YieldVault(address(0xc24F43A638E2c32995108415fb3EB402Cd675580));
   PrizePool public prizePool = PrizePool(address(0x46fdfAdF967526047175693C751c920f786248C9));
-  Claimer public claimer = Claimer(address(0xB6719828701798673852BceCadB764aaf26e8814));
+  address public claimer = address(0xB6719828701798673852BceCadB764aaf26e8814);
 
   /* ============ Setup ============ */
   function setUp() public {

@@ -6,7 +6,6 @@ import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.so
 import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { Vault } from "./Vault.sol";
 
@@ -55,7 +54,7 @@ contract VaultFactory {
     TwabController _twabController,
     IERC4626 _yieldVault,
     PrizePool _prizePool,
-    Claimer _claimer,
+    address _claimer,
     address _yieldFeeRecipient,
     uint256 _yieldFeePercentage,
     address _owner

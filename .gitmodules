@@ -22,9 +22,6 @@
 [submodule "lib/owner-manager-contracts"]
 	path = lib/owner-manager-contracts
 	url = https://github.com/pooltogether/owner-manager-contracts
-[submodule "lib/v5-vrgda-claimer"]
-	path = lib/v5-vrgda-claimer
-	url = https://github.com/pooltogether/v5-vrgda-claimer
 [submodule "lib/ring-buffer-lib"]
 	path = lib/ring-buffer-lib
 	url = https://github.com/pooltogether/ring-buffer-lib
