@@ -11,7 +11,7 @@ import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { ILiquidationSource } from "v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
+import { Hook } from "src/interfaces/IVaultHooks.sol";
 
 /// @notice Emitted when the TWAB controller is set to the zero address
 error TwabControllerZeroAddress();
@@ -133,7 +133,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     TwabController twabController,
     IERC4626 indexed yieldVault,
     PrizePool indexed prizePool,
-    Claimer claimer,
+    address claimer,
     address yieldFeeRecipient,
     uint256 yieldFeePercentage,
     address owner
@@ -144,7 +144,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param previousClaimer Address of the previous claimer
    * @param newClaimer Address of the new claimer
    */
-  event ClaimerSet(Claimer previousClaimer, Claimer newClaimer);
+  event ClaimerSet(address previousClaimer, address newClaimer);
 
   /**
    * @notice Emitted when a new LiquidationPair has been set.
@@ -195,7 +195,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   PrizePool private immutable _prizePool;
 
   /// @notice Address of the claimer.
-  Claimer private _claimer;
+  address private _claimer;
 
   /// @notice Address of the LiquidationPair used to liquidate yield for prize token.
   LiquidationPair private _liquidationPair;
@@ -217,6 +217,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
   uint256 private constant FEE_PRECISION = 1e9;
+
+  /// @notice Allows users to add hooks that execute code when prizes are won
+  mapping(address => Hook) public hooks;
 
   /* ============ Constructor ============ */
 
@@ -241,7 +244,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     TwabController twabController_,
     IERC4626 yieldVault_,
     PrizePool prizePool_,
-    Claimer claimer_,
+    address claimer_,
     address yieldFeeRecipient_,
     uint256 yieldFeePercentage_,
     address _owner
@@ -569,20 +572,43 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *        - caller can be any address except claimer address
    * @param _tier Tier to claim prize for
    * @param _winners Addresses of the winners to claim prizes
-   * @param _prizes The prizes to claim for each winner
+   * @param _prizeIndices The prizes to claim for each winner
    * @param _feePerClaim Fee to be charged per prize claim
    * @param _claimFeeRecipient Address that will receive `_claimFee` amount
    */
   function claimPrizes(
     uint8 _tier,
     address[] calldata _winners,
-    uint32[][] calldata _prizes,
+    uint32[][] calldata _prizeIndices,
     uint96 _feePerClaim,
     address _claimFeeRecipient
   ) external returns (uint256) {
     if (msg.sender != address(_claimer)) revert CallerNotClaimer(msg.sender, address(_claimer));
 
-    return _prizePool.claimPrizes(_tier, _winners, _prizes, _feePerClaim, _claimFeeRecipient);
+    for (uint w = 0; w < _winners.length; w++) {
+      uint prizeIndicesLength = _prizeIndices[w].length;
+      for (uint p = 0; p < prizeIndicesLength; p++) {
+        _claimPrize(w, _tier, _prizeIndices[w][p], _feePerClaim, _claimFeeRecipient);
+      }
+    }
+  }
+
+  function _claimPrize(address _winner, uint8 _tier, uint32 _prizeIndex, uint96 _fee, address _feeRecipient) internal {
+    Hook memory hook = hooks[_winner];
+    address recipient;
+    if (hook.useBeforeClaimHook) {
+      recipient = hook.hooks.beforeClaimPrize(_winner, _tier, _prizeIndex);
+    } else {
+      recipient = _winner;
+    }
+
+    uint prizeTotal = _prizePool.claimPrizes(_winner, _tier, _prizeIndex, _fee, _feeRecipient);
+
+    if (hook.useAfterClaimHook) {
+      hook.hooks.afterClaimPrize(_winner, _tier, _prizeIndex, prizeTotal - _fee, recipient);
+    }
+
+    return prizeTotal;
   }
 
   /**
@@ -609,8 +635,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param claimer_ Address of the claimer
    * return address New claimer address
    */
-  function setClaimer(Claimer claimer_) external onlyOwner returns (address) {
-    Claimer _previousClaimer = _claimer;
+  function setClaimer(address claimer_) external onlyOwner returns (address) {
+    address _previousClaimer = _claimer;
     _setClaimer(claimer_);
 
     emit ClaimerSet(_previousClaimer, claimer_);
@@ -1075,7 +1101,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Set claimer address.
    * @param claimer_ Address of the claimer
    */
-  function _setClaimer(Claimer claimer_) internal {
+  function _setClaimer(address claimer_) internal {
     _claimer = claimer_;
   }
 

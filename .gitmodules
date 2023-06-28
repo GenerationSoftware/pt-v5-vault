@@ -18,6 +18,7 @@
 [submodule "lib/v5-prize-pool"]
 	path = lib/v5-prize-pool
 	url = https://github.com/pooltogether/v5-prize-pool
+	branch = pool-2870-update-prizepool-vault-to-be-able-to-redistribute-prizes
 [submodule "lib/owner-manager-contracts"]
 	path = lib/owner-manager-contracts
 	url = https://github.com/pooltogether/owner-manager-contracts
