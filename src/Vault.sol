@@ -11,7 +11,7 @@ import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { ILiquidationSource } from "v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Hook } from "src/interfaces/IVaultHooks.sol";
+import { VaultHooks } from "src/interfaces/IVaultHooks.sol";
 
 /// @notice Emitted when the TWAB controller is set to the zero address
 error TwabControllerZeroAddress();
@@ -147,11 +147,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   event ClaimerSet(address previousClaimer, address newClaimer);
 
   /**
-   * @notice Emitted when an account sets a new hook
+   * @notice Emitted when an account sets new hooks
    * @param account The account whose hooks are being configured
-   * @param hook The hook being set
+   * @param hooks The hooks being set
    */
-  event HookSet(address account, Hook hook);
+  event SetHooks(address account, VaultHooks hooks);
 
   /**
    * @notice Emitted when a new LiquidationPair has been set.
@@ -226,7 +226,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   uint256 private constant FEE_PRECISION = 1e9;
 
   /// @notice Allows users to add hooks that execute code when prizes are won
-  mapping(address => Hook) internal _hooks;
+  mapping(address => VaultHooks) internal _hooks;
 
   /* ============ Constructor ============ */
 
@@ -597,26 +597,51 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     for (uint w = 0; w < _winners.length; w++) {
       uint prizeIndicesLength = _prizeIndices[w].length;
       for (uint p = 0; p < prizeIndicesLength; p++) {
-        totalPrizes += _claimPrize(_winners[w], _tier, _prizeIndices[w][p], _feePerClaim, _claimFeeRecipient);
+        totalPrizes += _claimPrize(
+          _winners[w],
+          _tier,
+          _prizeIndices[w][p],
+          _feePerClaim,
+          _claimFeeRecipient
+        );
       }
     }
 
     return totalPrizes;
   }
 
-  function _claimPrize(address _winner, uint8 _tier, uint32 _prizeIndex, uint96 _fee, address _feeRecipient) internal returns (uint256) {
-    Hook memory hook = _hooks[_winner];
+  function _claimPrize(
+    address _winner,
+    uint8 _tier,
+    uint32 _prizeIndex,
+    uint96 _fee,
+    address _feeRecipient
+  ) internal returns (uint256) {
+    VaultHooks memory hooks = _hooks[_winner];
     address recipient;
-    if (hook.useBeforeClaimPrize) {
-      recipient = hook.hooks.beforeClaimPrize(_winner, _tier, _prizeIndex);
+    if (hooks.useBeforeClaimPrize) {
+      recipient = hooks.implementation.beforeClaimPrize(_winner, _tier, _prizeIndex);
     } else {
       recipient = _winner;
     }
 
-    uint prizeTotal = _prizePool.claimPrize(_winner, _tier, _prizeIndex, recipient, _fee, _feeRecipient);
+    uint prizeTotal = _prizePool.claimPrize(
+      _winner,
+      _tier,
+      _prizeIndex,
+      recipient,
+      _fee,
+      _feeRecipient
+    );
 
-    if (hook.useAfterClaimPrize) {
-      hook.hooks.afterClaimPrize(_winner, _tier, _prizeIndex, prizeTotal - _fee, recipient);
+    if (hooks.useAfterClaimPrize) {
+      hooks.implementation.afterClaimPrize(
+        _winner,
+        _tier,
+        _prizeIndex,
+        prizeTotal - _fee,
+        recipient
+      );
     }
 
     return prizeTotal;
@@ -656,12 +681,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Sets the hooks for a winner
-   * @param hook The hook to set.
+   * @param hooks The hooks to set.
    */
-  function setHooks(Hook memory hook) external {
-    _hooks[msg.sender] = hook;
+  function setHooks(VaultHooks memory hooks) external {
+    _hooks[msg.sender] = hooks;
 
-    emit HookSet(msg.sender, hook);
+    emit SetHooks(msg.sender, hooks);
   }
 
   /**
@@ -669,7 +694,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _account The user to retrieve the hooks for
    * @return The hooks for the given user
    */
-  function getHooks(address _account) external view returns (Hook memory) {
+  function getHooks(address _account) external view returns (VaultHooks memory) {
     return _hooks[_account];
   }
 
