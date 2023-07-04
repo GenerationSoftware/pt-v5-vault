@@ -7,7 +7,6 @@ import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC
 import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { Claimer } from "v5-vrgda-claimer/Claimer.sol";
 
 import { ERC20PermitMock } from "test/contracts/mock/ERC20PermitMock.sol";
 import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
@@ -45,7 +44,7 @@ contract UnitBaseSetup is Test, Helpers {
   LiquidationPairMock public liquidationPair;
   address public liquidationPairTarget = 0xcbE704e38ddB2E6A8bA9f4d335f2637132C20113;
 
-  Claimer public claimer;
+  address public claimer;
   PrizePoolMock public prizePool;
 
   uint256 public winningRandomNumber = 123456;
@@ -66,11 +65,11 @@ contract UnitBaseSetup is Test, Helpers {
     underlyingAsset = setUpUnderlyingAsset();
     prizeToken = new ERC20PermitMock("PoolTogether");
 
-    twabController = new TwabController();
+    twabController = new TwabController(1 days, uint32(block.timestamp));
 
     prizePool = new PrizePoolMock(prizeToken);
 
-    claimer = Claimer(address(0xe291d9169F0316272482dD82bF297BB0a11D267f));
+    claimer = address(0xe291d9169F0316272482dD82bF297BB0a11D267f);
 
     yieldVault = new YieldVault(
       address(underlyingAsset),
