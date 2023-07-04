@@ -46,7 +46,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
     prizeToken = new ERC20Mock();
 
-    twabController = new TwabController();
+    twabController = new TwabController(1 days, uint32(block.timestamp));
 
     prizePool = new PrizePoolMock(prizeToken);
 

@@ -65,7 +65,7 @@ contract UnitBaseSetup is Test, Helpers {
     underlyingAsset = setUpUnderlyingAsset();
     prizeToken = new ERC20PermitMock("PoolTogether");
 
-    twabController = new TwabController();
+    twabController = new TwabController(1 days, uint32(block.timestamp));
 
     prizePool = new PrizePoolMock(prizeToken);
 
