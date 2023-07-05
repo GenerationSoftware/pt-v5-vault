@@ -7,12 +7,12 @@ openzeppelin/=lib/openzeppelin-contracts/contracts/
 owner-manager-contracts/=lib/owner-manager-contracts/contracts/
 
 ring-buffer-lib/=lib/ring-buffer-lib/src/
-v5-liquidator/=lib/v5-liquidator/src/
-v5-liquidator-interfaces/=lib/v5-liquidator/src/interfaces/
-v5-liquidator-libraries/=lib/v5-liquidator/src/libraries/
-v5-liquidator-test/=lib/v5-liquidator/test/
-v5-prize-pool/=lib/v5-prize-pool/src/
-v5-twab-controller/=lib/v5-twab-controller/src/
+v5-liquidator/=lib/pt-v5-liquidator/src/
+v5-liquidator-interfaces/=lib/pt-v5-liquidator/src/interfaces/
+v5-liquidator-libraries/=lib/pt-v5-liquidator/src/libraries/
+v5-liquidator-test/=lib/pt-v5-liquidator/test/
+v5-prize-pool/=lib/pt-v5-prize-pool/src/
+v5-twab-controller/=lib/pt-v5-prize-pool/lib/pt-v5-twab-controller/src/
 
 src/=src/
 test/=test/
