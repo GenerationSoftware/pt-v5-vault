@@ -8,7 +8,7 @@
 
 [![Code Coverage](https://github.com/pooltogether/v5-vault/actions/workflows/coverage.yml/badge.svg)](https://github.com/pooltogether/v5-vault/actions/workflows/coverage.yml)
 [![built-with openzeppelin](https://img.shields.io/badge/built%20with-OpenZeppelin-3677FF)](https://docs.openzeppelin.com/)
-[![GPLv3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
+![MIT license](https://img.shields.io/badge/license-MIT-blue)
 
 <strong>Have questions or want the latest news?</strong>
 <br/>Join the PoolTogether Discord or follow us on Twitter:
