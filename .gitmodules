@@ -12,9 +12,6 @@
 [submodule "lib/owner-manager-contracts"]
 	path = lib/owner-manager-contracts
 	url = https://github.com/pooltogether/owner-manager-contracts
-[submodule "lib/ring-buffer-lib"]
-	path = lib/ring-buffer-lib
-	url = https://github.com/pooltogether/ring-buffer-lib
 [submodule "lib/brokentoken"]
 	path = lib/brokentoken
 	url = https://github.com/GenerationSoftware/brokentoken
