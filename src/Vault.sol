@@ -11,7 +11,7 @@ import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { ILiquidationSource } from "v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
-import { VaultHooks } from "src/interfaces/IVaultHooks.sol";
+import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
 /// @notice Emitted when the TWAB controller is set to the zero address
 error TwabControllerZeroAddress();

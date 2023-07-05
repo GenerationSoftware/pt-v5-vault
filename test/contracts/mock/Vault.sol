@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { IERC20, IERC4626, PrizePool, TwabController, Vault } from "src/Vault.sol";
+import { IERC20, IERC4626, PrizePool, TwabController, Vault } from "../../../src/Vault.sol";
 
 contract VaultMock is Vault {
   constructor(

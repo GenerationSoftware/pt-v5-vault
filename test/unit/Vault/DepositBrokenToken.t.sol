@@ -2,7 +2,7 @@
 pragma solidity 0.8.17;
 
 import { UnitBrokenTokenBaseSetup } from "test/utils/UnitBrokenTokenBaseSetup.t.sol";
-import { DepositMoreThanMax } from "src/Vault.sol";
+import { DepositMoreThanMax } from "../../../src/Vault.sol";
 
 contract VaultDepositBrokenTokenTest is UnitBrokenTokenBaseSetup {
   /* ============ Events ============ */

@@ -11,7 +11,7 @@ import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 
-import { Vault } from "src/Vault.sol";
+import { Vault } from "../../src/Vault.sol";
 
 import { ERC20PermitMock } from "test/contracts/mock/ERC20PermitMock.sol";
 import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
