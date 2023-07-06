@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
 struct VaultHooks {
@@ -10,13 +10,15 @@ struct VaultHooks {
   IVaultHooks implementation;
 }
 
+/// @title  PoolTogether V5 Vault Hooks Interface
+/// @author PoolTogether Inc Team, Generation Software Team
 /// @notice Allows winners to attach smart contract hooks to their prize winnings
 interface IVaultHooks {
   /// @notice Triggered before the prize pool claim prize function is called.
   /// @param winner The user who won the prize and for whom this hook is attached
   /// @param tier The tier of the prize
   /// @param prizeIndex The index of the prize in the tier
-  /// @return The address of the recipient of the prize
+  /// @return address The address of the recipient of the prize
   function beforeClaimPrize(
     address winner,
     uint8 tier,
@@ -35,5 +37,5 @@ interface IVaultHooks {
     uint32 prizeIndex,
     uint256 payout,
     address recipient
-  ) external returns (bool);
+  ) external;
 }

@@ -1,12 +1,12 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
 import { ERC4626, ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { ERC20Permit, IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
-
 import { Ownable } from "owner-manager-contracts/Ownable.sol";
+
 import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
 import { ILiquidationSource } from "v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
@@ -86,20 +86,20 @@ error YieldFeeGTAvailable(uint256 shares, uint256 yieldFeeTotalSupply);
 /// @notice Emitted when the Liquidation Pair being set is the zero address
 error LPZeroAddress();
 
-/// @notice Emitted when the amount of shares being minted to receiver is greater than the max amount allowed
-/// @param shares The shares being minted
+/// @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed
 /// @param receiver The receiver address
+/// @param shares The shares being minted
 /// @param max The max amount of shares that can be minted to the receiver
-error MintGTMax(uint256 shares, address receiver, uint256 max);
+error MintGTMax(address receiver, uint256 shares, uint256 max);
 
-/// @notice Emitted when the yield fee percentage being set is greater than the fee precision
+/// @notice Emitted when the yield fee percentage being set is greater than 1
 /// @param yieldFeePercentage The yield fee percentage in integer format
-/// @param feePrecision The fee precision
-error YieldFeePercentageGTPrecision(uint256 yieldFeePercentage, uint256 feePrecision);
+/// @param maxYieldFeePercentage The max yield fee percentage in integer format (this value is equal to 1 in decimal format)
+error YieldFeePercentageGTPrecision(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
 
 /**
  * @title  PoolTogether V5 Vault
- * @author PoolTogether Inc Team
+ * @author PoolTogether Inc Team, Generation Software Team
  * @notice Vault extends the ERC4626 standard and is the entry point for users interacting with a V5 pool.
  *         Users deposit an underlying asset (i.e. USDC) in this contract and receive in exchange an ERC20 token
  *         representing their share of deposit in the vault.
@@ -123,8 +123,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param prizePool Address of the PrizePool that computes prizes
    * @param claimer Address of the claimer
    * @param yieldFeeRecipient Address of the yield fee recipient
-   * @param yieldFeePercentage Yield fee percentage
-   * @param owner Address of the owner
+   * @param yieldFeePercentage Yield fee percentage in integer format with 1e9 precision (50% would be 5e8)
+   * @param owner Address of the contract owner
    */
   event NewVault(
     IERC20 indexed asset,
@@ -182,11 +182,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
 
   /**
-   * @notice Emitted when a user sponsor the Vault.
+   * @notice Emitted when a user sponsors the Vault.
    * @param caller Address that called the function
    * @param receiver Address receiving the Vault shares
    * @param assets Amount of assets deposited into the Vault
-   * @param shares Amount of shares minted to `receiver`
+   * @param shares Amount of shares minted to the receiving address
    */
   event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
 
@@ -213,53 +213,53 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Most recent exchange rate recorded when burning or minting Vault shares.
   uint256 private _lastRecordedExchangeRate;
 
-  /// @notice Yield fee percentage represented in 9 decimal places and in decimal notation (i.e. 10000000 = 0.01 = 1%).
+  /// @notice Yield fee percentage represented in integer format with 9 decimal places (i.e. 10000000 = 0.01 = 1%).
   uint256 private _yieldFeePercentage;
 
   /// @notice Address of the yield fee recipient that receives the fee amount when yield is captured.
   address private _yieldFeeRecipient;
 
-  /// @notice Total supply of accrued yield fee.
+  /// @notice Total accrued supply from the yield fee.
   uint256 private _yieldFeeTotalSupply;
 
   /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
   uint256 private constant FEE_PRECISION = 1e9;
 
-  /// @notice Allows users to add hooks that execute code when prizes are won
+  /// @notice Maps user addresses to hooks that they want to execute when prizes are won
   mapping(address => VaultHooks) internal _hooks;
 
   /* ============ Constructor ============ */
 
   /**
    * @notice Vault constructor
-   * @dev `claimer` can be set to address zero if none is available yet.
-   * @param _asset Address of the underlying asset used by the vault
-   * @param _name Name of the ERC20 share minted by the vault
-   * @param _symbol Symbol of the ERC20 share minted by the vault
+   * @dev `claimer_` can be set to address zero if none is available yet.
+   * @param asset_ Address of the underlying asset used by the vault
+   * @param name_ Name of the ERC20 share minted by the vault
+   * @param symbol_ Symbol of the ERC20 share minted by the vault
    * @param twabController_ Address of the TwabController used to keep track of balances
    * @param yieldVault_ Address of the ERC4626 vault in which assets are deposited to generate yield
    * @param prizePool_ Address of the PrizePool that computes prizes
    * @param claimer_ Address of the claimer
    * @param yieldFeeRecipient_ Address of the yield fee recipient
    * @param yieldFeePercentage_ Yield fee percentage
-   * @param _owner Address that will gain ownership of this contract
+   * @param owner_ Address that will gain ownership of this contract
    */
   constructor(
-    IERC20 _asset,
-    string memory _name,
-    string memory _symbol,
+    IERC20 asset_,
+    string memory name_,
+    string memory symbol_,
     TwabController twabController_,
     IERC4626 yieldVault_,
     PrizePool prizePool_,
     address claimer_,
     address yieldFeeRecipient_,
     uint256 yieldFeePercentage_,
-    address _owner
-  ) ERC4626(_asset) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(_owner) {
+    address owner_
+  ) ERC4626(asset_) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(owner_) {
     if (address(twabController_) == address(0)) revert TwabControllerZeroAddress();
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
-    if (address(_owner) == address(0)) revert OwnerZeroAddress();
+    if (address(owner_) == address(0)) revert OwnerZeroAddress();
 
     _twabController = twabController_;
     _yieldVault = yieldVault_;
@@ -272,19 +272,19 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _assetUnit = 10 ** super.decimals();
 
     // Approve once for max amount
-    _asset.safeApprove(address(yieldVault_), type(uint256).max);
+    asset_.safeApprove(address(yieldVault_), type(uint256).max);
 
     emit NewVault(
-      _asset,
-      _name,
-      _symbol,
+      asset_,
+      name_,
+      symbol_,
       twabController_,
       yieldVault_,
       prizePool_,
       claimer_,
       yieldFeeRecipient_,
       yieldFeePercentage_,
-      _owner
+      owner_
     );
   }
 
@@ -368,18 +368,18 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @inheritdoc ERC4626
-   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
+   * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
    */
   function maxDeposit(address) public view virtual override returns (uint256) {
-    return _isVaultCollateralized() ? type(uint112).max : 0;
+    return _isVaultCollateralized() ? type(uint96).max : 0;
   }
 
   /**
    * @inheritdoc ERC4626
-   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
+   * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
    */
   function maxMint(address) public view virtual override returns (uint256) {
-    return _isVaultCollateralized() ? type(uint112).max : 0;
+    return _isVaultCollateralized() ? type(uint96).max : 0;
   }
 
   /* ============ Deposit Functions ============ */
@@ -515,7 +515,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return _assets;
   }
 
-  /* ============ Liquidate Functions ============ */
+  /* ============ Liquidation Functions ============ */
 
   /**
    * @inheritdoc ILiquidationSource
@@ -571,7 +571,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /* ============ Claim Functions ============ */
 
   /**
-   * @notice Claim prize for `_user`.
+   * @notice Claim prizes for the `_winners`
    * @dev Callable by anyone if claimer has not been set.
    * @dev If claimer has been set:
    *      - caller needs to be claimer address
@@ -581,14 +581,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _winners Addresses of the winners to claim prizes
    * @param _prizeIndices The prizes to claim for each winner
    * @param _feePerClaim Fee to be charged per prize claim
-   * @param _claimFeeRecipient Address that will receive `_claimFee` amount
+   * @param _feeRecipient Address that will receive `_claimFee` amount
+   * @return uint256 The total prize amounts claimed
    */
   function claimPrizes(
     uint8 _tier,
     address[] calldata _winners,
     uint32[][] calldata _prizeIndices,
     uint96 _feePerClaim,
-    address _claimFeeRecipient
+    address _feeRecipient
   ) external returns (uint256) {
     if (msg.sender != address(_claimer)) revert CallerNotClaimer(msg.sender, address(_claimer));
 
@@ -602,7 +603,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
           _tier,
           _prizeIndices[w][p],
           _feePerClaim,
-          _claimFeeRecipient
+          _feeRecipient
         );
       }
     }
@@ -610,6 +611,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return totalPrizes;
   }
 
+  /**
+   * @notice Claim prize for `_winner`.
+   * @param _winner Address of the winner to claim the prize for
+   * @param _tier Tier of the prize
+   * @param _prizeIndex The prize index to claim
+   * @param _fee Fee to be charged for the claim
+   * @param _feeRecipient Address that will receive the fee
+   * @return uint256 The total prize amount claimed
+   */
   function _claimPrize(
     address _winner,
     uint8 _tier,
@@ -669,7 +679,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Set claimer.
    * @param claimer_ Address of the claimer
-   * return address New claimer address
+   * @return address New claimer address
    */
   function setClaimer(address claimer_) external onlyOwner returns (address) {
     address _previousClaimer = _claimer;
@@ -692,7 +702,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Gets the hooks for the given user
    * @param _account The user to retrieve the hooks for
-   * @return The hooks for the given user
+   * @return VaultHooks The hooks for the given user
    */
   function getHooks(address _account) external view returns (VaultHooks memory) {
     return _hooks[_account];
@@ -702,7 +712,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Set liquidationPair.
    * @dev We reset approval of the previous liquidationPair and approve max for new one.
    * @param liquidationPair_ New liquidationPair address
-   * return address New liquidationPair address
+   * @return address New liquidationPair address
    */
   function setLiquidationPair(
     LiquidationPair liquidationPair_
@@ -728,7 +738,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Set yield fee percentage.
    * @dev Yield fee is represented in 9 decimals and can't exceed `1e9`.
    * @param yieldFeePercentage_ Yield fee percentage
-   * return uint256 New yield fee percentage
+   * @return uint256 New yield fee percentage
    */
   function setYieldFeePercentage(uint256 yieldFeePercentage_) external onlyOwner returns (uint256) {
     uint256 _previousYieldFeePercentage = _yieldFeePercentage;
@@ -741,7 +751,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Set fee recipient.
    * @param yieldFeeRecipient_ Address of the fee recipient
-   * return address New fee recipient address
+   * @return address New fee recipient address
    */
   function setYieldFeeRecipient(address yieldFeeRecipient_) external onlyOwner returns (address) {
     address _previousYieldFeeRecipient = _yieldFeeRecipient;
@@ -773,7 +783,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Get total yield fee accrued by this Vault.
-   * @dev If the vault becomes underecollateralized, this total yield fee can be used to recollateralize it.
+   * @dev If the vault becomes undercollateralized, this total yield fee can be used to collateralize it.
    * @return uint256 Total accrued yield fee
    */
   function yieldFeeTotalSupply() public view returns (uint256) {
@@ -817,7 +827,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return address Claimer address
    */
   function claimer() public view returns (address) {
-    return address(_claimer);
+    return _claimer;
   }
 
   /* ============ Internal Functions ============ */
@@ -826,6 +836,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Total amount of assets managed by this Vault.
    * @dev The total amount of assets managed by this vault is equal to
    *      the amount of assets managed by the YieldVault + the amount living in this vault.
+   * @return uint256 Total amount of assets
    */
   function _totalAssets() internal view returns (uint256) {
     return _yieldVault.maxWithdraw(address(this)) + super.totalAssets();
@@ -849,7 +860,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return _totalSupply() + _yieldFeeTotalSupply;
   }
 
-  /* ============ Liquidate Functions ============ */
+  /* ============ Liquidation Functions ============ */
 
   /**
    * @notice Return the yield amount (available yield minus fees) that can be liquidated by minting Vault shares.
@@ -885,7 +896,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /* ============ Conversion Functions ============ */
 
-  /// @inheritdoc ERC4626
+  /**
+   * @inheritdoc ERC4626
+   * @param _assets Amount of assets to convert
+   * @param _rounding Rounding mode (i.e. down or up)
+   * @return uint256 Amount of shares for the assets
+   */
   function _convertToShares(
     uint256 _assets,
     Math.Rounding _rounding
@@ -898,7 +914,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
         : _assets.mulDiv(_assetUnit, _exchangeRate, _rounding);
   }
 
-  /// @inheritdoc ERC4626
+  /**
+   * @inheritdoc ERC4626
+   * @param _shares Amount of shares to convert
+   * @param _rounding Rounding mode (i.e. down or up)
+   * @return uint256 Amount of assets represented by the shares
+   */
   function _convertToAssets(
     uint256 _shares,
     Math.Rounding _rounding
@@ -911,6 +932,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _shares Amount of shares to convert
    * @param _exchangeRate Exchange rate used to convert `_shares`
    * @param _rounding Rounding mode (i.e. down or up)
+   * @return uint256 Amount of assets represented by the shares
    */
   function _convertToAssets(
     uint256 _shares,
@@ -926,7 +948,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /* ============ Deposit Functions ============ */
 
   /**
-   * @notice Deposit/mint common workflow.
+   * @inheritdoc ERC4626
+   * @notice Deposit assets and mint shares
+   * @param _caller The caller of the deposit
+   * @param _receiver The receiver of the deposit shares
+   * @param _assets The assets to deposit
+   * @param _shares The shares to mint to the receiver
    * @dev If there are currently some underlying assets in the vault,
    *      we only transfer the difference from the user wallet into the vault.
    *      The difference is calculated this way:
@@ -983,7 +1010,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Amount of assets to deposit.
    */
   function _beforeMint(uint256 _shares, address _receiver) internal view returns (uint256) {
-    if (_shares > maxMint(_receiver)) revert MintGTMax(_shares, _receiver, maxMint(_receiver));
+    if (_shares > maxMint(_receiver)) revert MintGTMax(_receiver, _shares, maxMint(_receiver));
     return _convertToAssets(_shares, Math.Rounding.Up);
   }
 
@@ -1009,7 +1036,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /* ============ Withdraw Functions ============ */
 
-  /// @dev Withdraw/redeem common workflow.
+  /**
+   * @inheritdoc ERC4626
+   * @notice Withdraw assets and burn shares
+   * @param _caller Address of the caller
+   * @param _receiver Address of the receiver of the assets
+   * @param _owner Owner of the shares
+   * @param _assets Assets to send to the receiver
+   * @param _shares Shares to burn
+   */
   function _withdraw(
     address _caller,
     address _receiver,
@@ -1070,6 +1105,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Creates `_shares` tokens and assigns them to `_receiver`, increasing the total supply.
+   * @param _receiver Address that will receive the minted shares
+   * @param _shares Shares to mint
    * @dev Emits a {Transfer} event with `from` set to the zero address.
    * @dev `_receiver` cannot be the zero address.
    * @dev Updates the exchange rate.
@@ -1083,6 +1120,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Destroys `_shares` tokens from `_owner`, reducing the total supply.
+   * @param _owner The owner of the shares
+   * @param _shares The shares to burn
    * @dev Emits a {Transfer} event with `to` set to the zero address.
    * @dev `_owner` cannot be the zero address.
    * @dev `_owner` must have at least `_shares` tokens.
@@ -1097,6 +1136,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Updates `_from` and `_to` TWAB balance for a transfer.
+   * @param _from Address to transfer from
+   * @param _to Address to transfer to
+   * @param _shares Shares to transfer
    * @dev `_from` cannot be the zero address.
    * @dev `_to` cannot be the zero address.
    * @dev `_from` must have a balance of at least `_shares`.
@@ -1163,11 +1205,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Set yield fee percentage.
    * @dev Yield fee is represented in 9 decimals and can't exceed `1e9`.
-   * @param yieldFeePercentage_ Yield fee percentage
+   * @param yieldFeePercentage_ The new yield fee percentage to set
    */
   function _setYieldFeePercentage(uint256 yieldFeePercentage_) internal {
-    if (yieldFeePercentage_ > FEE_PRECISION)
+    if (yieldFeePercentage_ > FEE_PRECISION) {
       revert YieldFeePercentageGTPrecision(yieldFeePercentage_, FEE_PRECISION);
+    }
     _yieldFeePercentage = yieldFeePercentage_;
   }
 

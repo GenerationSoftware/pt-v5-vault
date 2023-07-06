@@ -95,6 +95,12 @@ npm run hint
 
 Test names including `SLOW` will be skipped on default test runs and need to be explicitly run.
 
+You can run tests with:
+
+```
+forge test
+```
+
 ### CI
 
 A default Github Actions workflow is setup to execute on push and pull request.
