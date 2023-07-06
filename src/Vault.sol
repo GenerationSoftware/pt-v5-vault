@@ -43,6 +43,12 @@ error WithdrawMoreThanMax(address owner, uint256 amount, uint256 max);
 /// @param max The max redeemable amount
 error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
 
+/// @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed
+/// @param receiver The receiver address
+/// @param shares The shares being minted
+/// @param max The max amount of shares that can be minted to the receiver
+error MintMoreThanMax(address receiver, uint256 shares, uint256 max);
+
 /// @notice Emitted during the liquidation process when the caller is not the liquidation pair contract
 /// @param caller The caller address
 /// @param liquidationPair The LP address
@@ -85,12 +91,6 @@ error YieldFeeGTAvailable(uint256 shares, uint256 yieldFeeTotalSupply);
 
 /// @notice Emitted when the Liquidation Pair being set is the zero address
 error LPZeroAddress();
-
-/// @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed
-/// @param receiver The receiver address
-/// @param shares The shares being minted
-/// @param max The max amount of shares that can be minted to the receiver
-error MintGTMax(address receiver, uint256 shares, uint256 max);
 
 /// @notice Emitted when the yield fee percentage being set is greater than 1
 /// @param yieldFeePercentage The yield fee percentage in integer format
@@ -962,7 +962,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Amount of assets to deposit.
    */
   function _beforeMint(uint256 _shares, address _receiver) internal view returns (uint256) {
-    if (_shares > maxMint(_receiver)) revert MintGTMax(_receiver, _shares, maxMint(_receiver));
+    if (_shares > maxMint(_receiver)) revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
     return _convertToAssets(_shares, Math.Rounding.Up);
   }
 

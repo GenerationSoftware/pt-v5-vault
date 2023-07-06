@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
+import { MintMoreThanMax, DepositMoreThanMax } from "src/Vault.sol";
+
 import { BrokenToken } from "brokentoken/BrokenToken.sol";
 
 import { IERC20, UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
@@ -44,7 +46,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
-  function testFailDepositMoreThanMax() external {
+  function testDepositMoreThanMax() external {
     vm.startPrank(alice);
 
     uint256 _moreThanMax = uint256(type(uint96).max) + 1;
@@ -52,6 +54,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
+    vm.expectRevert(abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint96).max));
     vault.deposit(_amount, alice);
 
     vm.stopPrank();
@@ -376,6 +379,20 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
+  function testMintMoreThanMax() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = uint256(type(uint96).max) + 1;
+    underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vm.expectRevert(abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint96).max));
+
+    vault.mint(_amount, alice);
+
+    vm.stopPrank();
+  }
+
   /* ============ Sponsor ============ */
   function testSponsor() external {
     vm.startPrank(alice);
@@ -492,6 +509,38 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     assertEq(twabController.balanceOf(address(vault), bob), _amount);
     assertEq(twabController.delegateBalanceOf(address(vault), bob), 0);
+
+    assertEq(twabController.balanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
+    assertEq(twabController.delegateBalanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
+
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
+    assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
+
+    vm.stopPrank();
+  }
+
+  function testSponsorAlreadyDelegateToSponsor() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+    underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    twabController.delegate(address(vault), twabController.SPONSORSHIP_ADDRESS());
+    
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
+    emit Sponsor(alice, alice, _amount, _amount);
+
+    vault.sponsor(_amount, alice);
+
+    assertEq(vault.balanceOf(alice), _amount);
+
+    assertEq(twabController.balanceOf(address(vault), alice), _amount);
+    assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
 
     assertEq(twabController.balanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
     assertEq(twabController.delegateBalanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
