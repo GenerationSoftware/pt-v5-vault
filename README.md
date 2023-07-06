@@ -6,7 +6,7 @@
 
 # PoolTogether V5 Vault
 
-[![Code Coverage](https://github.com/pooltogether/v5-vault/actions/workflows/coverage.yml/badge.svg)](https://github.com/pooltogether/v5-vault/actions/workflows/coverage.yml)
+[![Code Coverage](https://github.com/GenerationSoftware/pt-v5-vault/actions/workflows/coverage.yml/badge.svg)](https://github.com/GenerationSoftware/pt-v5-vault/actions/workflows/coverage.yml)
 [![built-with openzeppelin](https://img.shields.io/badge/built%20with-OpenZeppelin-3677FF)](https://docs.openzeppelin.com/)
 ![MIT license](https://img.shields.io/badge/license-MIT-blue)
 
@@ -94,6 +94,12 @@ npm run hint
 ### Tests
 
 Test names including `SLOW` will be skipped on default test runs and need to be explicitly run.
+
+You can run tests with:
+
+```
+forge test
+```
 
 ### CI
 

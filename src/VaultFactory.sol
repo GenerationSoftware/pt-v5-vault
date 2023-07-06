@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
@@ -9,13 +9,18 @@ import { TwabController } from "v5-twab-controller/TwabController.sol";
 
 import { Vault } from "./Vault.sol";
 
+/**
+ * @title  PoolTogether V5 Vault Factory
+ * @author PoolTogether Inc Team, Generation Software Team
+ * @notice Factory contract for deploying new vaults using a standard underlying ERC4626 yield vault.
+ */
 contract VaultFactory {
   /* ============ Events ============ */
 
   /**
    * @notice Emitted when a new Vault has been deployed by this factory.
-   * @param vaultFactory Address of the VaultFactory that deployed `vault`
    * @param vault Address of the vault that was deployed
+   * @param vaultFactory Address of the VaultFactory that deployed `vault`
    */
   event NewFactoryVault(Vault indexed vault, VaultFactory indexed vaultFactory);
 
@@ -82,7 +87,7 @@ contract VaultFactory {
 
   /**
    * @notice Total number of vaults deployed by this factory.
-   * @return Number of vaults deployed by this factory.
+   * @return uint256 Number of vaults deployed by this factory.
    */
   function totalVaults() external view returns (uint256) {
     return allVaults.length;
