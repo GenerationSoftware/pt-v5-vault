@@ -589,11 +589,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Claim prizes for the `_winners`
-   * @dev Callable by anyone if claimer has not been set.
-   * @dev If claimer has been set:
-   *      - caller needs to be claimer address
-   *      - If auto claim is disabled for `_user`:
-   *        - caller can be any address except claimer address
+   * @dev The caller must be the claimer
    * @param _tier Tier to claim prize for
    * @param _winners Addresses of the winners to claim prizes
    * @param _prizeIndices The prizes to claim for each winner
