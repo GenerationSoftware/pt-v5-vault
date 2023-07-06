@@ -288,14 +288,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     );
   }
 
-  /* ============ External Functions ============ */
-
-  /* ============ View Functions ============ */
-
-  /// @inheritdoc ILiquidationSource
-  function liquidatableBalanceOf(address _token) public view override returns (uint256) {
-    return _liquidatableBalanceOf(_token);
-  }
+  /* ===================================================== */
+  /* ============ Public & External Functions ============ */
+  /* ===================================================== */
 
   /**
    * @notice Total available yield amount accrued by this vault.
@@ -380,6 +375,23 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function maxMint(address) public view virtual override returns (uint256) {
     return _isVaultCollateralized() ? type(uint96).max : 0;
+  }
+
+  /**
+   * @notice Mint Vault shares to the yield fee `_recipient`.
+   * @dev Will revert if the Vault is undercollateralized
+   *      or if the `_shares` are greater than the accrued `_yieldFeeTotalSupply`.
+   * @param _shares Amount of shares to mint
+   * @param _recipient Address of the yield fee recipient
+   */
+  function mintYieldFee(uint256 _shares, address _recipient) external {
+    _requireVaultCollateralized();
+    if (_shares > _yieldFeeTotalSupply) revert YieldFeeGTAvailable(_shares, _yieldFeeTotalSupply);
+
+    _yieldFeeTotalSupply -= _shares;
+    _mint(_recipient, _shares);
+
+    emit MintYieldFee(msg.sender, _recipient, _shares);
   }
 
   /* ============ Deposit Functions ============ */
@@ -517,6 +529,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /* ============ Liquidation Functions ============ */
 
+  /// @inheritdoc ILiquidationSource
+  function liquidatableBalanceOf(address _token) public view override returns (uint256) {
+    return _liquidatableBalanceOf(_token);
+  }
+
   /**
    * @inheritdoc ILiquidationSource
    * @dev User provides prize tokens and receives in exchange Vault shares.
@@ -611,69 +628,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return totalPrizes;
   }
 
-  /**
-   * @notice Claim prize for `_winner`.
-   * @param _winner Address of the winner to claim the prize for
-   * @param _tier Tier of the prize
-   * @param _prizeIndex The prize index to claim
-   * @param _fee Fee to be charged for the claim
-   * @param _feeRecipient Address that will receive the fee
-   * @return uint256 The total prize amount claimed
-   */
-  function _claimPrize(
-    address _winner,
-    uint8 _tier,
-    uint32 _prizeIndex,
-    uint96 _fee,
-    address _feeRecipient
-  ) internal returns (uint256) {
-    VaultHooks memory hooks = _hooks[_winner];
-    address recipient;
-    if (hooks.useBeforeClaimPrize) {
-      recipient = hooks.implementation.beforeClaimPrize(_winner, _tier, _prizeIndex);
-    } else {
-      recipient = _winner;
-    }
-
-    uint prizeTotal = _prizePool.claimPrize(
-      _winner,
-      _tier,
-      _prizeIndex,
-      recipient,
-      _fee,
-      _feeRecipient
-    );
-
-    if (hooks.useAfterClaimPrize) {
-      hooks.implementation.afterClaimPrize(
-        _winner,
-        _tier,
-        _prizeIndex,
-        prizeTotal - _fee,
-        recipient
-      );
-    }
-
-    return prizeTotal;
-  }
-
-  /**
-   * @notice Mint Vault shares to the yield fee `_recipient`.
-   * @dev Will revert if the Vault is undercollateralized
-   *      or if the `_shares` are greater than the accrued `_yieldFeeTotalSupply`.
-   * @param _shares Amount of shares to mint
-   * @param _recipient Address of the yield fee recipient
-   */
-  function mintYieldFee(uint256 _shares, address _recipient) external {
-    _requireVaultCollateralized();
-    if (_shares > _yieldFeeTotalSupply) revert YieldFeeGTAvailable(_shares, _yieldFeeTotalSupply);
-
-    _yieldFeeTotalSupply -= _shares;
-    _mint(_recipient, _shares);
-
-    emit MintYieldFee(msg.sender, _recipient, _shares);
-  }
-
   /* ============ Setter Functions ============ */
 
   /**
@@ -697,15 +651,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _hooks[msg.sender] = hooks;
 
     emit SetHooks(msg.sender, hooks);
-  }
-
-  /**
-   * @notice Gets the hooks for the given user
-   * @param _account The user to retrieve the hooks for
-   * @return VaultHooks The hooks for the given user
-   */
-  function getHooks(address _account) external view returns (VaultHooks memory) {
-    return _hooks[_account];
   }
 
   /**
@@ -830,7 +775,18 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return _claimer;
   }
 
+  /**
+   * @notice Gets the hooks for the given user
+   * @param _account The user to retrieve the hooks for
+   * @return VaultHooks The hooks for the given user
+   */
+  function getHooks(address _account) external view returns (VaultHooks memory) {
+    return _hooks[_account];
+  }
+
+  /* ============================================ */
   /* ============ Internal Functions ============ */
+  /* ============================================ */
 
   /**
    * @notice Total amount of assets managed by this Vault.
@@ -1068,6 +1024,54 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     SafeERC20.safeTransfer(IERC20(asset()), _receiver, _assets);
 
     emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+  }
+
+  /* ============ Claim Functions ============ */
+
+  /**
+   * @notice Claim prize for `_winner`.
+   * @param _winner Address of the winner to claim the prize for
+   * @param _tier Tier of the prize
+   * @param _prizeIndex The prize index to claim
+   * @param _fee Fee to be charged for the claim
+   * @param _feeRecipient Address that will receive the fee
+   * @return uint256 The total prize amount claimed
+   */
+  function _claimPrize(
+    address _winner,
+    uint8 _tier,
+    uint32 _prizeIndex,
+    uint96 _fee,
+    address _feeRecipient
+  ) internal returns (uint256) {
+    VaultHooks memory hooks = _hooks[_winner];
+    address recipient;
+    if (hooks.useBeforeClaimPrize) {
+      recipient = hooks.implementation.beforeClaimPrize(_winner, _tier, _prizeIndex);
+    } else {
+      recipient = _winner;
+    }
+
+    uint prizeTotal = _prizePool.claimPrize(
+      _winner,
+      _tier,
+      _prizeIndex,
+      recipient,
+      _fee,
+      _feeRecipient
+    );
+
+    if (hooks.useAfterClaimPrize) {
+      hooks.implementation.afterClaimPrize(
+        _winner,
+        _tier,
+        _prizeIndex,
+        prizeTotal - _fee,
+        recipient
+      );
+    }
+
+    return prizeTotal;
   }
 
   /* ============ Permit Functions ============ */
