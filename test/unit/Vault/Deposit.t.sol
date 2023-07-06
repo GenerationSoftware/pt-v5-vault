@@ -44,6 +44,19 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
+  function testFailDepositMoreThanMax() external {
+    vm.startPrank(alice);
+
+    uint256 _moreThanMax = uint256(type(uint96).max) + 1;
+    uint256 _amount = _moreThanMax;
+    underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vault.deposit(_amount, alice);
+
+    vm.stopPrank();
+  }
+
   function testDepositAssetsLivingInVault() external {
     uint256 _vaultAmount = 500e18;
     underlyingAsset.mint(address(vault), _vaultAmount);

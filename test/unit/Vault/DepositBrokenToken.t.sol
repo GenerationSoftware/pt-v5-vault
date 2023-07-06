@@ -40,10 +40,10 @@ contract VaultDepositBrokenTokenTest is UnitBrokenTokenBaseSetup {
     vm.startPrank(alice);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    // Token with 50 decimals, amount is greater than type(uint112).max
+    // Token with 50 decimals, amount is greater than type(uint96).max
     if (brokenERC20Name == keccak256(bytes("HighDecimalToken"))) {
       vm.expectRevert(
-        abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
+        abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint96).max)
       );
       vault.deposit(_amount, alice);
 
