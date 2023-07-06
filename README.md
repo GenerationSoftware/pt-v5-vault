@@ -6,7 +6,7 @@
 
 # PoolTogether V5 Vault
 
-[![Code Coverage](https://github.com/pooltogether/v5-vault/actions/workflows/coverage.yml/badge.svg)](https://github.com/pooltogether/v5-vault/actions/workflows/coverage.yml)
+[![Code Coverage](https://github.com/GenerationSoftware/pt-v5-vault/actions/workflows/coverage.yml/badge.svg)](https://github.com/GenerationSoftware/pt-v5-vault/actions/workflows/coverage.yml)
 [![built-with openzeppelin](https://img.shields.io/badge/built%20with-OpenZeppelin-3677FF)](https://docs.openzeppelin.com/)
 ![MIT license](https://img.shields.io/badge/license-MIT-blue)
 
