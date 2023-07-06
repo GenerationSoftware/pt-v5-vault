@@ -190,6 +190,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
 
+  /**
+   * @notice Emitted when the `_lastRecordedExchangeRate` is updated.
+   * @param exchangeRate The recorded exchange rate
+   * @dev This happens on mint and burn of shares
+   */
+  event RecordedExchangeRate(uint256 exchangeRate);
+
   /* ============ Variables ============ */
 
   /// @notice Address of the TwabController used to keep track of balances.
@@ -1101,6 +1108,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Update exchange rate with the current exchange rate.
   function _updateExchangeRate() internal {
     _lastRecordedExchangeRate = _currentExchangeRate();
+    emit RecordedExchangeRate(_lastRecordedExchangeRate);
   }
 
   /**
