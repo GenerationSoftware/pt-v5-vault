@@ -608,7 +608,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint96 _feePerClaim,
     address _feeRecipient
   ) external returns (uint256) {
-    if (msg.sender != address(_claimer)) revert CallerNotClaimer(msg.sender, address(_claimer));
+    if (msg.sender != _claimer) revert CallerNotClaimer(msg.sender, _claimer);
 
     uint totalPrizes;
 
@@ -640,7 +640,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _setClaimer(claimer_);
 
     emit ClaimerSet(_previousClaimer, claimer_);
-    return address(claimer_);
+    return claimer_;
   }
 
   /**
