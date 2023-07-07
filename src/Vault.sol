@@ -910,7 +910,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *      we only transfer the difference from the user wallet into the vault.
    *      The difference is calculated this way:
    *      - if `_vaultAssets` balance is greater than 0 and lower than `_assets`,
-   *        we substract `_vaultAssets` from `_assets` and deposit `_assetsDeposit` amount into the vault
+   *        we subtract `_vaultAssets` from `_assets` and deposit `_assetsDeposit` amount into the vault
    *      - if `_vaultAssets` balance is greater than or equal to `_assets`,
    *        we know the vault has enough underlying assets to fulfill the deposit
    *        so we don't transfer any assets from the user wallet into the vault
@@ -924,9 +924,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     IERC20 _asset = IERC20(asset());
     uint256 _vaultAssets = _asset.balanceOf(address(this));
 
-    // If _asset is ERC777, `transferFrom` can trigger a reenterancy BEFORE the transfer happens through the
-    // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
-    // calls the vault, which is assumed not malicious.
+    // If _asset is ERC777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
+    // `tokensToSend` hook. On the other hand, the `tokenReceived` hook that is triggered after the transfer
+    // calls the vault which is assumed to not be malicious.
     //
     // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
     // assets are transferred and before the shares are minted, which is a valid state.
