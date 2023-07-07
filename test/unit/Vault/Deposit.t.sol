@@ -14,6 +14,8 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
   event Transfer(address indexed from, address indexed to, uint256 value);
 
+  event RecordedExchangeRate(uint256 exchangeRate);
+
   /* ============ Tests ============ */
 
   /* ============ Deposit ============ */
@@ -23,6 +25,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vm.expectEmit();
+    emit RecordedExchangeRate(1e18);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
