@@ -21,3 +21,6 @@
 [submodule "lib/pt-v5-prize-pool"]
 	path = lib/pt-v5-prize-pool
 	url = https://github.com/GenerationSoftware/pt-v5-prize-pool
+[submodule "lib/pt-v5-liquidator-interfaces"]
+	path = lib/pt-v5-liquidator-interfaces
+	url = https://github.com/generationsoftware/pt-v5-liquidator-interfaces
