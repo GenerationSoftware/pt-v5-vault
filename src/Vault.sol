@@ -8,9 +8,9 @@ import { Math } from "openzeppelin/utils/math/Math.sol";
 import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
 import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
-import { ILiquidationSource } from "v5-liquidator-interfaces/ILiquidationSource.sol";
-import { PrizePool } from "v5-prize-pool/PrizePool.sol";
-import { TwabController } from "v5-twab-controller/TwabController.sol";
+import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
+import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
+import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
 /// @notice Emitted when the TWAB controller is set to the zero address

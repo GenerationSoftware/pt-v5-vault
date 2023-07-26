@@ -15,9 +15,6 @@
 [submodule "lib/brokentoken"]
 	path = lib/brokentoken
 	url = https://github.com/GenerationSoftware/brokentoken
-[submodule "lib/pt-v5-liquidator"]
-	path = lib/pt-v5-liquidator
-	url = https://github.com/GenerationSoftware/pt-v5-liquidator
 [submodule "lib/pt-v5-prize-pool"]
 	path = lib/pt-v5-prize-pool
 	url = https://github.com/GenerationSoftware/pt-v5-prize-pool

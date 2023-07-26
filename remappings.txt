@@ -7,5 +7,5 @@ openzeppelin/=lib/openzeppelin-contracts/contracts/
 owner-manager-contracts/=lib/owner-manager-contracts/contracts/
 
 pt-v5-liquidator-interfaces/=lib/pt-v5-liquidator-interfaces/src/interfaces/
-pt-v5-cgda-liquidator/=lib/pt-v5-cgda-liquidator/src/
+pt-v5-twab-controller=lib/pt-v5-twab-controller/src/
 pt-v5-prize-pool/=lib/pt-v5-prize-pool/src/

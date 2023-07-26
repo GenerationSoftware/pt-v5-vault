@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { MintMoreThanMax, DepositMoreThanMax } from "../../src/Vault.sol";
+import { MintMoreThanMax, DepositMoreThanMax } from "../../../src/Vault.sol";
 
 import { BrokenToken } from "brokentoken/BrokenToken.sol";
 
-import { IERC20, UnitBaseSetup } from "../utils/UnitBaseSetup.t.sol";
+import { IERC20, UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
 import { console2 } from "forge-std/Test.sol";
 
 contract VaultDepositTest is UnitBaseSetup, BrokenToken {

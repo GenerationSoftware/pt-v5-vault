@@ -4,8 +4,8 @@ pragma solidity 0.8.17;
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
-import { PrizePool } from "v5-prize-pool/PrizePool.sol";
-import { TwabController } from "v5-twab-controller/TwabController.sol";
+import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
+import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import { Vault } from "./Vault.sol";
 

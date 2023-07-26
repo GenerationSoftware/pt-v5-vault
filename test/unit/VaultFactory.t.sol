@@ -5,8 +5,8 @@ import "forge-std/Test.sol";
 
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 
-import { PrizePool } from "v5-prize-pool/PrizePool.sol";
-import { TwabController } from "v5-twab-controller/TwabController.sol";
+import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
+import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import { VaultFactory } from "../../src/VaultFactory.sol";
 import { Vault } from "../../src/Vault.sol";

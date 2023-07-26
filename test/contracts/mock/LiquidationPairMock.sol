@@ -4,7 +4,7 @@ pragma solidity 0.8.17;
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 
-import { ILiquidationSource } from "v5-liquidator-interfaces/ILiquidationSource.sol";
+import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { MockLiquidatorLib } from "v5-liquidator-test/mocks/MockLiquidatorLib.sol";
 
 contract LiquidationPairMock {
