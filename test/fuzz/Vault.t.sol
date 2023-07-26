@@ -7,19 +7,19 @@ import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { Strings } from "openzeppelin/utils/Strings.sol";
 
-import { LiquidationPair } from "v5-liquidator/LiquidationPair.sol";
+import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
 import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 import { TwabController } from "v5-twab-controller/TwabController.sol";
 
 import { Vault } from "../../src/Vault.sol";
 
-import { ERC20PermitMock } from "test/contracts/mock/ERC20PermitMock.sol";
-import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
-import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock.sol";
-import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
-import { YieldVault } from "test/contracts/mock/YieldVault.sol";
+import { ERC20PermitMock } from "../contracts/mock/ERC20PermitMock.sol";
+import { LiquidationPairMock } from "../contracts/mock/LiquidationPairMock.sol";
+import { LiquidationRouterMock } from "../contracts/mock/LiquidationRouterMock.sol";
+import { PrizePoolMock } from "../contracts/mock/PrizePoolMock.sol";
+import { YieldVault } from "../contracts/mock/YieldVault.sol";
 
-import { Helpers } from "test/utils/Helpers.t.sol";
+import { Helpers } from "../utils/Helpers.t.sol";
 
 contract VaultFuzzTest is ERC4626Test, Helpers {
   /* ============ Variables ============ */

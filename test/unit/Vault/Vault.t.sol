@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { UnitBaseSetup, LiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "test/utils/UnitBaseSetup.t.sol";
+import { UnitBaseSetup, LiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "../../utils/UnitBaseSetup.t.sol";
 import { IVaultHooks, VaultHooks } from "../../../src/interfaces/IVaultHooks.sol";
-import "src/Vault.sol";
+import "../../src/Vault.sol";
 
 contract VaultTest is UnitBaseSetup {
   /* ============ Events ============ */

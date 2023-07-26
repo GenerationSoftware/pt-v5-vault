@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { UnitBrokenTokenBaseSetup } from "test/utils/UnitBrokenTokenBaseSetup.t.sol";
+import { UnitBrokenTokenBaseSetup } from "../../utils/UnitBrokenTokenBaseSetup.t.sol";
 
 contract VaultWithdrawBrokenTokenTest is UnitBrokenTokenBaseSetup {
   /* ============ Events ============ */

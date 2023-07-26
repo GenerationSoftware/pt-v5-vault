@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.17;
 
-import { UnitBaseSetup } from "test/utils/UnitBaseSetup.t.sol";
-import "src/Vault.sol";
+import { UnitBaseSetup } from "../utils/UnitBaseSetup.t.sol";
+import "../../src/Vault.sol";
 
 contract VaultLiquidateTest is UnitBaseSetup {
   /* ============ Events ============ */

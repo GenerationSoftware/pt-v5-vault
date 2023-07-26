@@ -4,7 +4,7 @@ pragma solidity 0.8.17;
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
-import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
+import { LiquidationPairMock } from "./LiquidationPairMock.sol";
 
 contract LiquidationRouterMock {
   using SafeERC20 for IERC20;

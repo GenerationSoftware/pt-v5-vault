@@ -6,13 +6,6 @@ brokentoken/=lib/brokentoken/src/
 openzeppelin/=lib/openzeppelin-contracts/contracts/
 owner-manager-contracts/=lib/owner-manager-contracts/contracts/
 
-v5-liquidator/=lib/pt-v5-liquidator/src/
-v5-liquidator-interfaces/=lib/pt-v5-liquidator/src/interfaces/
-v5-liquidator-libraries/=lib/pt-v5-liquidator/src/libraries/
-v5-liquidator-test/=lib/pt-v5-liquidator/test/
-v5-prize-pool/=lib/pt-v5-prize-pool/src/
-v5-twab-controller/=lib/pt-v5-prize-pool/lib/pt-v5-twab-controller/src/
-ring-buffer-lib/=lib/pt-v5-prize-pool/lib/pt-v5-twab-controller/lib/ring-buffer-lib/src/
-
-src/=src/
-test/=test/
+pt-v5-liquidator-interfaces/=lib/pt-v5-liquidator-interfaces/src/interfaces/
+pt-v5-cgda-liquidator/=lib/pt-v5-cgda-liquidator/src/
+pt-v5-prize-pool/=lib/pt-v5-prize-pool/src/

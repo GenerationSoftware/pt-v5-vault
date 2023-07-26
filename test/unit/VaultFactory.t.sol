@@ -10,7 +10,7 @@ import { TwabController } from "v5-twab-controller/TwabController.sol";
 
 import { VaultFactory } from "../../src/VaultFactory.sol";
 import { Vault } from "../../src/Vault.sol";
-import { YieldVault } from "test/contracts/mock/YieldVault.sol";
+import { YieldVault } from "../contracts/mock/YieldVault.sol";
 
 contract VaultFactoryTest is Test {
   /* ============ Events ============ */

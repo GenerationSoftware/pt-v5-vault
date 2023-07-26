@@ -12,10 +12,10 @@ import { PrizePool } from "v5-prize-pool/PrizePool.sol";
 
 import { IERC4626, Vault } from "../../src/Vault.sol";
 
-import { LiquidationPairMock } from "test/contracts/mock/LiquidationPairMock.sol";
-import { LiquidationRouterMock } from "test/contracts/mock/LiquidationRouterMock.sol";
-import { PrizePoolMock } from "test/contracts/mock/PrizePoolMock.sol";
-import { YieldVault } from "test/contracts/mock/YieldVault.sol";
+import { LiquidationPairMock } from "../contracts/mock/LiquidationPairMock.sol";
+import { LiquidationRouterMock } from "../contracts/mock/LiquidationRouterMock.sol";
+import { PrizePoolMock } from "../contracts/mock/PrizePoolMock.sol";
+import { YieldVault } from "../contracts/mock/YieldVault.sol";
 
 contract Helpers is Test {
   using Math for uint256;
