@@ -178,7 +178,6 @@ contract VaultTest is UnitBaseSetup {
     vm.startPrank(alice);
     VaultHooks memory hooks = VaultHooks({
       useBeforeClaimPrize: true,
-      useAfterClaimPrize: false,
       implementation: IVaultHooks(makeAddr("hooks"))
     });
     vault.setHooks(hooks);
@@ -202,7 +201,6 @@ contract VaultTest is UnitBaseSetup {
     vm.startPrank(alice);
     VaultHooks memory hooks = VaultHooks({
       useBeforeClaimPrize: true,
-      useAfterClaimPrize: true,
       implementation: IVaultHooks(makeAddr("hooks"))
     });
     vault.setHooks(hooks);
@@ -212,11 +210,6 @@ contract VaultTest is UnitBaseSetup {
       address(hooks.implementation),
       abi.encodeWithSelector(IVaultHooks.beforeClaimPrize.selector, alice, 1, 0),
       abi.encode(bob)
-    );
-    vm.mockCall(
-      address(hooks.implementation),
-      abi.encodeWithSelector(IVaultHooks.afterClaimPrize.selector, alice, 1, 0, 78, bob),
-      abi.encode(true)
     );
 
     vm.startPrank(address(claimer));
@@ -399,7 +392,6 @@ contract VaultTest is UnitBaseSetup {
 
     VaultHooks memory hooks = VaultHooks({
       useBeforeClaimPrize: true,
-      useAfterClaimPrize: true,
       implementation: IVaultHooks(makeAddr("hooks"))
     });
 
@@ -409,7 +401,6 @@ contract VaultTest is UnitBaseSetup {
 
     VaultHooks memory result = vault.getHooks(bob);
     assertEq(result.useBeforeClaimPrize, hooks.useBeforeClaimPrize);
-    assertEq(result.useAfterClaimPrize, hooks.useAfterClaimPrize);
     assertEq(address(result.implementation), address(hooks.implementation));
 
     vm.stopPrank();

@@ -139,6 +139,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     address owner
   );
 
+  event BeforeClaimPrizeFailed(
+    address indexed winner,
+    uint8 indexed tier,
+    uint32 indexed prizeIndex,
+    bytes reason
+  );
+
   /**
    * @notice Emitted when a new claimer has been set.
    * @param previousClaimer Address of the previous claimer
@@ -1050,7 +1057,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     VaultHooks memory hooks = _hooks[_winner];
     address recipient;
     if (hooks.useBeforeClaimPrize) {
-      recipient = hooks.implementation.beforeClaimPrize(_winner, _tier, _prizeIndex);
+      try hooks.implementation.beforeClaimPrize{gas: 150_000}(_winner, _tier, _prizeIndex, _fee, _feeRecipient) returns (address result) {
+        recipient = result;
+      } catch (bytes memory reason) {
+        emit BeforeClaimPrizeFailed(_winner, _tier, _prizeIndex, reason);
+        return 0;
+      }
     } else {
       recipient = _winner;
     }
@@ -1063,16 +1075,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       _fee,
       _feeRecipient
     );
-
-    if (hooks.useAfterClaimPrize) {
-      hooks.implementation.afterClaimPrize(
-        _winner,
-        _tier,
-        _prizeIndex,
-        prizeTotal - _fee,
-        recipient
-      );
-    }
 
     return prizeTotal;
   }
