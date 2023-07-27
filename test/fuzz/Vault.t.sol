@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
 import { ERC4626Test, IMockERC20 } from "erc4626-tests/ERC4626.test.sol";
 
@@ -343,7 +343,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     init.yield = int(bound(shares, 10e18, type(uint88).max));
 
     setUpVault(init);
-    vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
+    vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
 
     address caller = init.user[0];
     prizeToken.mint(caller, type(uint256).max);

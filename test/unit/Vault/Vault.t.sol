@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
-import { UnitBaseSetup, LiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "../../utils/UnitBaseSetup.t.sol";
+import { UnitBaseSetup, ILiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "../../utils/UnitBaseSetup.t.sol";
 import { IVaultHooks, VaultHooks } from "../../../src/interfaces/IVaultHooks.sol";
 import "../../../src/Vault.sol";
 
@@ -23,7 +23,7 @@ contract VaultTest is UnitBaseSetup {
 
   event ClaimerSet(address previousClaimer, address newClaimer);
 
-  event LiquidationPairSet(LiquidationPair newLiquidationPair);
+  event LiquidationPairSet(ILiquidationPair newLiquidationPair);
 
   event YieldFeeRecipientSet(address previousYieldFeeRecipient, address newYieldFeeRecipient);
 
@@ -153,15 +153,6 @@ contract VaultTest is UnitBaseSetup {
     assertEq(target, address(prizePool));
   }
 
-  function testTargetOfFail() public {
-    _setLiquidationPair();
-
-    vm.expectRevert(
-      abi.encodeWithSelector(TargetTokenNotSupported.selector, address(underlyingAsset))
-    );
-    vault.targetOf(address(underlyingAsset));
-  }
-
   /* ============ Claimer ============ */
 
   /* ============ claimPrize ============ */
@@ -260,7 +251,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testGetLiquidationPair() external {
-    vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
+    vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
     assertEq(vault.liquidationPair(), address(liquidationPair));
   }
 
@@ -311,7 +302,7 @@ contract VaultTest is UnitBaseSetup {
   /* ============ setLiquidationPair ============ */
   function testSetLiquidationPair() public {
     vm.expectEmit(true, true, true, true);
-    emit LiquidationPairSet(LiquidationPair(address(liquidationPair)));
+    emit LiquidationPairSet(ILiquidationPair(address(liquidationPair)));
 
     address _newLiquidationPairAddress = _setLiquidationPair();
 
@@ -324,14 +315,14 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetLiquidationPairUpdate() public {
-    vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
+    vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
 
     assertEq(
       underlyingAsset.allowance(address(vault), address(liquidationPair)),
       type(uint256).max
     );
 
-    LiquidationPair _newLiquidationPair = LiquidationPair(
+    ILiquidationPair _newLiquidationPair = ILiquidationPair(
       0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820
     );
 
@@ -346,11 +337,11 @@ contract VaultTest is UnitBaseSetup {
 
   function testSetLiquidationPairNotZeroAddress() public {
     vm.expectRevert(abi.encodeWithSelector(LPZeroAddress.selector));
-    vault.setLiquidationPair(LiquidationPair(address(0)));
+    vault.setLiquidationPair(ILiquidationPair(address(0)));
   }
 
   function testSetLiquidationPairOnlyOwner() public {
-    LiquidationPair _newLiquidationPair = LiquidationPair(
+    ILiquidationPair _newLiquidationPair = ILiquidationPair(
       0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820
     );
 

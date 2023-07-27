@@ -3,7 +3,7 @@ src = 'src'
 out = 'out'
 test = 'test'
 libs = ['lib']
-solc = "0.8.17"
+solc = "0.8.19"
 fs_permissions = [{ access = "read", path = "./broadcast"}]
 gas_reports = ["*"]
 

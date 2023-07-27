@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
 struct VaultHooks {
   /// @notice If true, the vault will call the beforeClaimPrize hook on the implementation

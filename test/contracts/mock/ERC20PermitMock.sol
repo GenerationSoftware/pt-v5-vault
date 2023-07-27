@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 import { ERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";

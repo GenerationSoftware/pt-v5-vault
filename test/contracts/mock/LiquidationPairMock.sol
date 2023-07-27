@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
@@ -22,7 +22,7 @@ contract LiquidationPairMock {
     _liquidatorLib = new MockLiquidatorLib();
   }
 
-  function _availableReserveOut() internal view returns (uint256) {
+  function _availableReserveOut() internal returns (uint256) {
     return ILiquidationSource(_source).liquidatableBalanceOf(_tokenOut);
   }
 
@@ -37,7 +37,7 @@ contract LiquidationPairMock {
     return true;
   }
 
-  function computeExactAmountIn(uint256 _amountOut) external view returns (uint256) {
+  function computeExactAmountIn(uint256 _amountOut) external returns (uint256) {
     return _liquidatorLib.computeExactAmountIn(100, 50, _availableReserveOut(), _amountOut);
   }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
 import { ERC4626, ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { ERC20Permit, IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
@@ -157,7 +157,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Emitted when a new LiquidationPair has been set.
    * @param newLiquidationPair Address of the new liquidationPair
    */
-  event LiquidationPairSet(LiquidationPair newLiquidationPair);
+  event LiquidationPairSet(ILiquidationPair newLiquidationPair);
 
   /**
    * @notice Emitted when yield fee is minted to the yield recipient.
@@ -211,8 +211,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Address of the claimer.
   address private _claimer;
 
-  /// @notice Address of the LiquidationPair used to liquidate yield for prize token.
-  LiquidationPair private _liquidationPair;
+  /// @notice Address of the ILiquidationPair used to liquidate yield for prize token.
+  ILiquidationPair private _liquidationPair;
 
   /// @notice Underlying asset unit (i.e. 10 ** 18 for DAI).
   uint256 private _assetUnit;
@@ -588,7 +588,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @inheritdoc ILiquidationSource
   function targetOf(address _token) external view returns (address) {
-    if (_token != _liquidationPair.tokenIn()) revert TargetTokenNotSupported(_token);
     return address(_prizePool);
   }
 
@@ -663,7 +662,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return address New liquidationPair address
    */
   function setLiquidationPair(
-    LiquidationPair liquidationPair_
+    ILiquidationPair liquidationPair_
   ) external onlyOwner returns (address) {
     if (address(liquidationPair_) == address(0)) revert LPZeroAddress();
 

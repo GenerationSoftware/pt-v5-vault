@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.17;
+pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
 import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
@@ -102,6 +102,6 @@ contract UnitBaseSetup is Test, Helpers {
 
   /* ============ Helpers ============ */
   function _setLiquidationPair() internal returns (address) {
-    return vault.setLiquidationPair(LiquidationPair(address(liquidationPair)));
+    return vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
   }
 }
