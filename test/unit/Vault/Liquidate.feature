@@ -55,27 +55,37 @@ Feature: Liquidate
 
 
   # Failure
+  Scenario: Bob swaps prize tokens in exchange of Vault shares
+    Given the YieldVault is now undercollateralized
+    When `liquidate` is called
+    Then the transaction reverts with the custom error `VaultUnderCollateralized`
+
   Scenario: Bob swaps prize tokens in exchange of Vault shares by calling `liquidate` directly
-    Given no underlying assets have accrued in the Vault
+    Given no underlying assets have accrued in the YieldVault
     When Bob calls `liquidate`
-    Then the transaction reverts with the error `Vault/caller-not-LP`
+    Then the transaction reverts with the custom error `LiquidationCallerNotLP`
 
-  Scenario: Bob swaps random tokens in exchange of Vault shares by calling `liquidate` directly
-    Given no underlying assets have accrued in the Vault
-    When Bob calls `liquidate`
-    Then the transaction reverts with the error `Vault/tokenIn-not-prizeToken`
+  Scenario: Bob swaps random tokens in exchange of Vault shares
+    Given no underlying assets have accrued in the YieldVault
+    When `liquidate` is called
+    Then the transaction reverts with the custom error `LiquidationTokenInNotPrizeToken`
 
-  Scenario: Bob swaps prize tokens in exchange of random tokens by calling `liquidate` directly
-    Given no underlying assets have accrued in the Vault
-    When Bob calls `liquidate`
-    Then the transaction reverts with the error `Vault/tokenOut-not-vaultShare`
+  Scenario: Bob swaps prize tokens in exchange of random tokens
+    Given no underlying assets have accrued in the YieldVault
+    When `liquidate` is called
+    Then the transaction reverts with the custom error `LiquidationTokenOutNotVaultShare`
+
+  Scenario: Bob swaps prize tokens in exchange of 0 Vault shares
+    Given no underlying assets have accrued in the YieldVault
+    When Bob swaps 0 prize tokens for 0 Vault shares through the LiquidationRouter
+    Then the transaction reverts with the custom error `LiquidationAmountOutZero`
 
   Scenario: Bob swaps prize tokens in exchange of Vault shares
-    Given no underlying assets have accrued in the Vault
+    Given no underlying assets have accrued in the YieldVault
     When Bob swaps 0 prize tokens for uint256.max Vault shares through the LiquidationRouter
-    Then the transaction reverts with the error `Vault/amount-gt-available-yield`
+    Then the transaction reverts with the custom error `LiquidationAmountOutGTYield`
 
   Scenario: Bob mints an arbitrary amount of yield fee
     Given no yield fee has accrued
     When Bob mints 10 yield fee shares
-    Then the transaction reverts with the error `Vault/shares-gt-yieldFeeSupply`
+    Then the transaction reverts with the custom error `YieldFeeGTAvailable`
