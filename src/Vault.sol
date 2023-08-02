@@ -385,20 +385,19 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Mint Vault shares to the yield fee `_recipient`.
+   * @notice Mint Vault shares to the `_yieldFeeRecipient`.
    * @dev Will revert if the Vault is undercollateralized
    *      or if the `_shares` are greater than the accrued `_yieldFeeTotalSupply`.
    * @param _shares Amount of shares to mint
-   * @param _recipient Address of the yield fee recipient
    */
-  function mintYieldFee(uint256 _shares, address _recipient) external {
+  function mintYieldFee(uint256 _shares) external {
     _requireVaultCollateralized();
     if (_shares > _yieldFeeTotalSupply) revert YieldFeeGTAvailable(_shares, _yieldFeeTotalSupply);
 
     _yieldFeeTotalSupply -= _shares;
-    _mint(_recipient, _shares);
+    _mint(_yieldFeeRecipient, _shares);
 
-    emit MintYieldFee(msg.sender, _recipient, _shares);
+    emit MintYieldFee(msg.sender, _yieldFeeRecipient, _shares);
   }
 
   /* ============ Deposit Functions ============ */

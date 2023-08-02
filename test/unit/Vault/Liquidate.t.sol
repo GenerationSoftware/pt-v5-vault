@@ -309,7 +309,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.expectEmit();
     emit MintYieldFee(address(this), bob, _yieldFeeShares);
 
-    vault.mintYieldFee(_yieldFeeShares, bob);
+    vault.mintYieldFee(_yieldFeeShares);
 
     assertEq(vault.balanceOf(bob), _yieldFeeShares);
 
@@ -414,6 +414,6 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
   function testMintYieldFeeGTYieldFeeSupply() public {
     vm.expectRevert(abi.encodeWithSelector(YieldFeeGTAvailable.selector, 10e18, 0));
-    vault.mintYieldFee(10e18, bob);
+    vault.mintYieldFee(10e18);
   }
 }
