@@ -159,6 +159,37 @@ contract VaultWithdrawTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
+  /* ============ Withdraw - Attacks ============ */
+  function testWithdrawOverflow() external {
+    uint256 _amount = type(uint96).max;
+    uint256 _doubleAmount = _amount * 2;
+
+    vm.startPrank(bob);
+
+    underlyingAsset.mint(bob, _doubleAmount);
+    underlyingAsset.approve(address(vault), _doubleAmount);
+
+    // Need to deposit in two steps cause it would overflow over the maxDeposit limit of uint96 otherwise
+    // NOTE: this is only possible cause balances are stored in uint112 in the TwabController, it would revert if it was uint96
+    vault.deposit(_amount, bob);
+    vault.deposit(_amount, bob);
+
+    assertEq(vault.balanceOf(bob), _doubleAmount);
+
+    assertEq(twabController.balanceOf(address(vault), bob), _doubleAmount);
+    assertEq(twabController.delegateBalanceOf(address(vault), bob), _doubleAmount);
+
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _doubleAmount);
+    assertEq(yieldVault.balanceOf(address(vault)), _doubleAmount);
+    assertEq(yieldVault.totalSupply(), _doubleAmount);
+
+    uint256 _bobMaxWithdraw = vault.maxWithdraw(bob);
+    assertEq(_bobMaxWithdraw, _doubleAmount);
+
+    vm.expectRevert(bytes("SafeCast: value doesn't fit in 96 bits"));
+    vault.withdraw(_bobMaxWithdraw, bob, bob);
+  }
+
   /* ============ Redeem ============ */
   function testRedeemFullAmount() external {
     vm.startPrank(alice);

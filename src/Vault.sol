@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import { ERC4626, ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { ERC20Permit, IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import { SafeCast } from "openzeppelin/utils/math/SafeCast.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
@@ -109,6 +110,7 @@ error YieldFeePercentageGTPrecision(uint256 yieldFeePercentage, uint256 maxYield
  */
 contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   using Math for uint256;
+  using SafeCast for uint256;
   using SafeERC20 for IERC20;
 
   /* ============ Events ============ */
@@ -232,7 +234,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
   uint256 private constant FEE_PRECISION = 1e9;
 
-  /// @notice Maps user addresses to hooks that they want to execute when prizes are won
+  /// @notice Maps user addresses to hooks that they want to execute when prizes are won.
   mapping(address => VaultHooks) internal _hooks;
 
   /* ============ Constructor ============ */
@@ -651,8 +653,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Sets the hooks for a winner
-   * @param hooks The hooks to set.
+   * @notice Sets the hooks for a winner.
+   * @param hooks The hooks to set
    */
   function setHooks(VaultHooks memory hooks) external {
     _hooks[msg.sender] = hooks;
@@ -783,7 +785,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Gets the hooks for the given user
+   * @notice Gets the hooks for the given user.
    * @param _account The user to retrieve the hooks for
    * @return VaultHooks The hooks for the given user
    */
@@ -1053,6 +1055,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   ) internal returns (uint256) {
     VaultHooks memory hooks = _hooks[_winner];
     address recipient;
+
     if (hooks.useBeforeClaimPrize) {
       recipient = hooks.implementation.beforeClaimPrize(_winner, _tier, _prizeIndex);
     } else {
@@ -1124,7 +1127,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Updates the exchange rate.
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
-    _twabController.mint(_receiver, uint96(_shares));
+    _twabController.mint(_receiver, SafeCast.toUint96(_shares));
     _updateExchangeRate();
 
     emit Transfer(address(0), _receiver, _shares);
@@ -1140,7 +1143,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Updates the exchange rate.
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
-    _twabController.burn(_owner, uint96(_shares));
+    _twabController.burn(_owner, SafeCast.toUint96(_shares));
     _updateExchangeRate();
 
     emit Transfer(_owner, address(0), _shares);
@@ -1156,7 +1159,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev `_from` must have a balance of at least `_shares`.
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
-    _twabController.transfer(_from, _to, uint96(_shares));
+    _twabController.transfer(_from, _to, SafeCast.toUint96(_shares));
 
     emit Transfer(_from, _to, _shares);
   }

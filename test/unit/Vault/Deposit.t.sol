@@ -187,6 +187,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
+  /* ============ Deposit - Attacks ============ */
   function testFailDepositInflationAttack() external {
     vm.startPrank(bob);
 
@@ -533,7 +534,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.approve(address(vault), type(uint256).max);
 
     twabController.delegate(address(vault), twabController.SPONSORSHIP_ADDRESS());
-    
+
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
 
