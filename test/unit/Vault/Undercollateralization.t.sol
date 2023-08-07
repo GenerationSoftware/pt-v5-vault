@@ -109,7 +109,6 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
   /* ============ Undercollateralization with yield accrued ============ */
   function testUndercollateralizationWithYield() external {
     vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
-    vault.setYieldFeeRecipient(bob);
 
     uint256 _aliceAmount = 15_000_000e18;
     uint256 _aliceAmountUndercollateralized = 7_800_000e18;
@@ -167,6 +166,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
   function testUndercollateralizationWithYieldFeesCaptured() external {
     _setLiquidationPair();
+
     vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
 
     uint256 _aliceAmount = 15_000_000e18;
