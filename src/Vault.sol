@@ -567,11 +567,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     if (_amountOut == 0) revert LiquidationAmountOutZero();
 
-    uint256 _amountOutToAssets = _convertToAssets(_amountOut, Math.Rounding.Down);
+    uint256 _assetAmountOut = _convertToAssets(_amountOut, Math.Rounding.Down);
     uint256 _liquidableYield = _liquidatableBalanceOf(_tokenOut);
 
-    if (_amountOutToAssets > _liquidableYield)
-      revert LiquidationAmountOutGTYield(_amountOutToAssets, _liquidableYield);
+    if (_assetAmountOut > _liquidableYield)
+      revert LiquidationAmountOutGTYield(_assetAmountOut, _liquidableYield);
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
 
@@ -583,7 +583,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     uint256 _vaultAssets = IERC20(asset()).balanceOf(address(this));
 
-    if (_vaultAssets != 0 && _amountOutToAssets >= _vaultAssets) {
+    if (_vaultAssets != 0 && _assetAmountOut >= _vaultAssets) {
       _yieldVault.deposit(_vaultAssets, address(this));
     }
 
