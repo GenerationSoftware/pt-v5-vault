@@ -374,16 +374,26 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @inheritdoc ERC4626
    * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
    */
-  function maxDeposit(address) public view virtual override returns (uint256) {
-    return _isVaultCollateralized() ? type(uint96).max : 0;
+  function maxDeposit(address recipient) public view virtual override returns (uint256) {
+    if (!_isVaultCollateralized()) return 0;
+
+    uint256 _vaultMaxDeposit = type(uint96).max - _convertToAssets(balanceOf(recipient), Math.Rounding.Down);
+    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
+
+    return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
   }
 
   /**
    * @inheritdoc ERC4626
    * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
    */
-  function maxMint(address) public view virtual override returns (uint256) {
-    return _isVaultCollateralized() ? type(uint96).max : 0;
+  function maxMint(address recipient) public view virtual override returns (uint256) {
+    if (!_isVaultCollateralized()) return 0;
+
+    uint256 _vaultMaxMint = type(uint96).max - balanceOf(recipient);
+    uint256 _yieldVaultMaxMint = _yieldVault.maxMint(address(this));
+
+    return _yieldVaultMaxMint < _vaultMaxMint ? _yieldVaultMaxMint : _vaultMaxMint;
   }
 
   /**
@@ -439,7 +449,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @inheritdoc ERC4626
   function mint(uint256 _shares, address _receiver) public virtual override returns (uint256) {
-    uint256 _assets = _beforeMint(_shares, _receiver);
+    uint256 _assets = _convertToAssets(_shares, Math.Rounding.Up);
 
     _deposit(msg.sender, _receiver, _assets, _shares);
 
@@ -464,7 +474,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    uint256 _assets = _beforeMint(_shares, _receiver);
+    uint256 _assets = _convertToAssets(_shares, Math.Rounding.Up);
 
     _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
     _deposit(msg.sender, _receiver, _assets, _shares);
@@ -969,17 +979,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Compute the amount of assets to deposit before minting `_shares`.
-   * @param _shares Amount of shares to mint
-   * @param _receiver Address of the receiver of the vault shares
-   * @return uint256 Amount of assets to deposit.
-   */
-  function _beforeMint(uint256 _shares, address _receiver) internal view returns (uint256) {
-    if (_shares > maxMint(_receiver)) revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
-    return _convertToAssets(_shares, Math.Rounding.Up);
-  }
-
-  /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @param _assets Amount of assets to deposit
    * @param _receiver Address of the receiver of the vault shares
@@ -1127,6 +1126,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Updates the exchange rate.
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
+    if (_shares > maxMint(_receiver)) revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
+
     _twabController.mint(_receiver, SafeCast.toUint96(_shares));
     _updateExchangeRate();
 

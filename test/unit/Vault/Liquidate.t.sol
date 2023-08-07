@@ -317,7 +317,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     assertEq(vault.yieldFeeTotalSupply(), 0);
   }
 
-  /* ============ Errors ============ */
+  /* ============ Liquidate - Errors ============ */
   function testLiquidateYieldVaultUndercollateralized() public {
     _setLiquidationPair();
 
@@ -412,8 +412,92 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
+  function testLiquidateAmountOutGTMaxMint() public {
+    _setLiquidationPair();
+
+    uint256 _amount = 1000e18;
+
+    underlyingAsset.mint(address(this), _amount);
+    _sponsor(underlyingAsset, vault, _amount, address(this));
+
+    uint256 _amountOut = type(uint104).max;
+    _accrueYield(underlyingAsset, yieldVault, _amountOut);
+
+    vm.startPrank(address(alice));
+
+    prizeToken.mint(alice, type(uint256).max);
+    prizeToken.approve(address(this), type(uint256).max);
+
+    vm.stopPrank();
+
+    uint256 _amountIn = liquidationPair.computeExactAmountIn(_amountOut);
+
+    IERC20(address(prizeToken)).transferFrom(
+      alice,
+      address(prizePool),
+      _amountIn
+    );
+
+    vm.startPrank(address(liquidationPair));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amountOut, type(uint96).max)
+    );
+
+    vault.liquidate(alice, address(prizeToken), _amountIn, address(vault), _amountOut);
+
+    vm.stopPrank();
+  }
+
+  /* ============ MintYieldFee - Errors ============ */
   function testMintYieldFeeGTYieldFeeSupply() public {
     vm.expectRevert(abi.encodeWithSelector(YieldFeeGTAvailable.selector, 10e18, 0));
     vault.mintYieldFee(10e18);
+  }
+
+  function testMintYieldFeeMoreThanMax() public {
+    _setLiquidationPair();
+
+    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+    vault.setYieldFeeRecipient(bob);
+
+    uint256 _amount = 1000e18;
+
+    underlyingAsset.mint(address(this), _amount);
+    _sponsor(underlyingAsset, vault, _amount, address(this));
+
+    uint256 _yield = 10e18;
+    _accrueYield(underlyingAsset, yieldVault, _yield);
+
+    vm.startPrank(alice);
+
+    prizeToken.mint(alice, 1000e18);
+
+    uint256 _liquidatableYield = vault.liquidatableBalanceOf(address(vault));
+
+    _liquidate(
+      liquidationRouter,
+      liquidationPair,
+      prizeToken,
+      _liquidatableYield,
+      alice
+    );
+
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+
+    underlyingAsset.mint(bob, vault.maxDeposit(bob));
+    underlyingAsset.approve(address(vault), vault.maxDeposit(bob));
+
+    vault.deposit(vault.maxDeposit(bob), bob);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(MintMoreThanMax.selector, bob, 1e18, 0)
+    );
+
+    vault.mintYieldFee(1e18);
+
+    vm.stopPrank();
   }
 }

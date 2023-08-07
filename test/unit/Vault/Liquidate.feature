@@ -54,7 +54,7 @@ Feature: Liquidate
     Then the Vault total supply must increase by 1
 
 
-  # Failure
+  # Liquidate - Errors
   Scenario: Bob swaps prize tokens in exchange of Vault shares
     Given the YieldVault is now undercollateralized
     When `liquidate` is called
@@ -85,7 +85,19 @@ Feature: Liquidate
     When Bob swaps 0 prize tokens for uint256.max Vault shares through the LiquidationRouter
     Then the transaction reverts with the custom error `LiquidationAmountOutGTYield`
 
-  Scenario: Bob mints an arbitrary amount of yield fee
+  Scenario: Alice swaps prize tokens in exchange of Vault shares
+    Given type(uint104).max underlying assets have accrued in the YieldVault
+    When Alice swaps type(uint104).max prize tokens for type(uint104).max Vault shares
+    Then the transaction reverts with the custom error `MintMoreThanMax`
+
+
+  # MintYieldFee - Errors
+  Scenario: Bob mints an arbitrary amount of yield fee shares
     Given no yield fee has accrued
     When Bob mints 10 yield fee shares
     Then the transaction reverts with the custom error `YieldFeeGTAvailable`
+
+  Scenario: Bob mints 1e18 yield fee shares
+    Given Bob owns type(uint96).max Vault shares and 10e18 of yield fee shares have accrued
+    When Bob mints 1e18 yield fee shares
+    Then the transaction reverts with the custom error `MintMoreThanMax`
