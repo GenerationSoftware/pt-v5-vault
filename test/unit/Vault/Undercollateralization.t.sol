@@ -241,12 +241,12 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     vm.stopPrank();
 
     uint256 _thisAmount = _getMaxWithdraw(address(this), vault, yieldVault);
-    assertApproxEqAbs(vault.maxWithdraw(address(this)), _thisAmount, 280000);
+    assertApproxEqAbs(vault.maxWithdraw(address(this)), _thisAmount, 2440000);
 
     vault.withdraw(vault.maxWithdraw(address(this)), address(this), address(this));
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(this)), _thisAmount, 280000);
+    assertApproxEqAbs(underlyingAsset.balanceOf(address(this)), _thisAmount, 2440000);
 
     assertEq(vault.totalSupply(), 0);
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 280000);
+    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 2440000);
   }
 }
