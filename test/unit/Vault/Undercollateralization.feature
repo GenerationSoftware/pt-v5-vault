@@ -24,3 +24,12 @@ Feature: Undercollateralization
     Then Bob can only withdraw his share of the underlying assets + yield fees left
     Then the yield fee recipient can only withdraw his share of the underlying assets + yield fees left
     Then the Vault `totalSupply` must be 0
+
+  Scenario: The YieldVault loses underlying assets but is still partially collateralized
+    Given Alice owns 1000 Vault shares and the Vault has liquidated 18 in yield and captured 2 in yield fees
+    When the YieldVault loses 1 underlying asset
+    Then `isVaultCollateralized` must return true
+    Then the yield fee recipient can't mint his 2 Vault shares
+    Then Alice can withdraw her full deposit
+    Then Bob can redeem his 18 Vault shares
+    Then the Vault `totalSupply` must be 0

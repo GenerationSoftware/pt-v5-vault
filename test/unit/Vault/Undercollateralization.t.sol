@@ -54,6 +54,8 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vm.stopPrank();
 
+    assertEq(vault.isVaultCollateralized(), false);
+
     vm.startPrank(bob);
 
     vault.withdraw(vault.maxWithdraw(bob), bob, bob);
@@ -61,6 +63,9 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vm.stopPrank();
 
+    // The Vault is now back to his initial state with no more shares,
+    // so the exchange rate is reset and the Vault is no longer undercollateralized
+    assertEq(vault.isVaultCollateralized(), true);
     assertEq(vault.totalSupply(), 0);
   }
 
@@ -212,7 +217,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     assertEq(vault.isVaultCollateralized(), false);
 
-    uint256 _yieldFeeShares = vault.yieldFeeTotalSupply();
+    uint256 _yieldFeeShares = vault.yieldFeeShares();
 
     // The Vault is now undercollateralized so we can't mint the yield fee
     vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
@@ -241,12 +246,90 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     vm.stopPrank();
 
     uint256 _thisAmount = _getMaxWithdraw(address(this), vault, yieldVault);
-    assertApproxEqAbs(vault.maxWithdraw(address(this)), _thisAmount, 280000);
+    assertApproxEqAbs(vault.maxWithdraw(address(this)), _thisAmount, 2440000);
 
     vault.withdraw(vault.maxWithdraw(address(this)), address(this), address(this));
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(this)), _thisAmount, 280000);
+    assertApproxEqAbs(underlyingAsset.balanceOf(address(this)), _thisAmount, 2440000);
 
     assertEq(vault.totalSupply(), 0);
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 280000);
+    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 2440000);
+  }
+
+  function testPartialUndercollateralizationWithYieldFeesCaptured() external {
+    _setLiquidationPair();
+
+    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+    vault.setYieldFeeRecipient(address(this));
+
+    uint256 _aliceAmount = 1000e18;
+    underlyingAsset.mint(alice, _aliceAmount);
+
+    vm.startPrank(alice);
+
+    _deposit(underlyingAsset, vault, _aliceAmount, alice);
+    assertEq(vault.balanceOf(alice), _aliceAmount);
+
+    vm.stopPrank();
+
+    assertEq(vault.isVaultCollateralized(), true);
+
+    // We accrue yield...
+    uint256 _yield = 20e18;
+    _accrueYield(underlyingAsset, yieldVault, _yield);
+
+    assertEq(vault.availableYieldBalance(), 20e18);
+    assertEq(vault.availableYieldFeeBalance(), 2e18);
+
+    // ...and liquidate it
+    prizeToken.mint(bob, type(uint256).max);
+
+    vm.startPrank(bob);
+
+    uint256 _liquidatedYield = vault.liquidatableBalanceOf(address(vault));
+
+    _liquidate(liquidationRouter, liquidationPair, prizeToken, _liquidatedYield, bob);
+
+    vm.stopPrank();
+
+    assertEq(vault.balanceOf(bob), _liquidatedYield);
+
+    assertEq(vault.availableYieldBalance(), 0);
+    assertEq(vault.availableYieldFeeBalance(), 0);
+
+    // We burn 1e18 underlying assets from the YieldVault to trigger the partial undercollateralization
+    underlyingAsset.burn(address(yieldVault), 1e18);
+
+    assertEq(vault.isVaultCollateralized(), true);
+
+    uint256 _yieldFeeShares = vault.yieldFeeShares();
+
+    // The Vault is now partially undercollateralized so we can't mint the yield fee
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        YieldFeeGTAvailableYield.selector,
+        vault.convertToAssets(_yieldFeeShares),
+        yieldVault.maxWithdraw(address(vault)) - vault.convertToAssets(vault.totalSupply())
+      )
+    );
+
+    vault.mintYieldFee(_yieldFeeShares);
+
+    vm.startPrank(alice);
+
+    vault.withdraw(vault.maxWithdraw(alice), alice, alice);
+
+    assertEq(underlyingAsset.balanceOf(alice), _aliceAmount);
+
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+
+    vault.withdraw(vault.maxWithdraw(bob), bob, bob);
+
+    assertEq(underlyingAsset.balanceOf(bob), _yield - _yieldFeeShares);
+
+    vm.stopPrank();
+
+    assertEq(vault.totalSupply(), 0);
   }
 }

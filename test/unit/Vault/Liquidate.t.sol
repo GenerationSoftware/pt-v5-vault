@@ -112,7 +112,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
-    assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
+    assertEq(vault.yieldFeeShares(), _yieldFeeShares);
     assertEq(_yield, _liquidatedYield + _yieldFeeShares);
 
     assertEq(vault.liquidatableBalanceOf(address(vault)), 0);
@@ -155,7 +155,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, LOW_YIELD_FEE_PERCENTAGE);
 
     assertEq(vault.balanceOf(alice), _liquidatedYield);
-    assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
+    assertEq(vault.yieldFeeShares(), _yieldFeeShares);
     assertEq(_yield, _liquidatedYield + _yieldFeeShares);
 
     assertEq(vault.liquidatableBalanceOf(address(vault)), 0);
@@ -304,7 +304,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     assertEq(vault.balanceOf(bob), 0);
 
     assertEq(vault.totalSupply(), _amount + _liquidatedYield);
-    assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
+    assertEq(vault.yieldFeeShares(), _yieldFeeShares);
 
     vm.expectEmit();
     emit MintYieldFee(address(this), bob, _yieldFeeShares);
@@ -314,7 +314,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     assertEq(vault.balanceOf(bob), _yieldFeeShares);
 
     assertEq(vault.totalSupply(), _amount + _liquidatedYield + _yieldFeeShares);
-    assertEq(vault.yieldFeeTotalSupply(), 0);
+    assertEq(vault.yieldFeeShares(), 0);
   }
 
   /* ============ Liquidate - Errors ============ */
@@ -330,13 +330,9 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        VaultUnderCollateralized.selector
-      )
-    );
+    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
 
-    vault.liquidate(address(this), address(0), 0, address(vault), 0);
+    vault.liquidate(address(this), address(prizeToken), 1e18, address(vault), 1e18);
 
     vm.stopPrank();
   }
@@ -432,11 +428,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     uint256 _amountIn = liquidationPair.computeExactAmountIn(_amountOut);
 
-    IERC20(address(prizeToken)).transferFrom(
-      alice,
-      address(prizePool),
-      _amountIn
-    );
+    IERC20(address(prizeToken)).transferFrom(alice, address(prizePool), _amountIn);
 
     vm.startPrank(address(liquidationPair));
 
@@ -450,8 +442,15 @@ contract VaultLiquidateTest is UnitBaseSetup {
   }
 
   /* ============ MintYieldFee - Errors ============ */
-  function testMintYieldFeeGTYieldFeeSupply() public {
-    vm.expectRevert(abi.encodeWithSelector(YieldFeeGTAvailable.selector, 10e18, 0));
+  function testMintYieldFeeGTYieldFeeShares() public {
+    uint256 _amount = 1000e18;
+
+    underlyingAsset.mint(address(this), _amount);
+    _sponsor(underlyingAsset, vault, _amount, address(this));
+
+    _accrueYield(underlyingAsset, yieldVault, 10e18);
+
+    vm.expectRevert(abi.encodeWithSelector(YieldFeeGTAvailableShares.selector, 10e18, 0));
     vault.mintYieldFee(10e18);
   }
 
@@ -475,13 +474,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     uint256 _liquidatableYield = vault.liquidatableBalanceOf(address(vault));
 
-    _liquidate(
-      liquidationRouter,
-      liquidationPair,
-      prizeToken,
-      _liquidatableYield,
-      alice
-    );
+    _liquidate(liquidationRouter, liquidationPair, prizeToken, _liquidatableYield, alice);
 
     vm.stopPrank();
 
@@ -492,9 +485,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vault.deposit(vault.maxDeposit(bob), bob);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(MintMoreThanMax.selector, bob, 1e18, 0)
-    );
+    vm.expectRevert(abi.encodeWithSelector(MintMoreThanMax.selector, bob, 1e18, 0));
 
     vault.mintYieldFee(1e18);
 
