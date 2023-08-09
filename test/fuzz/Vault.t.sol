@@ -259,18 +259,9 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     );
 
     uint256 totalAssets = _call_vault(abi.encodeWithSelector(Vault.totalAssets.selector));
-    uint256 withdrawableAssets = yieldVault.convertToAssets(yieldVault.balanceOf(_vault_));
+    uint256 depositedAssets = vault.convertToAssets(vault.totalSupply());
 
-    if (withdrawableAssets >= totalAssets) {
-      assertApproxEqAbs(liquidatableBalanceOf, withdrawableAssets - totalAssets, _delta_, "yield");
-    } else {
-      assertApproxEqAbs(
-        liquidatableBalanceOf,
-        underlyingAsset.balanceOf(_vault_),
-        _delta_,
-        "yield"
-      );
-    }
+    assertApproxEqAbs(liquidatableBalanceOf, totalAssets - depositedAssets, _delta_, "yield");
   }
 
   function test_liquidatableBalanceOf(Init memory init, uint shares) public virtual {
@@ -289,6 +280,11 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     uint256 yield = _call_vault(
       abi.encodeWithSelector(Vault.liquidatableBalanceOf.selector, _vault_)
     );
+
+    // Skips test if no yield is liquidatable
+    vm.assume(yield != 0);
+    require(yield != 0);
+
     uint256 callerVaultSharesBalanceBefore = vault.balanceOf(caller);
     uint256 vaultTotalAssetsBefore = vault.totalAssets();
 
@@ -352,6 +348,24 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
   }
 
   /* ============ Override setup ============ */
+
+  // Mint yield to the YieldVault
+  function setUpYield(Init memory init) public virtual override {
+    if (init.yield >= 0) {
+      // gain
+      uint gain = uint(init.yield);
+      try IMockERC20(_underlying_).mint(address(yieldVault), gain) {} catch {
+        vm.assume(false);
+      } // this can be replaced by calling yield generating functions if provided by the vault
+    } else {
+      // loss
+      vm.assume(init.yield > type(int).min); // avoid overflow in conversion
+      uint loss = uint(-1 * init.yield);
+      try IMockERC20(_underlying_).burn(address(yieldVault), loss) {} catch {
+        vm.assume(false);
+      } // this can be replaced by calling yield generating functions if provided by the vault
+    }
+  }
 
   // We set the higher bound to uint88 to avoid overflowing above uint96
   function setUpVault(Init memory init) public virtual override {

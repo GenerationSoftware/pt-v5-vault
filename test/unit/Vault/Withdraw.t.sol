@@ -169,7 +169,7 @@ contract VaultWithdrawTest is UnitBaseSetup {
     assertEq(vault.balanceOf(bob), _yield - _yieldFeeShares);
 
     // 1e18 have been allocated as yield fee
-    assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
+    assertEq(vault.yieldFeeShares(), _yieldFeeShares);
     assertEq(_yield, _liquidatedYield + _yieldFeeShares);
 
     vm.stopPrank();

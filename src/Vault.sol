@@ -85,10 +85,15 @@ error TargetTokenNotSupported(address token);
 /// @param claimer The claimer address
 error CallerNotClaimer(address caller, address claimer);
 
-/// @notice Emitted when the minted yield exceeds the yield fee supply
-/// @param shares The shares to mint
-/// @param yieldFeeTotalSupply The accrued yield fee available
-error YieldFeeGTAvailable(uint256 shares, uint256 yieldFeeTotalSupply);
+/// @notice Emitted when the minted yield exceeds the yield fee shares available
+/// @param shares The amount of yield shares to mint
+/// @param yieldFeeShares The accrued yield fee shares available
+error YieldFeeGTAvailableShares(uint256 shares, uint256 yieldFeeShares);
+
+/// @notice Emitted when the minted yield exceeds the amount of available yield in the YieldVault
+/// @param assets The amount of yield assets requested
+/// @param availableYield The amount of yield available
+error YieldFeeGTAvailableYield(uint256 assets, uint256 availableYield);
 
 /// @notice Emitted when the Liquidation Pair being set is the zero address
 error LPZeroAddress();
@@ -251,11 +256,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Yield fee percentage represented in integer format with 9 decimal places (i.e. 10000000 = 0.01 = 1%).
   uint256 private _yieldFeePercentage;
 
-  /// @notice Address of the yield fee recipient that receives the fee amount when yield is captured.
+  /// @notice Address of the yield fee recipient. Receives Vault shares when `mintYieldFee` is called.
   address private _yieldFeeRecipient;
 
-  /// @notice Total accrued supply from the yield fee.
-  uint256 private _yieldFeeTotalSupply;
+  /// @notice Total yield fee shares available. Can be minted to `_yieldFeeRecipient` by calling `mintYieldFee`.
+  uint256 private _yieldFeeShares;
 
   /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
   uint256 private constant FEE_PRECISION = 1e9;
@@ -331,16 +336,19 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Total available yield amount accrued by this vault.
    * @dev This amount includes the liquidatable yield + yield fee amount.
    * @dev The available yield is equal to the total amount of assets managed by this Vault
-   *      minus the total amount of assets supplied to the Vault and yield fees allocated to `_yieldFeeRecipient`.
-   * @dev If `_sharesToAssets` is greater than `_assets`, it means that the Vault is undercollateralized.
+   *      minus the total amount of assets supplied to the Vault and current allocated `_yieldFeeShares`.
+   * @dev If `_assetsAllocated` is greater than `_assets`, it means that the Vault is undercollateralized.
    *      We must not mint more shares than underlying assets available so we return 0.
    * @return uint256 Total yield amount
    */
   function availableYieldBalance() public view returns (uint256) {
     uint256 _assets = _totalAssets();
-    uint256 _sharesToAssets = _convertToAssets(_totalShares(), Math.Rounding.Down);
+    uint256 _assetsAllocated = _convertToAssets(
+      _totalSupply() + _yieldFeeShares,
+      Math.Rounding.Down
+    );
 
-    return _sharesToAssets > _assets ? 0 : _assets - _sharesToAssets;
+    return _assetsAllocated > _assets ? 0 : _assets - _assetsAllocated;
   }
 
   /**
@@ -403,8 +411,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function maxDeposit(address recipient) public view virtual override returns (uint256) {
     if (!_isVaultCollateralized()) return 0;
 
-    uint256 _vaultMaxDeposit = type(uint96).max -
-      _convertToAssets(balanceOf(recipient), Math.Rounding.Up);
+    uint256 _vaultMaxDeposit = type(uint96).max - _convertToAssets(balanceOf(recipient), Math.Rounding.Up);
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
     return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
@@ -425,15 +432,22 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Mint Vault shares to the `_yieldFeeRecipient`.
-   * @dev Will revert if the Vault is undercollateralized
-   *      or if the `_shares` are greater than the accrued `_yieldFeeTotalSupply`.
+   * @dev Will revert if the Vault is undercollateralized.
+   * @dev Will revert if `_shares` is greater than `_yieldFeeShares`.
+   * @dev Will revert if there is not enough yield available in the YieldVault to back `_shares`.
    * @param _shares Amount of shares to mint
    */
   function mintYieldFee(uint256 _shares) external {
     _requireVaultCollateralized();
-    if (_shares > _yieldFeeTotalSupply) revert YieldFeeGTAvailable(_shares, _yieldFeeTotalSupply);
 
-    _yieldFeeTotalSupply -= _shares;
+    uint256 _assets = _convertToAssets(_shares, Math.Rounding.Down);
+    uint256 _availableYield = _yieldVault.maxWithdraw(address(this)) -
+      _convertToAssets(_totalSupply(), Math.Rounding.Down);
+
+    if (_assets > _availableYield) revert YieldFeeGTAvailableYield(_assets, _availableYield);
+    if (_shares > _yieldFeeShares) revert YieldFeeGTAvailableShares(_shares, _yieldFeeShares);
+
+    _yieldFeeShares -= _shares;
     _mint(_yieldFeeRecipient, _shares);
 
     emit MintYieldFee(msg.sender, _yieldFeeRecipient, _shares);
@@ -613,6 +627,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
 
+    // Distributes the specified yield fee percentage.
+    // For instance, with a yield fee percentage of 20% and 8e18 Vault shares being liquidated,
+    // this calculation assigns 2e18 Vault shares to the yield fee recipient.
+    // `_amountOut` is the amount of Vault shares being liquidated after accounting for the yield fee.
     if (_yieldFeePercentage != 0) {
       _increaseYieldFeeBalance(
         (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut
@@ -740,8 +758,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev If the vault becomes undercollateralized, this total yield fee can be used to collateralize it.
    * @return uint256 Total accrued yield fee
    */
-  function yieldFeeTotalSupply() public view returns (uint256) {
-    return _yieldFeeTotalSupply;
+  function yieldFeeShares() public view returns (uint256) {
+    return _yieldFeeShares;
   }
 
   /**
@@ -799,12 +817,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Total amount of assets managed by this Vault.
-   * @dev The total amount of assets managed by this vault is equal to
-   *      the amount of assets managed by the YieldVault + the amount living in this vault.
    * @return uint256 Total amount of assets
    */
   function _totalAssets() internal view returns (uint256) {
-    return _yieldVault.maxWithdraw(address(this)) + super.totalAssets();
+    return _yieldVault.maxWithdraw(address(this));
   }
 
   /**
@@ -813,16 +829,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function _totalSupply() internal view returns (uint256) {
     return _twabController.totalSupply(address(this));
-  }
-
-  /**
-   * @notice Total amount of shares managed by this Vault.
-   * @dev Equal to the total amount of shares minted by this Vault
-   *      + the total amount of yield fees allocated by this Vault.
-   * @return uint256 Total amount of shares
-   */
-  function _totalShares() internal view returns (uint256) {
-    return _totalSupply() + _yieldFeeTotalSupply;
   }
 
   /* ============ Liquidation Functions ============ */
@@ -856,7 +862,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _shares Amount of shares to increase yield fee balance by
    */
   function _increaseYieldFeeBalance(uint256 _shares) internal {
-    _yieldFeeTotalSupply += _shares;
+    _yieldFeeShares += _shares;
   }
 
   /* ============ Conversion Functions ============ */
@@ -1161,14 +1167,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Calculate exchange rate between the amount of assets withdrawable from the YieldVault
    *         and the amount of shares minted by this Vault.
-   * @dev We exclude the amount of yield generated by the YieldVault, so users can only withdraw their share of deposits.
-   *      Except when the vault is undercollateralized, in this case, any unclaimed yield is included in the calculation.
+   * @dev The amount of yield generated by the YieldVault is excluded from the calculation,
+   *      so users can only withdraw the amount of underlying assets they deposited.
+   *      Except when the vault is undercollateralized, in this case, any unclaimed yield is included.
    * @dev We start with an exchange rate of 1 which is equal to 1 underlying asset unit.
    * @return uint256 Exchange rate
    */
   function _currentExchangeRate() internal view returns (uint256) {
     uint256 _totalSupplyAmount = _totalSupply();
-    uint256 _totalSupplyToAssets = _convertToAssets(
+    uint256 _depositedAssets = _convertToAssets(
       _totalSupplyAmount,
       _lastRecordedExchangeRate,
       Math.Rounding.Down
@@ -1176,10 +1183,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
 
-    // If the Vault is collateralized, we exclude the yield from the calculation
-    // so users can only withdraw their share of deposits.
-    if (_withdrawableAssets > _totalSupplyToAssets) {
-      _withdrawableAssets = _withdrawableAssets - (_withdrawableAssets - _totalSupplyToAssets);
+    // If the Vault is collateralized, yield is excluded from the withdrawable amount
+    // and users can only withdraw the amount of underlying assets they deposited.
+    // Otherwise, any unclaimed yield is included and shared proportionally amongst depositors.
+    if (_withdrawableAssets > _depositedAssets) {
+      _withdrawableAssets = _depositedAssets;
     }
 
     if (_totalSupplyAmount != 0 && _withdrawableAssets != 0) {
