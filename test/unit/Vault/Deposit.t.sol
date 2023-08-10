@@ -5,7 +5,7 @@ import { BrokenToken } from "brokentoken/BrokenToken.sol";
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { IERC20, UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
-import { MintMoreThanMax, DepositMoreThanMax, SweepZeroAssets } from "../../../src/Vault.sol";
+import { MintMoreThanMax, MintZeroShares, DepositMoreThanMax, SweepZeroAssets } from "../../../src/Vault.sol";
 
 contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
@@ -392,6 +392,16 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     );
 
     vault.mint(_amount, alice);
+
+    vm.stopPrank();
+  }
+
+  function testMintZeroShares() external {
+    vm.startPrank(alice);
+
+    vm.expectRevert(abi.encodeWithSelector(MintZeroShares.selector));
+
+    vault.mint(0, alice);
 
     vm.stopPrank();
   }
