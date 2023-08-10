@@ -65,6 +65,9 @@ error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
  */
 error MintMoreThanMax(address receiver, uint256 shares, uint256 max);
 
+/// @notice Emitted when `_deposit` is called but no shares are minted back to the receiver.
+error MintZeroShares();
+
 /// @notice Emitted when `sweep` is called but no underlying assets are currently held by the Vault.
 error SweepZeroAssets();
 
@@ -970,6 +973,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *      - if `_vaultAssets` balance is greater than or equal to `_assets`,
    *        we know the vault has enough underlying assets to fulfill the deposit
    *        so we don't transfer any assets from the user wallet into the vault
+   * @dev Will revert if 0 shares are minted back to the receiver.
    */
   function _deposit(
     address _caller,
@@ -977,6 +981,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _assets,
     uint256 _shares
   ) internal virtual override {
+    if (_shares == 0) revert MintZeroShares();
+
     IERC20 _asset = IERC20(asset());
     uint256 _vaultAssets = _asset.balanceOf(address(this));
 

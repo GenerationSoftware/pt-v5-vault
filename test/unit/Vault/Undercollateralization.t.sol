@@ -81,30 +81,22 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     _deposit(underlyingAsset, vault, _aliceAmount, alice);
     assertEq(vault.balanceOf(alice), _aliceAmount);
 
-    vm.stopPrank();
-
     assertEq(vault.isVaultCollateralized(), true);
 
     // We burn underlying assets from the YieldVault to trigger the undercollateralization
     underlyingAsset.burn(address(yieldVault), 10_000_000e18);
 
+    assertEq(vault.exchangeRate(), 5e17); // 50%
     assertEq(vault.isVaultCollateralized(), false);
 
     assertEq(vault.maxWithdraw(alice), _aliceAmountUndercollateralized);
-
-    vm.startPrank(alice);
-
-    vm.expectEmit();
-    emit RecordedExchangeRate(5e17); // 50%
-
-    // Trigger recorded exchange rate by depositing 0
-    vault.deposit(0, alice);
 
     // After the next withdraw, there will be no assets left in the vault, so the exchange rate should be reset after the shares are burned
     vm.expectEmit();
     emit RecordedExchangeRate(1e18); // 100%
 
     vault.withdraw(vault.maxWithdraw(alice), alice, alice);
+
     assertEq(underlyingAsset.balanceOf(alice), _aliceAmountUndercollateralized);
     assertEq(vault.totalSupply(), 0);
 

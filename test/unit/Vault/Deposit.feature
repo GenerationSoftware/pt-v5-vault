@@ -116,6 +116,11 @@ Feature: Deposit
     When Alice mints type(uint88).max + 1 shares
     Then the transaction reverts with the custom error MintMoreThanMax
 
+  Scenario: Alice mints 0 shares from the Vault
+    Given Alice owns 0 Vault shares
+    When Alice mints 0 shares
+    Then the transaction reverts with the custom error MintZeroShares
+
   # Sponsor
   Scenario: Alice sponsors the Vault
     Given Alice owns 0 Vault shares and has not sponsored the Vault
