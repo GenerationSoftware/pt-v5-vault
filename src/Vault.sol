@@ -65,6 +65,9 @@ error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
  */
 error MintMoreThanMax(address receiver, uint256 shares, uint256 max);
 
+/// @notice Emitted when `sweep` is called but no underlying assets are currently held by the Vault.
+error SweepZeroAssets();
+
 /**
  * @notice Emitted during the liquidation process when the caller is not the liquidation pair contract.
  * @param caller The caller address
@@ -229,6 +232,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param shares Amount of shares minted to the receiving address
    */
   event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+
+  /**
+   * @notice Emitted when a user sweeps assets held by the Vault into the YieldVault.
+   * @param caller Address that called the function
+   * @param assets Amount of assets sweeped into the YieldVault
+   */
+  event Sweep(address indexed caller, uint256 assets);
 
   /**
    * @notice Emitted when the `_lastRecordedExchangeRate` is updated.
@@ -539,6 +549,22 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     return _sponsor(_assets, _receiver);
   }
 
+  /**
+   * @notice Deposit underlying assets that have been mistakenly sent to the Vault into the YieldVault.
+   * @dev The deposited assets will contribute to the yield of the YieldVault.
+   * @return uint256 Amount of underlying assets deposited
+   */
+  function sweep() external returns (uint256) {
+    uint256 _assets = IERC20(asset()).balanceOf(address(this));
+    if (_assets == 0) revert SweepZeroAssets();
+
+    _yieldVault.deposit(_assets, address(this));
+
+    emit Sweep(msg.sender, _assets);
+
+    return _assets;
+  }
+
   /* ============ Withdraw Functions ============ */
 
   /// @inheritdoc ERC4626
@@ -615,12 +641,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       _increaseYieldFeeBalance(
         (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut
       );
-    }
-
-    uint256 _vaultAssets = IERC20(asset()).balanceOf(address(this));
-
-    if (_vaultAssets != 0 && _amountOutToAssets >= _vaultAssets) {
-      _yieldVault.deposit(_vaultAssets, address(this));
     }
 
     _mint(_account, _amountOut);
