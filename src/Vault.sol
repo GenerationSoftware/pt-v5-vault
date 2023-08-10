@@ -533,32 +533,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
-   * @param _shares Amount of shares to mint to `_receiver`
-   * @param _receiver Address of the receiver of the vault shares
-   * @param _deadline Timestamp after which the approval is no longer valid
-   * @param _v V part of the secp256k1 signature
-   * @param _r R part of the secp256k1 signature
-   * @param _s S part of the secp256k1 signature
-   * @return uint256 Amount of assets deposited into the Vault.
-   */
-  function mintWithPermit(
-    uint256 _shares,
-    address _receiver,
-    uint256 _deadline,
-    uint8 _v,
-    bytes32 _r,
-    bytes32 _s
-  ) external returns (uint256) {
-    uint256 _assets = _convertToAssets(_shares, Math.Rounding.Up);
-
-    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
-    _deposit(msg.sender, _receiver, _assets, _shares);
-
-    return _assets;
-  }
-
-  /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @param _assets Amount of assets to deposit
    * @param _receiver Address of the receiver of the vault shares
