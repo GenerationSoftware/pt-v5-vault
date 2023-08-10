@@ -14,93 +14,126 @@ import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
-/// @notice Emitted when the TWAB controller is set to the zero address
+/// @notice Emitted when the TWAB controller is set to the zero address.
 error TwabControllerZeroAddress();
 
-/// @notice Emitted when the Yield Vault is set to the zero address
+/// @notice Emitted when the Yield Vault is set to the zero address.
 error YieldVaultZeroAddress();
 
-/// @notice Emitted when the Prize Pool is set to the zero address
+/// @notice Emitted when the Prize Pool is set to the zero address.
 error PrizePoolZeroAddress();
 
-/// @notice Emitted when the Owner is set to the zero address
+/// @notice Emitted when the Owner is set to the zero address.
 error OwnerZeroAddress();
 
-/// @notice Emitted when the amount being deposited for the receiver is greater than the max amount allowed
-/// @param receiver The receiver of the deposit
-/// @param amount The amount to deposit
-/// @param max The max deposit amount allowed
+/**
+ * @notice Emitted when the underlying asset passed to the constructor is different from the YieldVault one.
+ * @param asset Address of the underlying asset passed to the constructor
+ * @param yieldVaultAsset Address of the YieldVault underlying asset
+ */
+error UnderlyingAssetMismatch(address asset, address yieldVaultAsset);
+
+/**
+ * @notice Emitted when the amount being deposited for the receiver is greater than the max amount allowed.
+ * @param receiver The receiver of the deposit
+ * @param amount The amount to deposit
+ * @param max The max deposit amount allowed
+ */
 error DepositMoreThanMax(address receiver, uint256 amount, uint256 max);
 
-/// @notice Emitted when the amount being withdrawn for the owner is greater than the max amount allowed
-/// @param owner The owner of the assets
-/// @param amount The amount to withdraw
-/// @param max The max withdrawable amount
+/**
+ * @notice Emitted when the amount being withdrawn for the owner is greater than the max amount allowed.
+ * @param owner The owner of the assets
+ * @param amount The amount to withdraw
+ * @param max The max withdrawable amount
+ */
 error WithdrawMoreThanMax(address owner, uint256 amount, uint256 max);
 
-/// @notice Emitted when the amount being redeemed for owner is greater than the max allowed amount
-/// @param owner The owner of the assets
-/// @param amount The amount to redeem
-/// @param max The max redeemable amount
+/**
+ * @notice Emitted when the amount being redeemed for owner is greater than the max allowed amount.
+ * @param owner The owner of the assets
+ * @param amount The amount to redeem
+ * @param max The max redeemable amount
+ */
 error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
 
-/// @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed
-/// @param receiver The receiver address
-/// @param shares The shares being minted
-/// @param max The max amount of shares that can be minted to the receiver
+/**
+ * @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed.
+ * @param receiver The receiver address
+ * @param shares The shares being minted
+ * @param max The max amount of shares that can be minted to the receiver
+ */
 error MintMoreThanMax(address receiver, uint256 shares, uint256 max);
 
-/// @notice Emitted during the liquidation process when the caller is not the liquidation pair contract
-/// @param caller The caller address
-/// @param liquidationPair The LP address
+/**
+ * @notice Emitted during the liquidation process when the caller is not the liquidation pair contract.
+ * @param caller The caller address
+ * @param liquidationPair The LP address
+ */
 error LiquidationCallerNotLP(address caller, address liquidationPair);
 
-/// @notice Emitted during the liquidation process when the token in is not the prize token
-/// @param tokenIn The provided tokenIn address
-/// @param prizeToken The prize token address
+/**
+ * @notice Emitted during the liquidation process when the token in is not the prize token.
+ * @param tokenIn The provided tokenIn address
+ * @param prizeToken The prize token address
+ */
 error LiquidationTokenInNotPrizeToken(address tokenIn, address prizeToken);
 
-/// @notice Emitted during the liquidation process when the token out is not the vault share token
-/// @param tokenOut The provided tokenOut address
-/// @param vaultShare The vault share token address
+/**
+ * @notice Emitted during the liquidation process when the token out is not the vault share token.
+ * @param tokenOut The provided tokenOut address
+ * @param vaultShare The vault share token address
+ */
 error LiquidationTokenOutNotVaultShare(address tokenOut, address vaultShare);
 
-/// @notice Emitted during the liquidation process when the liquidation amount out is zero
+/// @notice Emitted during the liquidation process when the liquidation amount out is zero.
 error LiquidationAmountOutZero();
 
-/// @notice Emitted during the liquidation process if the amount out is greater than the available yield
-/// @param amountOut The amount out
-/// @param availableYield The available yield
+/**
+ * @notice Emitted during the liquidation process if the amount out is greater than the available yield.
+ * @param amountOut The amount out
+ * @param availableYield The available yield
+ */
 error LiquidationAmountOutGTYield(uint256 amountOut, uint256 availableYield);
 
-/// @notice Emitted when the vault is under-collateralized
+/// @notice Emitted when the vault is under-collateralized.
 error VaultUnderCollateralized();
 
-/// @notice Emitted when the target token is not supported for a given token address
-/// @param token The unsupported token address
+/**
+ * @notice Emitted when the target token is not supported for a given token address.
+ * @param token The unsupported token address
+ */
 error TargetTokenNotSupported(address token);
 
-/// @notice Emitted when the caller is not the prize claimer
-/// @param caller The caller address
-/// @param claimer The claimer address
+/**
+ * @notice Emitted when the caller is not the prize claimer.
+ * @param caller The caller address
+ * @param claimer The claimer address
+ */
 error CallerNotClaimer(address caller, address claimer);
 
-/// @notice Emitted when the minted yield exceeds the yield fee shares available
-/// @param shares The amount of yield shares to mint
-/// @param yieldFeeShares The accrued yield fee shares available
+/**
+ * @notice Emitted when the minted yield exceeds the yield fee shares available.
+ * @param shares The amount of yield shares to mint
+ * @param yieldFeeShares The accrued yield fee shares available
+ */
 error YieldFeeGTAvailableShares(uint256 shares, uint256 yieldFeeShares);
 
-/// @notice Emitted when the minted yield exceeds the amount of available yield in the YieldVault
-/// @param assets The amount of yield assets requested
-/// @param availableYield The amount of yield available
+/**
+ * @notice Emitted when the minted yield exceeds the amount of available yield in the YieldVault.
+ * @param assets The amount of yield assets requested
+ * @param availableYield The amount of yield available
+ */
 error YieldFeeGTAvailableYield(uint256 assets, uint256 availableYield);
 
-/// @notice Emitted when the Liquidation Pair being set is the zero address
+/// @notice Emitted when the Liquidation Pair being set is the zero address.
 error LPZeroAddress();
 
-/// @notice Emitted when the yield fee percentage being set is greater than 1
-/// @param yieldFeePercentage The yield fee percentage in integer format
-/// @param maxYieldFeePercentage The max yield fee percentage in integer format (this value is equal to 1 in decimal format)
+/**
+ * @notice Emitted when the yield fee percentage being set is greater than 1.
+ * @param yieldFeePercentage The yield fee percentage in integer format
+ * @param maxYieldFeePercentage The max yield fee percentage in integer format (this value is equal to 1 in decimal format)
+ */
 error YieldFeePercentageGTPrecision(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
 
 /// @notice Emitted when the BeforeClaim prize hook fails
@@ -300,6 +333,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
     if (address(owner_) == address(0)) revert OwnerZeroAddress();
+    if (address(asset_) != yieldVault_.asset())
+      revert UnderlyingAssetMismatch(address(asset_), yieldVault_.asset());
 
     _twabController = twabController_;
     _yieldVault = yieldVault_;
