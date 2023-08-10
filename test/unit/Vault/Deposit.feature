@@ -172,6 +172,27 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
 
+  # Sweep
+  Scenario: Alice mistakenly sends 1,000 underlying assets to the Vault
+    Given Alice owns 0 Vault shares
+    When Bob calls the `sweep` function
+    Then Alice must not receive any Vault shares
+    Then Alice `balance` must be equal to 0
+    Then Alice `delegateBalance` must be equal to 0
+    Then Bob must not receive any Vault shares
+    Then Bob `balance` must be equal to 0
+    Then Bob `delegateBalance` must be equal to 0
+    Then the YieldVault balance of underlying assets must increase by 1,000
+    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 0
+    Then the `availableYieldBalance` must be equalt to 1,000
+
+  # Sweep - Error
+  Scenario: Bob calls the `sweep` function
+    Given 0 underlying assets are currently held by the Vault
+    When Bob calls the `sweep` function
+    Then the transaction reverts with the custom error `SweepZeroAssets`
+
   # Delegate
   Scenario: Alice delegates to Bob
     Given Alice and Bob owns 0 Vault shares and have not delegated to another address

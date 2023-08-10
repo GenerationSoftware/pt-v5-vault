@@ -5,13 +5,15 @@ import { BrokenToken } from "brokentoken/BrokenToken.sol";
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { IERC20, UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
-import { MintMoreThanMax, DepositMoreThanMax } from "../../../src/Vault.sol";
+import { MintMoreThanMax, DepositMoreThanMax, SweepZeroAssets } from "../../../src/Vault.sol";
 
 contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
   event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
 
   event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+
+  event Sweep(address indexed caller, uint256 assets);
 
   event Transfer(address indexed from, address indexed to, uint256 value);
 
@@ -552,6 +554,56 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     vm.stopPrank();
   }
+
+  /* ============ Sweep ============ */
+  function testSweep() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+    underlyingAsset.mint(alice, _amount);
+
+    underlyingAsset.transfer(address(vault), _amount);
+
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+
+    vm.expectEmit();
+    emit Sweep(bob, _amount);
+
+    vault.sweep();
+
+    assertEq(vault.balanceOf(alice), 0);
+
+    assertEq(twabController.balanceOf(address(vault), alice), 0);
+    assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
+
+    assertEq(vault.balanceOf(bob), 0);
+
+    assertEq(twabController.balanceOf(address(vault), bob), 0);
+    assertEq(twabController.delegateBalanceOf(address(vault), bob), 0);
+
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
+    assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
+
+    assertEq(vault.totalSupply(), 0);
+    assertEq(vault.availableYieldBalance(), _amount);
+
+    vm.stopPrank();
+  }
+
+  function testSweepZeroAssets() external {
+    vm.startPrank(bob);
+
+    vm.expectRevert(abi.encodeWithSelector(SweepZeroAssets.selector));
+
+    vault.sweep();
+
+    vm.stopPrank();
+  }
+
+  /* ============ Sweep - Error ============ */
 
   /* ============ Delegate ============ */
   function testDelegate() external {
