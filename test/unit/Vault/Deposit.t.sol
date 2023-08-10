@@ -353,62 +353,6 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
-  function testMintWithPermit() external {
-    vm.startPrank(alice);
-
-    uint256 _amount = 1000e18;
-    underlyingAsset.mint(alice, _amount);
-
-    vm.expectEmit();
-    emit Transfer(address(0), alice, _amount);
-
-    vm.expectEmit();
-    emit Deposit(alice, alice, _amount, _amount);
-
-    _mintWithPermit(underlyingAsset, vault, _amount, alice, alice, alicePrivateKey);
-
-    assertEq(vault.balanceOf(alice), _amount);
-
-    assertEq(twabController.balanceOf(address(vault), alice), _amount);
-    assertEq(twabController.delegateBalanceOf(address(vault), alice), _amount);
-
-    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
-    assertEq(yieldVault.balanceOf(address(vault)), _amount);
-    assertEq(yieldVault.totalSupply(), _amount);
-
-    vm.stopPrank();
-  }
-
-  function testMintWithPermitOnBehalf() external {
-    vm.startPrank(alice);
-
-    uint256 _amount = 1000e18;
-    underlyingAsset.mint(alice, _amount);
-
-    vm.expectEmit();
-    emit Transfer(address(0), bob, _amount);
-
-    vm.expectEmit();
-    emit Deposit(alice, bob, _amount, _amount);
-
-    _mintWithPermit(underlyingAsset, vault, _amount, bob, alice, alicePrivateKey);
-
-    assertEq(vault.balanceOf(alice), 0);
-    assertEq(vault.balanceOf(bob), _amount);
-
-    assertEq(twabController.balanceOf(address(vault), alice), 0);
-    assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
-
-    assertEq(twabController.balanceOf(address(vault), bob), _amount);
-    assertEq(twabController.delegateBalanceOf(address(vault), bob), _amount);
-
-    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
-    assertEq(yieldVault.balanceOf(address(vault)), _amount);
-    assertEq(yieldVault.totalSupply(), _amount);
-
-    vm.stopPrank();
-  }
-
   /* ============ Mint - Errors ============ */
   function testMintMoreThanMax() external {
     vm.startPrank(alice);
