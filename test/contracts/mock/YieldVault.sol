@@ -10,10 +10,6 @@ contract YieldVault is ERC4626Mock {
 
   constructor(address _asset, string memory _name, string memory _symbol) ERC4626Mock(_asset) {}
 
-  function burnAssets(address _account, uint256 _assets) external {
-    ERC20Mock(asset()).burn(_account, _assets);
-  }
-
   /**
    * We override the virtual shares and assets implementation since this approach captures
    * a very small part of the yield being accrued, which offsets by 1 wei
@@ -26,24 +22,7 @@ contract YieldVault is ERC4626Mock {
     Math.Rounding rounding
   ) internal view virtual override returns (uint256) {
     uint256 supply = totalSupply();
-    return
-      (assets == 0 || supply == 0)
-        ? _initialConvertToShares(assets, rounding)
-        : assets.mulDiv(supply, totalAssets(), rounding);
-  }
-
-  function _initialConvertToShares(
-    uint256 assets,
-    Math.Rounding /*rounding*/
-  ) internal view virtual returns (uint256 shares) {
-    return assets;
-  }
-
-  function _initialConvertToAssets(
-    uint256 shares,
-    Math.Rounding /*rounding*/
-  ) internal view virtual returns (uint256) {
-    return shares;
+    return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
   }
 
   function _convertToAssets(
@@ -51,9 +30,6 @@ contract YieldVault is ERC4626Mock {
     Math.Rounding rounding
   ) internal view virtual override returns (uint256) {
     uint256 supply = totalSupply();
-    return
-      (supply == 0)
-        ? _initialConvertToAssets(shares, rounding)
-        : shares.mulDiv(totalAssets(), supply, rounding);
+    return (shares == 0 || supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
   }
 }
