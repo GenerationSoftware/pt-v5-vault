@@ -43,6 +43,17 @@ Feature: Withdraw
     Then the YieldVault balance of underlying assets must be equal to 0
     Then the Vault `totalSupply` must be equal to 0
 
+  # Withdraw - Errors
+  Scenario: Alice withdraws 1,001 underlying assets
+    Given Alice owns 1,000 Vault shares
+    When Alice `withdraw` 1,001 underlying assets
+    Then the transaction reverts with the custom error `WithdrawMoreThanMax`
+
+  Scenario: Alice withdraws 0 underlying assets
+    Given Alice owns 0 Vault shares
+    When Alice `withdraw` 0 underlying assets
+    Then the transaction reverts with the custom error `WithdrawZeroAssets`
+
   # Redeem
   Scenario: Alice redeems her full deposit
     Given Alice owns 1,000 Vault shares
@@ -87,3 +98,14 @@ Feature: Withdraw
     Then the Vault balance of YieldVault shares must be equal to 0
     Then the YieldVault balance of underlying assets must be equal to 0
     Then the Vault `totalSupply` must be equal to 0
+
+  # Redeem - Errors
+  Scenario: Alice redeems 1,001 Vault shares
+    Given Alice owns 1,000 Vault shares
+    When Alice `redeem` 1,001 shares
+    Then the transaction reverts with the custom error `RedeemMoreThanMax`
+
+  Scenario: Alice redeems 0 shares
+    Given Alice owns 0 Vault shares
+    When Alice `redeem` 0 shares
+    Then the transaction reverts with the custom error `WithdrawZeroAssets`
