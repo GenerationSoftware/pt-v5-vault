@@ -61,12 +61,22 @@ Feature: Deposit
   Scenario: Alice deposits into the Vault
     Given Alice owns 0 Vault shares
     When Alice deposits type(uint96).max + 1 underlying assets
-    Then the transaction reverts with the custom error DepositMoreThanMax
+    Then the transaction reverts with the custom error `DepositMoreThanMax`
 
   Scenario: Alice deposits into the Vault
     Given Alice owns 0 Vault shares and YieldVault's maxDeposit function returns type(uint88).max
     When Alice deposits type(uint88).max + 1 underlying assets
-    Then the transaction reverts with the custom error DepositMoreThanMax
+    Then the transaction reverts with the custom error `DepositMoreThanMax`
+
+  Scenario: Alice deposits into the Vault
+    Given Alice owns 0 Vault shares and the YieldVault's exchange rate has been manipulated
+    When Alice deposits 1,000 underlying assets
+    Then the transaction reverts with the custom error `YVWithdrawableAssetsLTExpected`
+
+  Scenario: Alice deposits into the Vault
+    Given Alice owns 0 Vault shares and the Vault is undercollateralized
+    When Alice deposits 1,000 underlying assets
+    Then the transaction reverts with the custom error `VaultUnderCollateralized`
 
   # Deposit - Attacks
   # Inflation attack
@@ -120,6 +130,11 @@ Feature: Deposit
     Given Alice owns 0 Vault shares
     When Alice mints 0 shares
     Then the transaction reverts with the custom error MintZeroShares
+
+  Scenario: Alice mints 1,000 shares from the Vault
+    Given Alice owns 0 Vault shares and the Vault is undercollateralized
+    When Alice mints 1,000 shares
+    Then the transaction reverts with the custom error VaultUnderCollateralized
 
   # Sponsor
   Scenario: Alice sponsors the Vault

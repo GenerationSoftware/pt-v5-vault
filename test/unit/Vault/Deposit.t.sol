@@ -5,7 +5,7 @@ import { BrokenToken } from "brokentoken/BrokenToken.sol";
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { IERC20, UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
-import { MintMoreThanMax, MintZeroShares, DepositMoreThanMax, SweepZeroAssets } from "../../../src/Vault.sol";
+import "../../../src/Vault.sol";
 
 contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
@@ -17,8 +17,6 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
   event Transfer(address indexed from, address indexed to, uint256 value);
 
-  event RecordedExchangeRate(uint256 exchangeRate);
-
   /* ============ Tests ============ */
 
   /* ============ Deposit ============ */
@@ -28,9 +26,6 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
-
-    vm.expectEmit();
-    emit RecordedExchangeRate(1e18);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
@@ -208,6 +203,60 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectRevert(
       abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint88).max)
     );
+
+    vault.deposit(_amount, alice);
+
+    vm.stopPrank();
+  }
+
+  function testYieldVaultExchangeRateManipulated() external {
+    vm.startPrank(alice);
+
+    // Alice deposits in a new YieldVault
+    uint256 _yieldVaultAmount = 333e18;
+
+    underlyingAsset.mint(alice, _yieldVaultAmount);
+    underlyingAsset.approve(address(yieldVault), type(uint256).max);
+
+    yieldVault.deposit(_yieldVaultAmount, alice);
+
+    // 0.1e18 underlying assets are sent to the YieldVault
+    // to manipulate the exchange rate
+    underlyingAsset.mint(address(yieldVault), 0.1e18);
+
+    // When Alice deposits in the Vault, her deposit reverts
+    // because the amount of assets withdrawable from the YieldVault
+    // is lower than the amount deposited by Alice
+    uint256 _vaultAmount = 1000e18;
+
+    underlyingAsset.mint(alice, _vaultAmount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        YVWithdrawableAssetsLTExpected.selector,
+        _vaultAmount - 1,
+        _vaultAmount
+      )
+    );
+
+    vault.deposit(_vaultAmount, alice);
+  }
+
+  function testDepositVaultUndercollateralized() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000;
+
+    underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vault.deposit(_amount, alice);
+
+    underlyingAsset.burn(address(yieldVault), _amount);
+
+    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+
     vault.deposit(_amount, alice);
 
     vm.stopPrank();
@@ -402,6 +451,25 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectRevert(abi.encodeWithSelector(MintZeroShares.selector));
 
     vault.mint(0, alice);
+
+    vm.stopPrank();
+  }
+
+  function testMintVaultUndercollateralized() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+
+    underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vault.mint(_amount, alice);
+
+    underlyingAsset.burn(address(yieldVault), _amount);
+
+    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+
+    vault.mint(_amount, alice);
 
     vm.stopPrank();
   }
