@@ -119,13 +119,21 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
+    (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
+      underlyingAsset,
+      vault,
+      _amount,
+      alice,
+      alicePrivateKey
+    );
+
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
 
     vm.expectEmit();
     emit Deposit(alice, alice, _amount, _amount);
 
-    _depositWithPermit(underlyingAsset, vault, _amount, alice, alice, alicePrivateKey);
+    _depositWithPermit(vault, _amount, alice, alice, _v, _r, _s);
 
     assertEq(vault.balanceOf(alice), _amount);
 
@@ -145,13 +153,21 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
+    (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
+      underlyingAsset,
+      vault,
+      _amount,
+      alice,
+      alicePrivateKey
+    );
+
     vm.expectEmit();
     emit Transfer(address(0), bob, _amount);
 
     vm.expectEmit();
     emit Deposit(alice, bob, _amount, _amount);
 
-    _depositWithPermit(underlyingAsset, vault, _amount, bob, alice, alicePrivateKey);
+    _depositWithPermit(vault, _amount, alice, bob, _v, _r, _s);
 
     assertEq(vault.balanceOf(alice), 0);
     assertEq(vault.balanceOf(bob), _amount);
@@ -167,6 +183,40 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
+  }
+
+  function testDepositWithPermitByThirdParty() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+    underlyingAsset.mint(alice, _amount);
+
+    (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
+      underlyingAsset,
+      vault,
+      _amount,
+      alice,
+      alicePrivateKey
+    );
+
+    vm.stopPrank();
+
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
+    emit Deposit(alice, alice, _amount, _amount);
+
+    _depositWithPermit(vault, _amount, alice, alice, _v, _r, _s);
+
+    assertEq(vault.balanceOf(alice), _amount);
+
+    assertEq(twabController.balanceOf(address(vault), alice), _amount);
+    assertEq(twabController.delegateBalanceOf(address(vault), alice), _amount);
+
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
+    assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
   }
 
   /* ============ Deposit - Errors ============ */
@@ -540,13 +590,21 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
 
+    (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
+      underlyingAsset,
+      vault,
+      _amount,
+      alice,
+      alicePrivateKey
+    );
+
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);
 
     vm.expectEmit();
     emit Sponsor(alice, _amount, _amount);
 
-    _sponsorWithPermit(underlyingAsset, vault, _amount, alice, alicePrivateKey);
+    _sponsorWithPermit(vault, _amount, alice, _v, _r, _s);
 
     assertEq(vault.balanceOf(alice), _amount);
 
@@ -561,6 +619,43 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     assertEq(yieldVault.totalSupply(), _amount);
 
     vm.stopPrank();
+  }
+
+  function testSponsorWithPermitByThirdParty() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+    underlyingAsset.mint(alice, _amount);
+
+    (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
+      underlyingAsset,
+      vault,
+      _amount,
+      alice,
+      alicePrivateKey
+    );
+
+    vm.stopPrank();
+
+    vm.expectEmit();
+    emit Transfer(address(0), alice, _amount);
+
+    vm.expectEmit();
+    emit Sponsor(alice, _amount, _amount);
+
+    _sponsorWithPermit(vault, _amount, alice, _v, _r, _s);
+
+    assertEq(vault.balanceOf(alice), _amount);
+
+    assertEq(twabController.balanceOf(address(vault), alice), _amount);
+    assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
+
+    assertEq(twabController.balanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
+    assertEq(twabController.delegateBalanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
+
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
+    assertEq(yieldVault.balanceOf(address(vault)), _amount);
+    assertEq(yieldVault.totalSupply(), _amount);
   }
 
   /* ============ Sweep ============ */

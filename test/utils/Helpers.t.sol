@@ -35,28 +35,17 @@ contract Helpers is Test {
    */
   uint256 public constant LOW_YIELD_FEE_PERCENTAGE = 1000000; // 0.001 = 0.1%
 
-  /* ============ Deposit ============ */
-  function _deposit(
-    IERC20 _underlyingAsset,
-    Vault _vault,
-    uint256 _assets,
-    address _user
-  ) internal returns (uint256) {
-    _underlyingAsset.approve(address(_vault), type(uint256).max);
-    return _vault.deposit(_assets, _user);
-  }
-
-  function _depositWithPermit(
+  /* ============ Permit ============ */
+  function _signPermit(
     IERC20Permit _underlyingAsset,
     Vault _vault,
     uint256 _assets,
-    address _user,
     address _owner,
     uint256 _ownerPrivateKey
-  ) internal returns (uint256) {
+  ) internal view returns (uint8 _v, bytes32 _r, bytes32 _s) {
     uint256 _nonce = _underlyingAsset.nonces(_owner);
 
-    (uint8 _v, bytes32 _r, bytes32 _s) = vm.sign(
+    (_v, _r, _s) = vm.sign(
       _ownerPrivateKey,
       keccak256(
         abi.encodePacked(
@@ -68,8 +57,29 @@ contract Helpers is Test {
         )
       )
     );
+  }
 
-    return _vault.depositWithPermit(_assets, _user, block.timestamp, _v, _r, _s);
+  /* ============ Deposit ============ */
+  function _deposit(
+    IERC20 _underlyingAsset,
+    Vault _vault,
+    uint256 _assets,
+    address _receiver
+  ) internal returns (uint256) {
+    _underlyingAsset.approve(address(_vault), type(uint256).max);
+    return _vault.deposit(_assets, _receiver);
+  }
+
+  function _depositWithPermit(
+    Vault _vault,
+    uint256 _assets,
+    address _owner,
+    address _receiver,
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s
+  ) internal returns (uint256) {
+    return _vault.depositWithPermit(_assets, _owner, _receiver, block.timestamp, _v, _r, _s);
   }
 
   /* ============ Mint ============ */
@@ -77,10 +87,10 @@ contract Helpers is Test {
     IERC20 _underlyingAsset,
     Vault _vault,
     uint256 _shares,
-    address _user
+    address _receiver
   ) internal returns (uint256) {
     _underlyingAsset.approve(address(_vault), type(uint256).max);
-    return _vault.mint(_shares, _user);
+    return _vault.mint(_shares, _receiver);
   }
 
   /* ============ Sponsor ============ */
@@ -94,28 +104,14 @@ contract Helpers is Test {
   }
 
   function _sponsorWithPermit(
-    IERC20Permit _underlyingAsset,
     Vault _vault,
     uint256 _assets,
     address _owner,
-    uint256 _ownerPrivateKey
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s
   ) internal returns (uint256) {
-    uint256 _nonce = _underlyingAsset.nonces(_owner);
-
-    (uint8 _v, bytes32 _r, bytes32 _s) = vm.sign(
-      _ownerPrivateKey,
-      keccak256(
-        abi.encodePacked(
-          "\x19\x01",
-          _underlyingAsset.DOMAIN_SEPARATOR(),
-          keccak256(
-            abi.encode(_PERMIT_TYPEHASH, _owner, address(_vault), _assets, _nonce, block.timestamp)
-          )
-        )
-      )
-    );
-
-    return _vault.sponsorWithPermit(_assets, block.timestamp, _v, _r, _s);
+    return _vault.sponsorWithPermit(_assets, _owner, block.timestamp, _v, _r, _s);
   }
 
   /* ============ Undercollateralization ============ */

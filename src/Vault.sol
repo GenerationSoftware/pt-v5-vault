@@ -480,20 +480,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @inheritdoc ERC4626
   function deposit(uint256 _assets, address _receiver) public virtual override returns (uint256) {
-    _requireVaultCollateralized();
-
-    if (_assets > maxDeposit(_receiver))
-      revert DepositMoreThanMax(_receiver, _assets, maxDeposit(_receiver));
-
-    uint256 _shares = _convertToShares(_assets, Math.Rounding.Down);
-    _deposit(msg.sender, _receiver, _assets, _shares);
-
-    return _shares;
+    return _depositAssets(_assets, msg.sender, _receiver);
   }
 
   /**
    * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
    * @param _assets Amount of assets to approve and deposit
+   * @param _owner Address of the owner depositing `_assets` and signing the permit
    * @param _receiver Address of the receiver of the vault shares
    * @param _deadline Timestamp after which the approval is no longer valid
    * @param _v V part of the secp256k1 signature
@@ -503,14 +496,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function depositWithPermit(
     uint256 _assets,
+    address _owner,
     address _receiver,
     uint256 _deadline,
     uint8 _v,
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
-    return deposit(_assets, _receiver);
+    _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    return _depositAssets(_assets, _owner, _receiver);
   }
 
   /// @inheritdoc ERC4626
@@ -518,7 +512,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _requireVaultCollateralized();
 
     uint256 _assets = _convertToAssets(_shares, Math.Rounding.Up);
-
     _deposit(msg.sender, _receiver, _assets, _shares);
 
     return _assets;
@@ -530,12 +523,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Amount of shares minted to caller.
    */
   function sponsor(uint256 _assets) external returns (uint256) {
-    return _sponsor(_assets);
+    return _sponsor(_assets, msg.sender);
   }
 
   /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @param _assets Amount of assets to deposit
+   * @param _owner Address of the owner depositing `_assets` and signing the permit
    * @param _deadline Timestamp after which the approval is no longer valid
    * @param _v V part of the secp256k1 signature
    * @param _r R part of the secp256k1 signature
@@ -544,13 +538,14 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function sponsorWithPermit(
     uint256 _assets,
+    address _owner,
     uint256 _deadline,
     uint8 _v,
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
-    return _sponsor(_assets);
+    _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    return _sponsor(_assets, _owner);
   }
 
   /**
@@ -988,23 +983,47 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
+   * @notice Deposit assets and mint shares.
+   * @param _assets The assets to deposit
+   * @param _owner The owner of the assets
+   * @param _receiver The receiver of the deposit shares
+   * @return uint256 Amount of shares minted to `_receiver`
+   */
+  function _depositAssets(
+    uint256 _assets,
+    address _owner,
+    address _receiver
+  ) internal returns (uint256) {
+    _requireVaultCollateralized();
+
+    if (_assets > maxDeposit(_receiver))
+      revert DepositMoreThanMax(_receiver, _assets, maxDeposit(_receiver));
+
+    uint256 _shares = _convertToShares(_assets, Math.Rounding.Down);
+    _deposit(_owner, _receiver, _assets, _shares);
+
+    return _shares;
+  }
+
+  /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @dev There is no receiver parameter.
    *      The calling address is the one depositing assets and receiving shares.
    * @dev If the caller has not delegated to the sponsorship address yet, this function will.
    * @param _assets Amount of assets to deposit
+   * @param _owner Address of the owner depositing `_assets`
    * @return uint256 Amount of shares minted to `_receiver`.
    */
-  function _sponsor(uint256 _assets) internal returns (uint256) {
-    uint256 _shares = deposit(_assets, msg.sender);
+  function _sponsor(uint256 _assets, address _owner) internal returns (uint256) {
+    uint256 _shares = _depositAssets(_assets, _owner, _owner);
 
     if (
-      _twabController.delegateOf(address(this), msg.sender) != _twabController.SPONSORSHIP_ADDRESS()
+      _twabController.delegateOf(address(this), _owner) != _twabController.SPONSORSHIP_ADDRESS()
     ) {
-      _twabController.sponsor(msg.sender);
+      _twabController.sponsor(_owner);
     }
 
-    emit Sponsor(msg.sender, _assets, _shares);
+    emit Sponsor(_owner, _assets, _shares);
 
     return _shares;
   }
