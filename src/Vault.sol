@@ -243,11 +243,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Emitted when a user sponsors the Vault.
    * @param caller Address that called the function
-   * @param receiver Address receiving the Vault shares
    * @param assets Amount of assets deposited into the Vault
-   * @param shares Amount of shares minted to the receiving address
+   * @param shares Amount of shares minted to the caller address
    */
-  event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+  event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
   /**
    * @notice Emitted when a user sweeps assets held by the Vault into the YieldVault.
@@ -530,33 +529,30 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @param _assets Amount of assets to deposit
-   * @param _receiver Address of the receiver of the vault shares
-   * @return uint256 Amount of shares minted to `_receiver`.
+   * @return uint256 Amount of shares minted to caller.
    */
-  function sponsor(uint256 _assets, address _receiver) external returns (uint256) {
-    return _sponsor(_assets, _receiver);
+  function sponsor(uint256 _assets) external returns (uint256) {
+    return _sponsor(_assets);
   }
 
   /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @param _assets Amount of assets to deposit
-   * @param _receiver Address of the receiver of the vault shares
    * @param _deadline Timestamp after which the approval is no longer valid
    * @param _v V part of the secp256k1 signature
    * @param _r R part of the secp256k1 signature
    * @param _s S part of the secp256k1 signature
-   * @return uint256 Amount of shares minted to `_receiver`.
+   * @return uint256 Amount of shares minted to caller.
    */
   function sponsorWithPermit(
     uint256 _assets,
-    address _receiver,
     uint256 _deadline,
     uint8 _v,
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
     _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
-    return _sponsor(_assets, _receiver);
+    return _sponsor(_assets);
   }
 
   /**
@@ -1018,20 +1014,22 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
+   * @dev There is no receiver parameter.
+   *      The calling address is the one depositing assets and receiving shares.
+   * @dev If the caller has not delegated to the sponsorship address yet, this function will.
    * @param _assets Amount of assets to deposit
-   * @param _receiver Address of the receiver of the vault shares
    * @return uint256 Amount of shares minted to `_receiver`.
    */
-  function _sponsor(uint256 _assets, address _receiver) internal returns (uint256) {
-    uint256 _shares = deposit(_assets, _receiver);
+  function _sponsor(uint256 _assets) internal returns (uint256) {
+    uint256 _shares = deposit(_assets, msg.sender);
 
     if (
-      _twabController.delegateOf(address(this), _receiver) != _twabController.SPONSORSHIP_ADDRESS()
+      _twabController.delegateOf(address(this), msg.sender) != _twabController.SPONSORSHIP_ADDRESS()
     ) {
-      _twabController.sponsor(_receiver);
+      _twabController.sponsor(msg.sender);
     }
 
-    emit Sponsor(msg.sender, _receiver, _assets, _shares);
+    emit Sponsor(msg.sender, _assets, _shares);
 
     return _shares;
   }
