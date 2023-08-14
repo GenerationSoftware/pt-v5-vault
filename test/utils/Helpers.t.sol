@@ -87,18 +87,16 @@ contract Helpers is Test {
   function _sponsor(
     IERC20 _underlyingAsset,
     Vault _vault,
-    uint256 _assets,
-    address _user
+    uint256 _assets
   ) internal returns (uint256) {
     _underlyingAsset.approve(address(_vault), type(uint256).max);
-    return _vault.sponsor(_assets, _user);
+    return _vault.sponsor(_assets);
   }
 
   function _sponsorWithPermit(
     IERC20Permit _underlyingAsset,
     Vault _vault,
     uint256 _assets,
-    address _user,
     address _owner,
     uint256 _ownerPrivateKey
   ) internal returns (uint256) {
@@ -117,7 +115,7 @@ contract Helpers is Test {
       )
     );
 
-    return _vault.sponsorWithPermit(_assets, _user, block.timestamp, _v, _r, _s);
+    return _vault.sponsorWithPermit(_assets, block.timestamp, _v, _r, _s);
   }
 
   /* ============ Undercollateralization ============ */

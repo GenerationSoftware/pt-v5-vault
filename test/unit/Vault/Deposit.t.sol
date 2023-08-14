@@ -11,7 +11,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
   event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
 
-  event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+  event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
   event Sweep(address indexed caller, uint256 assets);
 
@@ -486,9 +486,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     emit Transfer(address(0), alice, _amount);
 
     vm.expectEmit();
-    emit Sponsor(alice, alice, _amount, _amount);
+    emit Sponsor(alice, _amount, _amount);
 
-    vault.sponsor(_amount, alice);
+    vault.sponsor(_amount);
 
     assertEq(vault.balanceOf(alice), _amount);
 
@@ -505,29 +505,27 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
-  function testSponsorOnBehalf() external {
+  function testSponsorAlreadyDelegate() external {
     vm.startPrank(alice);
 
     uint256 _amount = 1000e18;
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    vm.expectEmit();
-    emit Transfer(address(0), bob, _amount);
+    twabController.delegate(address(vault), twabController.SPONSORSHIP_ADDRESS());
 
     vm.expectEmit();
-    emit Sponsor(alice, bob, _amount, _amount);
+    emit Transfer(address(0), alice, _amount);
 
-    vault.sponsor(_amount, bob);
+    vm.expectEmit();
+    emit Sponsor(alice, _amount, _amount);
 
-    assertEq(vault.balanceOf(alice), 0);
-    assertEq(vault.balanceOf(bob), _amount);
+    vault.sponsor(_amount);
 
-    assertEq(twabController.balanceOf(address(vault), alice), 0);
+    assertEq(vault.balanceOf(alice), _amount);
+
+    assertEq(twabController.balanceOf(address(vault), alice), _amount);
     assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
-
-    assertEq(twabController.balanceOf(address(vault), bob), _amount);
-    assertEq(twabController.delegateBalanceOf(address(vault), bob), 0);
 
     assertEq(twabController.balanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
     assertEq(twabController.delegateBalanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
@@ -549,74 +547,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     emit Transfer(address(0), alice, _amount);
 
     vm.expectEmit();
-    emit Sponsor(alice, alice, _amount, _amount);
+    emit Sponsor(alice, _amount, _amount);
 
-    _sponsorWithPermit(underlyingAsset, vault, _amount, alice, alice, alicePrivateKey);
-
-    assertEq(vault.balanceOf(alice), _amount);
-
-    assertEq(twabController.balanceOf(address(vault), alice), _amount);
-    assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
-
-    assertEq(twabController.balanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
-    assertEq(twabController.delegateBalanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
-
-    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
-    assertEq(yieldVault.balanceOf(address(vault)), _amount);
-    assertEq(yieldVault.totalSupply(), _amount);
-
-    vm.stopPrank();
-  }
-
-  function testSponsorWithPermitOnBehalf() external {
-    vm.startPrank(alice);
-
-    uint256 _amount = 1000e18;
-    underlyingAsset.mint(alice, _amount);
-
-    vm.expectEmit();
-    emit Transfer(address(0), bob, _amount);
-
-    vm.expectEmit();
-    emit Sponsor(alice, bob, _amount, _amount);
-
-    _sponsorWithPermit(underlyingAsset, vault, _amount, bob, alice, alicePrivateKey);
-
-    assertEq(vault.balanceOf(alice), 0);
-    assertEq(vault.balanceOf(bob), _amount);
-
-    assertEq(twabController.balanceOf(address(vault), alice), 0);
-    assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
-
-    assertEq(twabController.balanceOf(address(vault), bob), _amount);
-    assertEq(twabController.delegateBalanceOf(address(vault), bob), 0);
-
-    assertEq(twabController.balanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
-    assertEq(twabController.delegateBalanceOf(address(vault), SPONSORSHIP_ADDRESS), 0);
-
-    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
-    assertEq(yieldVault.balanceOf(address(vault)), _amount);
-    assertEq(yieldVault.totalSupply(), _amount);
-
-    vm.stopPrank();
-  }
-
-  function testSponsorAlreadyDelegateToSponsor() external {
-    vm.startPrank(alice);
-
-    uint256 _amount = 1000e18;
-    underlyingAsset.mint(alice, _amount);
-    underlyingAsset.approve(address(vault), type(uint256).max);
-
-    twabController.delegate(address(vault), twabController.SPONSORSHIP_ADDRESS());
-
-    vm.expectEmit();
-    emit Transfer(address(0), alice, _amount);
-
-    vm.expectEmit();
-    emit Sponsor(alice, alice, _amount, _amount);
-
-    vault.sponsor(_amount, alice);
+    _sponsorWithPermit(underlyingAsset, vault, _amount, alice, alicePrivateKey);
 
     assertEq(vault.balanceOf(alice), _amount);
 

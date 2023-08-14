@@ -15,7 +15,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _yield = 10e18;
     _accrueYield(underlyingAsset, yieldVault, _yield);
@@ -49,7 +49,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _yield = 10e18;
     _accrueYield(underlyingAsset, yieldVault, _yield);
@@ -87,7 +87,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _yield = 10e18;
     _accrueYield(underlyingAsset, yieldVault, _yield);
@@ -130,7 +130,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e2;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _yield = 10e2;
     _accrueYield(underlyingAsset, yieldVault, _yield);
@@ -173,7 +173,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _yield = 10e18;
 
@@ -228,7 +228,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e2;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _yield = 10e2;
 
@@ -284,7 +284,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _yield = 10e18;
     _accrueYield(underlyingAsset, yieldVault, _yield);
@@ -324,7 +324,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     underlyingAsset.burn(address(yieldVault), 100e18);
 
@@ -414,7 +414,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _amountOut = type(uint104).max;
     _accrueYield(underlyingAsset, yieldVault, _amountOut);
@@ -446,7 +446,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     _accrueYield(underlyingAsset, yieldVault, 10e18);
 
@@ -463,7 +463,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     uint256 _amount = 1000e18;
 
     underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount, address(this));
+    _sponsor(underlyingAsset, vault, _amount);
 
     uint256 _yield = 10e18;
     _accrueYield(underlyingAsset, yieldVault, _yield);
