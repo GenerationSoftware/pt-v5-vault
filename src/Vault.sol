@@ -1032,6 +1032,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _yieldVault.withdraw(_assets, address(this), address(this));
     SafeERC20.safeTransfer(IERC20(asset()), _receiver, _assets);
 
+    _updateExchangeRate();
+
     emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
   }
 
@@ -1144,7 +1146,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
     _twabController.burn(_owner, SafeCast.toUint96(_shares));
-    _updateExchangeRate();
 
     emit Transfer(_owner, address(0), _shares);
   }
