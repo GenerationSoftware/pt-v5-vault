@@ -166,6 +166,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
   function testUndercollateralizationWithYieldFeesCaptured() external {
     _setLiquidationPair();
+
     vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
 
     uint256 _aliceAmount = 15_000_000e18;
@@ -213,7 +214,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     uint256 _yieldFeeShares = vault.yieldFeeTotalSupply();
 
     vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
-    vault.mintYieldFee(_yieldFeeShares, address(this));
+    vault.mintYieldFee(_yieldFeeShares);
 
     vm.startPrank(bob);
 
