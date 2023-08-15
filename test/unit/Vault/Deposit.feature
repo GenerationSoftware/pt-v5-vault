@@ -44,19 +44,6 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
 
-  Scenario: Alice deposits with permit into the Vault on behalf of Bob
-    Given Alice owns 0 Vault shares and Bob owns 0 Vault shares
-    When Alice signs her transaction and deposits 1,000 underlying assets
-    Then Bob must receive an amount of Vault shares equivalent to Alice deposit
-    Then Alice must not receive any Vault shares
-    Then Alice `balance` must be equal to 0
-    Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to 1,000
-    Then Bob `delegateBalance` must be equal to 1,000
-    Then the YieldVault balance of underlying assets must increase by 1,000
-    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to 1,000
-
   Scenario: Alice deposits with permit into the Vault via a third party
     Given Alice owns 0 Vault shares
     When Alice signs her permit and a third party uses it to deposit 1,000 underlying assets

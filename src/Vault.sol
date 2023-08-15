@@ -487,9 +487,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
+   * @dev Can't be used to deposit on behalf of another user since `permit` does not accept a receiver parameter.
+   *      Meaning that anyone could reuse the signature and pass an arbitrary `_receiver` to this function.
    * @param _assets Amount of assets to approve and deposit
    * @param _owner Address of the owner depositing `_assets` and signing the permit
-   * @param _receiver Address of the receiver of the vault shares
    * @param _deadline Timestamp after which the approval is no longer valid
    * @param _v V part of the secp256k1 signature
    * @param _r R part of the secp256k1 signature
@@ -499,14 +500,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function depositWithPermit(
     uint256 _assets,
     address _owner,
-    address _receiver,
     uint256 _deadline,
     uint8 _v,
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
     _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
-    return _depositAssets(_assets, _owner, _receiver);
+    return _depositAssets(_assets, _owner, _owner);
   }
 
   /// @inheritdoc ERC4626
