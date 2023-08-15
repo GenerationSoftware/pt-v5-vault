@@ -72,7 +72,7 @@ contract Helpers is Test {
     return _vault.depositWithPermit(_assets, _user, block.timestamp, _v, _r, _s);
   }
 
-  /* ============ Deposit ============ */
+  /* ============ Mint ============ */
   function _mint(
     IERC20 _underlyingAsset,
     Vault _vault,

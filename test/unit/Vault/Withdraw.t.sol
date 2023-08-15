@@ -125,6 +125,93 @@ contract VaultWithdrawTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
+  function testWithdrawFullAmountYieldLiquidated() external {
+    _setLiquidationPair();
+
+    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+
+    uint256 _aliceAmount = 1000e18;
+    underlyingAsset.mint(alice, _aliceAmount);
+
+    vm.startPrank(alice);
+
+    _deposit(underlyingAsset, vault, _aliceAmount, alice);
+
+    vm.stopPrank();
+
+    uint256 _yield = 10e18;
+    _accrueYield(underlyingAsset, yieldVault, _yield);
+
+    vm.startPrank(bob);
+
+    prizeToken.mint(bob, type(uint256).max);
+
+    // We liquidate the accrued yield
+    uint256 _liquidatedYield = vault.liquidatableBalanceOf(address(vault));
+
+    (uint256 _bobPrizeTokenBalanceBefore, uint256 _prizeTokenContributed) = _liquidate(
+      liquidationRouter,
+      liquidationPair,
+      prizeToken,
+      _liquidatedYield,
+      bob
+    );
+
+    assertEq(prizeToken.balanceOf(address(prizePool)), _prizeTokenContributed);
+    assertEq(prizeToken.balanceOf(bob), _bobPrizeTokenBalanceBefore - _prizeTokenContributed);
+
+    uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, YIELD_FEE_PERCENTAGE);
+    uint256 _bobAmount = _yield - _yieldFeeShares;
+
+    // Bob now owns 9e18 Vault shares
+    assertEq(vault.balanceOf(bob), _yield - _yieldFeeShares);
+
+    // 1e18 have been allocated as yield fee
+    assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
+    assertEq(_yield, _liquidatedYield + _yieldFeeShares);
+
+    vm.stopPrank();
+
+    // The Vault is still collateralized, so users can withdraw their full deposit
+    assertEq(vault.maxWithdraw(bob), _bobAmount);
+    assertEq(vault.maxWithdraw(alice), _aliceAmount);
+
+    // We burn the accrued yield to set the Vault in an undercollateralized state
+    underlyingAsset.burn(address(yieldVault), _yield);
+
+    assertLt(vault.exchangeRate(), 1e18);
+
+    // The Vault is now undercollateralized, so users can withdraw their share of the deposits
+    // any unclaimed yield fee goes proportionally to each user
+
+    // We lose a bit of precision due to the exchange rate being below 1e18 and rounded down
+    assertApproxEqAbs(vault.maxWithdraw(bob), _getMaxWithdraw(bob, vault, yieldVault), 6);
+    assertApproxEqAbs(vault.maxWithdraw(alice), _getMaxWithdraw(alice, vault, yieldVault), 693);
+
+    vm.startPrank(alice);
+
+    uint256 _aliceWithdrawableAmount = vault.maxWithdraw(alice);
+    vault.withdraw(_aliceWithdrawableAmount, alice, alice);
+
+    assertEq(vault.balanceOf(alice), 0);
+    assertEq(underlyingAsset.balanceOf(alice), _aliceWithdrawableAmount);
+
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+
+    uint256 _bobWithdrawableAmount = vault.maxWithdraw(bob);
+    vault.withdraw(_bobWithdrawableAmount, bob, bob);
+
+    assertEq(vault.balanceOf(bob), 0);
+    assertEq(underlyingAsset.balanceOf(bob), _bobWithdrawableAmount);
+
+    assertEq(vault.totalSupply(), 0);
+    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 7);
+
+    vm.stopPrank();
+  }
+
   function testWithdrawOnBehalf() external {
     uint256 _amount = 1000e18;
     underlyingAsset.mint(bob, _amount);

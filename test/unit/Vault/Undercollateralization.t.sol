@@ -207,17 +207,21 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     assertEq(vault.availableYieldBalance(), 0);
     assertEq(vault.availableYieldFeeBalance(), 0);
 
+    // We burn underlying assets from the YieldVault to trigger the undercollateralization
     underlyingAsset.burn(address(yieldVault), 10_000_000e18);
 
     assertEq(vault.isVaultCollateralized(), false);
 
     uint256 _yieldFeeShares = vault.yieldFeeTotalSupply();
 
+    // The Vault is now undercollateralized so we can't mint the yield fee
     vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
     vault.mintYieldFee(_yieldFeeShares);
 
     vm.startPrank(bob);
 
+    // We lose in precision because the Vault is undercollateralized
+    // and the exchange rate is below 1e18 and rounded down
     _bobAmount = _getMaxWithdraw(bob, vault, yieldVault);
     assertApproxEqAbs(vault.maxWithdraw(bob), _bobAmount, 2382812);
 
@@ -241,6 +245,8 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vault.withdraw(vault.maxWithdraw(address(this)), address(this), address(this));
     assertApproxEqAbs(underlyingAsset.balanceOf(address(this)), _thisAmount, 280000);
+
     assertEq(vault.totalSupply(), 0);
+    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 280000);
   }
 }
