@@ -74,12 +74,11 @@ contract Helpers is Test {
     Vault _vault,
     uint256 _assets,
     address _owner,
-    address _receiver,
     uint8 _v,
     bytes32 _r,
     bytes32 _s
   ) internal returns (uint256) {
-    return _vault.depositWithPermit(_assets, _owner, _receiver, block.timestamp, _v, _r, _s);
+    return _vault.depositWithPermit(_assets, _owner, block.timestamp, _v, _r, _s);
   }
 
   /* ============ Mint ============ */
