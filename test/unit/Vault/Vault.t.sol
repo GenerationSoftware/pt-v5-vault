@@ -218,7 +218,7 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testClaimPrizeClaimerNotSet() public {
+  function testClaimPrizesClaimerNotSet() public {
     vault.setClaimer(address(0));
 
     address _randomUser = address(0xFf107770b6a31261836307218997C66c34681B5A);
@@ -232,11 +232,30 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testClaimPrizeCallerNotClaimer() public {
+  function testClaimPrizesCallerNotClaimer() public {
     vm.startPrank(alice);
 
     vm.expectRevert(abi.encodeWithSelector(CallerNotClaimer.selector, alice, claimer));
     claimPrize(uint8(1), alice, 0, 0, address(0));
+
+    vm.stopPrank();
+  }
+
+  function testClaimPrizeCallerNotClaimer() public {
+    vm.startPrank(alice);
+
+    vm.expectRevert(abi.encodeWithSelector(CallerNotClaimer.selector, alice, claimer));
+    vault.claimPrize(alice, uint8(1), uint32(0), uint96(0), address(0));
+
+    vm.stopPrank();
+  }
+
+  function testClaimPrize_INTERNAL_USE_ONLY_notCallable() public {
+    vm.startPrank(address(claimer));
+
+    mockPrizePoolClaimPrize(uint8(1), alice, 0, 0, address(claimer));
+    vm.expectRevert();
+    vault.claimPrize_INTERNAL_USE_ONLY(alice, uint8(1), 0, 0, address(claimer));
 
     vm.stopPrank();
   }
