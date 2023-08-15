@@ -98,10 +98,16 @@ error LPZeroAddress();
 /// @param maxYieldFeePercentage The max yield fee percentage in integer format (this value is equal to 1 in decimal format)
 error YieldFeePercentageGTPrecision(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
 
+/// @notice Emitted when the BeforeClaim prize hook fails
+/// @param reason The revert reason that was thrown
 error BeforeClaimPrizeFailed(bytes reason);
 
+/// @notice Emitted when the AfterClaim prize hook fails
+/// @param reason The revert reason that was thrown
 error AfterClaimPrizeFailed(bytes reason);
 
+// The gas to give to each of the before and after prize claim hooks.
+// This should be enough gas to mint an NFT if needed.
 uint256 constant HOOK_GAS = 150_000;
 
 /**
@@ -205,6 +211,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   event RecordedExchangeRate(uint256 exchangeRate);
 
+  /**
+   * @notice Emitted when a prize claim fails
+   * @param winner The winner of the prize
+   * @param tier The prize tier
+   * @param prizeIndex The prize index
+   * @param reason The revert reason that was thrown
+   */
   event ClaimFailed(
     address indexed winner,
     uint8 indexed tier,
@@ -1058,6 +1071,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /* ============ Claim Functions ============ */
+  /**
+   * @notice Claim prize for a winner
+   * @param _winner The winner of the prize
+   * @param _tier The prize tier
+   * @param _prizeIndex The prize index
+   * @param _fee The fee to charge
+   * @param _feeRecipient The recipient of the fee
+   * @return The total prize amount claimed. Zero if already claimed.
+   */
   function claimPrize(
     address _winner,
     uint8 _tier,
@@ -1272,6 +1294,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _yieldFeeRecipient = yieldFeeRecipient_;
   }
 
+  /**
+   * @notice Requires the caller to be the claimer
+   */
   modifier onlyClaimer() {
     if (msg.sender != _claimer) revert CallerNotClaimer(msg.sender, _claimer);
     _;
