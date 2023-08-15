@@ -330,11 +330,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        VaultUnderCollateralized.selector
-      )
-    );
+    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
 
     vault.liquidate(address(this), address(0), 0, address(vault), 0);
 
@@ -432,11 +428,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     uint256 _amountIn = liquidationPair.computeExactAmountIn(_amountOut);
 
-    IERC20(address(prizeToken)).transferFrom(
-      alice,
-      address(prizePool),
-      _amountIn
-    );
+    IERC20(address(prizeToken)).transferFrom(alice, address(prizePool), _amountIn);
 
     vm.startPrank(address(liquidationPair));
 
@@ -475,13 +467,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     uint256 _liquidatableYield = vault.liquidatableBalanceOf(address(vault));
 
-    _liquidate(
-      liquidationRouter,
-      liquidationPair,
-      prizeToken,
-      _liquidatableYield,
-      alice
-    );
+    _liquidate(liquidationRouter, liquidationPair, prizeToken, _liquidatableYield, alice);
 
     vm.stopPrank();
 
@@ -492,9 +478,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vault.deposit(vault.maxDeposit(bob), bob);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(MintMoreThanMax.selector, bob, 1e18, 0)
-    );
+    vm.expectRevert(abi.encodeWithSelector(MintMoreThanMax.selector, bob, 1e18, 0));
 
     vault.mintYieldFee(1e18);
 

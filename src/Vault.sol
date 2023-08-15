@@ -377,7 +377,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function maxDeposit(address recipient) public view virtual override returns (uint256) {
     if (!_isVaultCollateralized()) return 0;
 
-    uint256 _vaultMaxDeposit = type(uint96).max - _convertToAssets(balanceOf(recipient), Math.Rounding.Down);
+    uint256 _vaultMaxDeposit = type(uint96).max -
+      _convertToAssets(balanceOf(recipient), Math.Rounding.Up);
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
     return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
@@ -1126,7 +1127,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Updates the exchange rate.
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
-    if (_shares > maxMint(_receiver)) revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
+    if (_shares > maxMint(_receiver))
+      revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
 
     _twabController.mint(_receiver, SafeCast.toUint96(_shares));
     _updateExchangeRate();

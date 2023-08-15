@@ -181,7 +181,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    vm.expectRevert(abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint96).max));
+    vm.expectRevert(
+      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint96).max)
+    );
     vault.deposit(_amount, alice);
 
     vm.stopPrank();
@@ -189,7 +191,6 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
   function testDepositMoreThanYieldVaultMax() external {
     vm.startPrank(alice);
-
 
     uint256 _amount = uint256(type(uint88).max) + 1;
 
@@ -202,7 +203,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
       abi.encode(type(uint88).max)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint88).max));
+    vm.expectRevert(
+      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint88).max)
+    );
     vault.deposit(_amount, alice);
 
     vm.stopPrank();
@@ -415,7 +418,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    vm.expectRevert(abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint96).max));
+    vm.expectRevert(
+      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint96).max)
+    );
 
     vault.mint(_amount, alice);
 
@@ -436,7 +441,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
       abi.encode(type(uint88).max)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint88).max));
+    vm.expectRevert(
+      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint88).max)
+    );
 
     vault.mint(_amount, alice);
 

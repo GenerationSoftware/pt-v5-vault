@@ -54,7 +54,9 @@ contract VaultWithdrawTest is UnitBaseSetup {
     underlyingAsset.mint(alice, _amount);
     _deposit(underlyingAsset, vault, _amount, alice);
 
-    vm.expectRevert(abi.encodeWithSelector(WithdrawMoreThanMax.selector, alice, _amount + 1, _amount));
+    vm.expectRevert(
+      abi.encodeWithSelector(WithdrawMoreThanMax.selector, alice, _amount + 1, _amount)
+    );
     vault.withdraw(_amount + 1, alice, alice);
 
     vm.stopPrank();
@@ -283,7 +285,9 @@ contract VaultWithdrawTest is UnitBaseSetup {
     underlyingAsset.mint(alice, _amount);
     uint256 _shares = _deposit(underlyingAsset, vault, _amount, alice);
 
-    vm.expectRevert(abi.encodeWithSelector(RedeemMoreThanMax.selector, alice, _shares + 1, _shares));
+    vm.expectRevert(
+      abi.encodeWithSelector(RedeemMoreThanMax.selector, alice, _shares + 1, _shares)
+    );
     vault.redeem(_shares + 1, alice, alice);
 
     vm.stopPrank();
