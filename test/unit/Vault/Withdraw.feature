@@ -43,6 +43,12 @@ Feature: Withdraw
     Then the YieldVault balance of underlying assets must be equal to 0
     Then the Vault `totalSupply` must be equal to 0
 
+  # Withdraw - Attacks
+  Scenario: Bob tries to withdraw more than uint96 to exploit a rounding down error
+    Given Bob owns double the max amount that fits in uint96 Vault shares
+    When Bob `withdraw` his full deposit
+    Then it reverts with the error "SafeCast: value doesn't fit in 96 bits"
+
   # Redeem
   Scenario: Alice redeems her full deposit
     Given Alice owns 1,000 Vault shares
