@@ -22,7 +22,9 @@ interface IVaultHooks {
   function beforeClaimPrize(
     address winner,
     uint8 tier,
-    uint32 prizeIndex
+    uint32 prizeIndex,
+    uint96 fee,
+    address feeRecipient
   ) external returns (address);
 
   /// @notice Triggered after the prize pool claim prize function is called.
