@@ -143,6 +143,31 @@ contract VaultTest is UnitBaseSetup {
     );
   }
 
+  function testConstructorUnderlyingAssetMismatch() external {
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.asset.selector),
+      abi.encode(address(0))
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(UnderlyingAssetMismatch.selector, address(underlyingAsset), address(0))
+    );
+
+    new VaultMock(
+      IERC20(address(underlyingAsset)),
+      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+      "PTaEthDAI",
+      twabController,
+      yieldVault,
+      PrizePool(address(prizePool)),
+      claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
+      address(this)
+    );
+  }
+
   /* ============ External functions ============ */
 
   /* ============ targetOf ============ */
