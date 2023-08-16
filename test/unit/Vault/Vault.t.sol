@@ -67,7 +67,6 @@ contract VaultTest is UnitBaseSetup {
     assertEq(testVault.name(), vaultName);
     assertEq(testVault.symbol(), vaultSymbol);
     assertEq(testVault.decimals(), assetDecimals);
-    assertEq(testVault.exchangeRate(), 10 ** assetDecimals);
     assertEq(testVault.twabController(), address(twabController));
     assertEq(testVault.yieldVault(), address(yieldVault));
     assertEq(testVault.prizePool(), address(prizePool));

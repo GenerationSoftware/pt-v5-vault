@@ -17,7 +17,6 @@ Feature: Undercollateralization
     Given Alice owns 15,000,000 Vault shares and Bob owns 5,000,000 Vault shares
     When the YieldVault loses 20,000,000 underlying assets
     Then `isVaultCollateralized` must return false
-    Then `exchangeRate` must return 0
     Then Bob can't withdraw his 2,500,000 underlying assets
     Then Alice can't withdraw her 10,000,000 underlying assets
     Then Alice can't deposit into the Vault
