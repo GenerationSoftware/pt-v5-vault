@@ -56,7 +56,39 @@ contract VaultFactoryTest is Test {
       address(this)
     );
 
+    assertEq(address(Vault(_vault).asset()), address(asset));
+
     assertEq(vaultFactory.totalVaults(), 1);
     assertTrue(vaultFactory.deployedVaults(Vault(_vault)));
+  }
+
+  function testDeployVault_secondDeployShouldHaveDiffAddress() public {
+    Vault _vault1 = Vault(vaultFactory.deployVault(
+      asset,
+      name,
+      symbol,
+      twabController,
+      yieldVault,
+      prizePool,
+      claimer,
+      address(this),
+      0,
+      address(this)
+    ));
+
+    Vault _vault2 = Vault(vaultFactory.deployVault(
+      asset,
+      name,
+      symbol,
+      twabController,
+      yieldVault,
+      prizePool,
+      claimer,
+      address(this),
+      0,
+      address(this)
+    ));
+
+    assertNotEq(address(_vault1), address(_vault2));
   }
 }
