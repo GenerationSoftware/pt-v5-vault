@@ -14,89 +14,146 @@ import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
-/// @notice Emitted when the TWAB controller is set to the zero address
+/// @notice Emitted when the TWAB controller is set to the zero address.
 error TwabControllerZeroAddress();
 
-/// @notice Emitted when the Yield Vault is set to the zero address
+/// @notice Emitted when the Yield Vault is set to the zero address.
 error YieldVaultZeroAddress();
 
-/// @notice Emitted when the Prize Pool is set to the zero address
+/// @notice Emitted when the Prize Pool is set to the zero address.
 error PrizePoolZeroAddress();
 
-/// @notice Emitted when the Owner is set to the zero address
+/// @notice Emitted when the Owner is set to the zero address.
 error OwnerZeroAddress();
 
-/// @notice Emitted when the amount being deposited for the receiver is greater than the max amount allowed
-/// @param receiver The receiver of the deposit
-/// @param amount The amount to deposit
-/// @param max The max deposit amount allowed
+/**
+ * @notice Emitted when the underlying asset passed to the constructor is different from the YieldVault one.
+ * @param asset Address of the underlying asset passed to the constructor
+ * @param yieldVaultAsset Address of the YieldVault underlying asset
+ */
+error UnderlyingAssetMismatch(address asset, address yieldVaultAsset);
+
+/**
+ * @notice Emitted when the amount being deposited for the receiver is greater than the max amount allowed.
+ * @param receiver The receiver of the deposit
+ * @param amount The amount to deposit
+ * @param max The max deposit amount allowed
+ */
 error DepositMoreThanMax(address receiver, uint256 amount, uint256 max);
 
-/// @notice Emitted when the amount being withdrawn for the owner is greater than the max amount allowed
-/// @param owner The owner of the assets
-/// @param amount The amount to withdraw
-/// @param max The max withdrawable amount
+/**
+ * @notice Emitted when the amount being withdrawn for the owner is greater than the max amount allowed.
+ * @param owner The owner of the assets
+ * @param amount The amount to withdraw
+ * @param max The max withdrawable amount
+ */
 error WithdrawMoreThanMax(address owner, uint256 amount, uint256 max);
 
-/// @notice Emitted when the amount being redeemed for owner is greater than the max allowed amount
-/// @param owner The owner of the assets
-/// @param amount The amount to redeem
-/// @param max The max redeemable amount
+/**
+ * @notice Emitted when the amount being redeemed for owner is greater than the max allowed amount.
+ * @param owner The owner of the assets
+ * @param amount The amount to redeem
+ * @param max The max redeemable amount
+ */
 error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
 
-/// @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed
-/// @param receiver The receiver address
-/// @param shares The shares being minted
-/// @param max The max amount of shares that can be minted to the receiver
+/**
+ * @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed.
+ * @param receiver The receiver address
+ * @param shares The shares being minted
+ * @param max The max amount of shares that can be minted to the receiver
+ */
 error MintMoreThanMax(address receiver, uint256 shares, uint256 max);
 
-/// @notice Emitted during the liquidation process when the caller is not the liquidation pair contract
-/// @param caller The caller address
-/// @param liquidationPair The LP address
+/// @notice Emitted when `_deposit` is called but no shares are minted back to the receiver.
+error MintZeroShares();
+
+/// @notice Emitted when `_withdraw` is called but no assets are being withdrawn.
+error WithdrawZeroAssets();
+
+/// @notice Emitted when `sweep` is called but no underlying assets are currently held by the Vault.
+error SweepZeroAssets();
+
+/**
+ * @notice Emitted during the liquidation process when the caller is not the liquidation pair contract.
+ * @param caller The caller address
+ * @param liquidationPair The LP address
+ */
 error LiquidationCallerNotLP(address caller, address liquidationPair);
 
-/// @notice Emitted during the liquidation process when the token in is not the prize token
-/// @param tokenIn The provided tokenIn address
-/// @param prizeToken The prize token address
+/**
+ * @notice Emitted during the liquidation process when the token in is not the prize token.
+ * @param tokenIn The provided tokenIn address
+ * @param prizeToken The prize token address
+ */
 error LiquidationTokenInNotPrizeToken(address tokenIn, address prizeToken);
 
-/// @notice Emitted during the liquidation process when the token out is not the vault share token
-/// @param tokenOut The provided tokenOut address
-/// @param vaultShare The vault share token address
+/**
+ * @notice Emitted during the liquidation process when the token out is not the vault share token.
+ * @param tokenOut The provided tokenOut address
+ * @param vaultShare The vault share token address
+ */
 error LiquidationTokenOutNotVaultShare(address tokenOut, address vaultShare);
 
-/// @notice Emitted during the liquidation process when the liquidation amount out is zero
+/// @notice Emitted during the liquidation process when the liquidation amount out is zero.
 error LiquidationAmountOutZero();
 
-/// @notice Emitted during the liquidation process if the amount out is greater than the available yield
-/// @param amountOut The amount out
-/// @param availableYield The available yield
+/**
+ * @notice Emitted during the liquidation process if the amount out is greater than the available yield.
+ * @param amountOut The amount out
+ * @param availableYield The available yield
+ */
 error LiquidationAmountOutGTYield(uint256 amountOut, uint256 availableYield);
 
-/// @notice Emitted when the vault is under-collateralized
+/// @notice Emitted when the Vault is under-collateralized.
 error VaultUnderCollateralized();
 
-/// @notice Emitted when the target token is not supported for a given token address
-/// @param token The unsupported token address
+/**
+ * @notice Emitted when after a deposit the amount of withdrawable assets from the YieldVault is lower than the expected amount.
+ * @param withdrawableAssets The actual amount of assets withdrawable from the YieldVault
+ * @param expectedWithdrawableAssets The expected amount of assets withdrawable from the YieldVault
+ */
+error YVWithdrawableAssetsLTExpected(
+  uint256 withdrawableAssets,
+  uint256 expectedWithdrawableAssets
+);
+
+/**
+ * @notice Emitted when the target token is not supported for a given token address.
+ * @param token The unsupported token address
+ */
 error TargetTokenNotSupported(address token);
 
-/// @notice Emitted when the caller is not the prize claimer
-/// @param caller The caller address
-/// @param claimer The claimer address
+/**
+ * @notice Emitted when the caller is not the prize claimer.
+ * @param caller The caller address
+ * @param claimer The claimer address
+ */
 error CallerNotClaimer(address caller, address claimer);
 
-/// @notice Emitted when the minted yield exceeds the yield fee supply
-/// @param shares The shares to mint
-/// @param yieldFeeTotalSupply The accrued yield fee available
-error YieldFeeGTAvailable(uint256 shares, uint256 yieldFeeTotalSupply);
+/**
+ * @notice Emitted when the minted yield exceeds the yield fee shares available.
+ * @param shares The amount of yield shares to mint
+ * @param yieldFeeShares The accrued yield fee shares available
+ */
+error YieldFeeGTAvailableShares(uint256 shares, uint256 yieldFeeShares);
 
-/// @notice Emitted when the Liquidation Pair being set is the zero address
+/**
+ * @notice Emitted when the minted yield exceeds the amount of available yield in the YieldVault.
+ * @param assets The amount of yield assets requested
+ * @param availableYield The amount of yield available
+ */
+error YieldFeeGTAvailableYield(uint256 assets, uint256 availableYield);
+
+/// @notice Emitted when the Liquidation Pair being set is the zero address.
 error LPZeroAddress();
 
-/// @notice Emitted when the yield fee percentage being set is greater than 1
-/// @param yieldFeePercentage The yield fee percentage in integer format
-/// @param maxYieldFeePercentage The max yield fee percentage in integer format (this value is equal to 1 in decimal format)
-error YieldFeePercentageGTPrecision(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
+/**
+ * @notice Emitted when the yield fee percentage being set is greater than or equal to 1.
+ * @param yieldFeePercentage The yield fee percentage in integer format
+ * @param maxYieldFeePercentage The max yield fee percentage in integer format (this value is equal to 1 in decimal format)
+ */
+error YieldFeePercentageGtePrecision(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
 
 /// @notice Emitted when the BeforeClaim prize hook fails
 /// @param reason The revert reason that was thrown
@@ -198,32 +255,17 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Emitted when a user sponsors the Vault.
    * @param caller Address that called the function
-   * @param receiver Address receiving the Vault shares
    * @param assets Amount of assets deposited into the Vault
-   * @param shares Amount of shares minted to the receiving address
+   * @param shares Amount of shares minted to the caller address
    */
-  event Sponsor(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
+  event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
   /**
-   * @notice Emitted when the `_lastRecordedExchangeRate` is updated.
-   * @param exchangeRate The recorded exchange rate
-   * @dev This happens on mint and burn of shares
+   * @notice Emitted when a user sweeps assets held by the Vault into the YieldVault.
+   * @param caller Address that called the function
+   * @param assets Amount of assets sweeped into the YieldVault
    */
-  event RecordedExchangeRate(uint256 exchangeRate);
-
-  /**
-   * @notice Emitted when a prize claim fails
-   * @param winner The winner of the prize
-   * @param tier The prize tier
-   * @param prizeIndex The prize index
-   * @param reason The revert reason that was thrown
-   */
-  event ClaimFailed(
-    address indexed winner,
-    uint8 indexed tier,
-    uint32 indexed prizeIndex,
-    bytes reason
-  );
+  event Sweep(address indexed caller, uint256 assets);
 
   /* ============ Variables ============ */
 
@@ -242,20 +284,14 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Address of the ILiquidationPair used to liquidate yield for prize token.
   ILiquidationPair private _liquidationPair;
 
-  /// @notice Underlying asset unit (i.e. 10 ** 18 for DAI).
-  uint256 private _assetUnit;
-
-  /// @notice Most recent exchange rate recorded when burning or minting Vault shares.
-  uint256 private _lastRecordedExchangeRate;
-
   /// @notice Yield fee percentage represented in integer format with 9 decimal places (i.e. 10000000 = 0.01 = 1%).
   uint256 private _yieldFeePercentage;
 
-  /// @notice Address of the yield fee recipient that receives the fee amount when yield is captured.
+  /// @notice Address of the yield fee recipient. Receives Vault shares when `mintYieldFee` is called.
   address private _yieldFeeRecipient;
 
-  /// @notice Total accrued supply from the yield fee.
-  uint256 private _yieldFeeTotalSupply;
+  /// @notice Total yield fee shares available. Can be minted to `_yieldFeeRecipient` by calling `mintYieldFee`.
+  uint256 private _yieldFeeShares;
 
   /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
   uint256 private constant FEE_PRECISION = 1e9;
@@ -295,6 +331,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
     if (address(owner_) == address(0)) revert OwnerZeroAddress();
+    if (address(asset_) != yieldVault_.asset())
+      revert UnderlyingAssetMismatch(address(asset_), yieldVault_.asset());
 
     _twabController = twabController_;
     _yieldVault = yieldVault_;
@@ -303,8 +341,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _setClaimer(claimer_);
     _setYieldFeeRecipient(yieldFeeRecipient_);
     _setYieldFeePercentage(yieldFeePercentage_);
-
-    _assetUnit = 10 ** super.decimals();
 
     // Approve once for max amount
     asset_.safeApprove(address(yieldVault_), type(uint256).max);
@@ -331,16 +367,19 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Total available yield amount accrued by this vault.
    * @dev This amount includes the liquidatable yield + yield fee amount.
    * @dev The available yield is equal to the total amount of assets managed by this Vault
-   *      minus the total amount of assets supplied to the Vault and yield fees allocated to `_yieldFeeRecipient`.
-   * @dev If `_sharesToAssets` is greater than `_assets`, it means that the Vault is undercollateralized.
+   *      minus the total amount of assets supplied to the Vault and current allocated `_yieldFeeShares`.
+   * @dev If `_assetsAllocated` is greater than `_assets`, it means that the Vault is undercollateralized.
    *      We must not mint more shares than underlying assets available so we return 0.
    * @return uint256 Total yield amount
    */
   function availableYieldBalance() public view returns (uint256) {
     uint256 _assets = _totalAssets();
-    uint256 _sharesToAssets = _convertToAssets(_totalShares(), Math.Rounding.Down);
+    uint256 _assetsAllocated = _convertToAssets(
+      _totalSupply() + _yieldFeeShares,
+      Math.Rounding.Down
+    );
 
-    return _sharesToAssets > _assets ? 0 : _assets - _sharesToAssets;
+    return _assetsAllocated > _assets ? 0 : _assets - _assetsAllocated;
   }
 
   /**
@@ -380,15 +419,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Current exchange rate between the Vault shares and
-   *         the total amount of underlying assets withdrawable from the YieldVault.
-   * @return uint256 Current exchange rate
-   */
-  function exchangeRate() public view returns (uint256) {
-    return _currentExchangeRate();
-  }
-
-  /**
    * @notice Check if the Vault is collateralized.
    * @return bool True if the vault is collateralized, false otherwise
    */
@@ -425,15 +455,22 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Mint Vault shares to the `_yieldFeeRecipient`.
-   * @dev Will revert if the Vault is undercollateralized
-   *      or if the `_shares` are greater than the accrued `_yieldFeeTotalSupply`.
+   * @dev Will revert if the Vault is undercollateralized.
+   * @dev Will revert if `_shares` is greater than `_yieldFeeShares`.
+   * @dev Will revert if there is not enough yield available in the YieldVault to back `_shares`.
    * @param _shares Amount of shares to mint
    */
   function mintYieldFee(uint256 _shares) external {
     _requireVaultCollateralized();
-    if (_shares > _yieldFeeTotalSupply) revert YieldFeeGTAvailable(_shares, _yieldFeeTotalSupply);
 
-    _yieldFeeTotalSupply -= _shares;
+    uint256 _assets = _convertToAssets(_shares, Math.Rounding.Down);
+    uint256 _availableYield = _yieldVault.maxWithdraw(address(this)) -
+      _convertToAssets(_totalSupply(), Math.Rounding.Down);
+
+    if (_assets > _availableYield) revert YieldFeeGTAvailableYield(_assets, _availableYield);
+    if (_shares > _yieldFeeShares) revert YieldFeeGTAvailableShares(_shares, _yieldFeeShares);
+
+    _yieldFeeShares -= _shares;
     _mint(_yieldFeeRecipient, _shares);
 
     emit MintYieldFee(msg.sender, _yieldFeeRecipient, _shares);
@@ -443,19 +480,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @inheritdoc ERC4626
   function deposit(uint256 _assets, address _receiver) public virtual override returns (uint256) {
-    if (_assets > maxDeposit(_receiver))
-      revert DepositMoreThanMax(_receiver, _assets, maxDeposit(_receiver));
-
-    uint256 _shares = _convertToShares(_assets, Math.Rounding.Down);
-    _deposit(msg.sender, _receiver, _assets, _shares);
-
-    return _shares;
+    return _depositAssets(_assets, msg.sender, _receiver);
   }
 
   /**
    * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
+   * @dev Can't be used to deposit on behalf of another user since `permit` does not accept a receiver parameter.
+   *      Meaning that anyone could reuse the signature and pass an arbitrary `_receiver` to this function.
    * @param _assets Amount of assets to approve and deposit
-   * @param _receiver Address of the receiver of the vault shares
+   * @param _owner Address of the owner depositing `_assets` and signing the permit
    * @param _deadline Timestamp after which the approval is no longer valid
    * @param _v V part of the secp256k1 signature
    * @param _r R part of the secp256k1 signature
@@ -464,46 +497,21 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function depositWithPermit(
     uint256 _assets,
-    address _receiver,
+    address _owner,
     uint256 _deadline,
     uint8 _v,
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
-    return deposit(_assets, _receiver);
+    _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    return _depositAssets(_assets, _owner, _owner);
   }
 
   /// @inheritdoc ERC4626
   function mint(uint256 _shares, address _receiver) public virtual override returns (uint256) {
+    _requireVaultCollateralized();
+
     uint256 _assets = _convertToAssets(_shares, Math.Rounding.Up);
-
-    _deposit(msg.sender, _receiver, _assets, _shares);
-
-    return _assets;
-  }
-
-  /**
-   * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
-   * @param _shares Amount of shares to mint to `_receiver`
-   * @param _receiver Address of the receiver of the vault shares
-   * @param _deadline Timestamp after which the approval is no longer valid
-   * @param _v V part of the secp256k1 signature
-   * @param _r R part of the secp256k1 signature
-   * @param _s S part of the secp256k1 signature
-   * @return uint256 Amount of assets deposited into the Vault.
-   */
-  function mintWithPermit(
-    uint256 _shares,
-    address _receiver,
-    uint256 _deadline,
-    uint8 _v,
-    bytes32 _r,
-    bytes32 _s
-  ) external returns (uint256) {
-    uint256 _assets = _convertToAssets(_shares, Math.Rounding.Up);
-
-    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
     _deposit(msg.sender, _receiver, _assets, _shares);
 
     return _assets;
@@ -512,33 +520,48 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @param _assets Amount of assets to deposit
-   * @param _receiver Address of the receiver of the vault shares
-   * @return uint256 Amount of shares minted to `_receiver`.
+   * @return uint256 Amount of shares minted to caller.
    */
-  function sponsor(uint256 _assets, address _receiver) external returns (uint256) {
-    return _sponsor(_assets, _receiver);
+  function sponsor(uint256 _assets) external returns (uint256) {
+    return _sponsor(_assets, msg.sender);
   }
 
   /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
    * @param _assets Amount of assets to deposit
-   * @param _receiver Address of the receiver of the vault shares
+   * @param _owner Address of the owner depositing `_assets` and signing the permit
    * @param _deadline Timestamp after which the approval is no longer valid
    * @param _v V part of the secp256k1 signature
    * @param _r R part of the secp256k1 signature
    * @param _s S part of the secp256k1 signature
-   * @return uint256 Amount of shares minted to `_receiver`.
+   * @return uint256 Amount of shares minted to caller.
    */
   function sponsorWithPermit(
     uint256 _assets,
-    address _receiver,
+    address _owner,
     uint256 _deadline,
     uint8 _v,
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(asset()), msg.sender, address(this), _assets, _deadline, _v, _r, _s);
-    return _sponsor(_assets, _receiver);
+    _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    return _sponsor(_assets, _owner);
+  }
+
+  /**
+   * @notice Deposit underlying assets that have been mistakenly sent to the Vault into the YieldVault.
+   * @dev The deposited assets will contribute to the yield of the YieldVault.
+   * @return uint256 Amount of underlying assets deposited
+   */
+  function sweep() external returns (uint256) {
+    uint256 _assets = IERC20(asset()).balanceOf(address(this));
+    if (_assets == 0) revert SweepZeroAssets();
+
+    _yieldVault.deposit(_assets, address(this));
+
+    emit Sweep(msg.sender, _assets);
+
+    return _assets;
   }
 
   /* ============ Withdraw Functions ============ */
@@ -606,23 +629,21 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_amountOut == 0) revert LiquidationAmountOutZero();
 
     uint256 _assetAmountOut = _convertToAssets(_amountOut, Math.Rounding.Down);
-    uint256 _liquidableYield = _liquidatableBalanceOf(_tokenOut);
+    uint256 _liquidatableYield = _liquidatableBalanceOf(_tokenOut);
 
-    if (_assetAmountOut > _liquidableYield)
-      revert LiquidationAmountOutGTYield(_assetAmountOut, _liquidableYield);
+    if (_assetAmountOut > _liquidatableYield)
+      revert LiquidationAmountOutGTYield(_assetAmountOut, _liquidatableYield);
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
 
+    // Distributes the specified yield fee percentage.
+    // For instance, with a yield fee percentage of 20% and 8e18 Vault shares being liquidated,
+    // this calculation assigns 2e18 Vault shares to the yield fee recipient.
+    // `_amountOut` is the amount of Vault shares being liquidated after accounting for the yield fee.
     if (_yieldFeePercentage != 0) {
       _increaseYieldFeeBalance(
         (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut
       );
-    }
-
-    uint256 _vaultAssets = IERC20(asset()).balanceOf(address(this));
-
-    if (_vaultAssets != 0 && _assetAmountOut >= _vaultAssets) {
-      _yieldVault.deposit(_vaultAssets, address(this));
     }
 
     _mint(_account, _amountOut);
@@ -740,8 +761,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev If the vault becomes undercollateralized, this total yield fee can be used to collateralize it.
    * @return uint256 Total accrued yield fee
    */
-  function yieldFeeTotalSupply() public view returns (uint256) {
-    return _yieldFeeTotalSupply;
+  function yieldFeeShares() public view returns (uint256) {
+    return _yieldFeeShares;
   }
 
   /**
@@ -799,12 +820,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Total amount of assets managed by this Vault.
-   * @dev The total amount of assets managed by this vault is equal to
-   *      the amount of assets managed by the YieldVault + the amount living in this vault.
    * @return uint256 Total amount of assets
    */
   function _totalAssets() internal view returns (uint256) {
-    return _yieldVault.maxWithdraw(address(this)) + super.totalAssets();
+    return _yieldVault.maxWithdraw(address(this));
   }
 
   /**
@@ -813,16 +832,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function _totalSupply() internal view returns (uint256) {
     return _twabController.totalSupply(address(this));
-  }
-
-  /**
-   * @notice Total amount of shares managed by this Vault.
-   * @dev Equal to the total amount of shares minted by this Vault
-   *      + the total amount of yield fees allocated by this Vault.
-   * @return uint256 Total amount of shares
-   */
-  function _totalShares() internal view returns (uint256) {
-    return _totalSupply() + _yieldFeeTotalSupply;
   }
 
   /* ============ Liquidation Functions ============ */
@@ -856,7 +865,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _shares Amount of shares to increase yield fee balance by
    */
   function _increaseYieldFeeBalance(uint256 _shares) internal {
-    _yieldFeeTotalSupply += _shares;
+    _yieldFeeShares += _shares;
   }
 
   /* ============ Conversion Functions ============ */
@@ -865,49 +874,42 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @inheritdoc ERC4626
    * @param _assets Amount of assets to convert
    * @param _rounding Rounding mode (i.e. down or up)
-   * @return uint256 Amount of shares for the assets
+   * @return uint256 Amount of shares corresponding to the assets
    */
   function _convertToShares(
     uint256 _assets,
     Math.Rounding _rounding
   ) internal view virtual override returns (uint256) {
-    uint256 _exchangeRate = _currentExchangeRate();
+    uint256 _collateralAssets = _collateral();
+    uint256 _depositedAssets = _totalSupply();
+
+    if (_assets == 0 || _depositedAssets == 0) {
+      return _assets;
+    }
 
     return
-      (_assets == 0 || _exchangeRate == 0)
-        ? _assets
-        : _assets.mulDiv(_assetUnit, _exchangeRate, _rounding);
+      _collateralAssets == 0 ? 0 : _assets.mulDiv(_depositedAssets, _collateralAssets, _rounding);
   }
 
   /**
    * @inheritdoc ERC4626
    * @param _shares Amount of shares to convert
    * @param _rounding Rounding mode (i.e. down or up)
-   * @return uint256 Amount of assets represented by the shares
+   * @return uint256 Amount of assets corresponding to the shares
    */
   function _convertToAssets(
     uint256 _shares,
     Math.Rounding _rounding
   ) internal view virtual override returns (uint256) {
-    return _convertToAssets(_shares, _currentExchangeRate(), _rounding);
-  }
+    uint256 _collateralAssets = _collateral();
+    uint256 _depositedAssets = _totalSupply();
 
-  /**
-   * @notice Convert `_shares` to `_assets`.
-   * @param _shares Amount of shares to convert
-   * @param _exchangeRate Exchange rate used to convert `_shares`
-   * @param _rounding Rounding mode (i.e. down or up)
-   * @return uint256 Amount of assets represented by the shares
-   */
-  function _convertToAssets(
-    uint256 _shares,
-    uint256 _exchangeRate,
-    Math.Rounding _rounding
-  ) internal view returns (uint256) {
+    if (_shares == 0 || _depositedAssets == 0) {
+      return _shares;
+    }
+
     return
-      (_shares == 0 || _exchangeRate == 0)
-        ? _shares
-        : _shares.mulDiv(_exchangeRate, _assetUnit, _rounding);
+      _collateralAssets == 0 ? 0 : _shares.mulDiv(_collateralAssets, _depositedAssets, _rounding);
   }
 
   /* ============ Deposit Functions ============ */
@@ -927,6 +929,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *      - if `_vaultAssets` balance is greater than or equal to `_assets`,
    *        we know the vault has enough underlying assets to fulfill the deposit
    *        so we don't transfer any assets from the user wallet into the vault
+   * @dev Will revert if 0 shares are minted back to the receiver.
    */
   function _deposit(
     address _caller,
@@ -934,6 +937,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _assets,
     uint256 _shares
   ) internal virtual override {
+    if (_shares == 0) revert MintZeroShares();
+
     IERC20 _asset = IERC20(asset());
     uint256 _vaultAssets = _asset.balanceOf(address(this));
 
@@ -962,28 +967,63 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       );
     }
 
+    uint256 _withdrawableAssetsBefore = _yieldVault.maxWithdraw(address(this));
+
     _yieldVault.deposit(_assets, address(this));
+
+    uint256 _expectedWithdrawableAssets = _withdrawableAssetsBefore + _assets;
+    uint256 _withdrawableAssetsAfter = _yieldVault.maxWithdraw(address(this));
+
+    if (_withdrawableAssetsAfter < _expectedWithdrawableAssets)
+      revert YVWithdrawableAssetsLTExpected(_withdrawableAssetsAfter, _expectedWithdrawableAssets);
+
     _mint(_receiver, _shares);
 
     emit Deposit(_caller, _receiver, _assets, _shares);
   }
 
   /**
+   * @notice Deposit assets and mint shares.
+   * @param _assets The assets to deposit
+   * @param _owner The owner of the assets
+   * @param _receiver The receiver of the deposit shares
+   * @return uint256 Amount of shares minted to `_receiver`
+   */
+  function _depositAssets(
+    uint256 _assets,
+    address _owner,
+    address _receiver
+  ) internal returns (uint256) {
+    _requireVaultCollateralized();
+
+    if (_assets > maxDeposit(_receiver))
+      revert DepositMoreThanMax(_receiver, _assets, maxDeposit(_receiver));
+
+    uint256 _shares = _convertToShares(_assets, Math.Rounding.Down);
+    _deposit(_owner, _receiver, _assets, _shares);
+
+    return _shares;
+  }
+
+  /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
+   * @dev There is no receiver parameter.
+   *      The calling address is the one depositing assets and receiving shares.
+   * @dev If the caller has not delegated to the sponsorship address yet, this function will.
    * @param _assets Amount of assets to deposit
-   * @param _receiver Address of the receiver of the vault shares
+   * @param _owner Address of the owner depositing `_assets`
    * @return uint256 Amount of shares minted to `_receiver`.
    */
-  function _sponsor(uint256 _assets, address _receiver) internal returns (uint256) {
-    uint256 _shares = deposit(_assets, _receiver);
+  function _sponsor(uint256 _assets, address _owner) internal returns (uint256) {
+    uint256 _shares = _depositAssets(_assets, _owner, _owner);
 
     if (
-      _twabController.delegateOf(address(this), _receiver) != _twabController.SPONSORSHIP_ADDRESS()
+      _twabController.delegateOf(address(this), _owner) != _twabController.SPONSORSHIP_ADDRESS()
     ) {
-      _twabController.sponsor(_receiver);
+      _twabController.sponsor(_owner);
     }
 
-    emit Sponsor(msg.sender, _receiver, _assets, _shares);
+    emit Sponsor(_owner, _assets, _shares);
 
     return _shares;
   }
@@ -1006,6 +1046,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _assets,
     uint256 _shares
   ) internal virtual override {
+    if (_assets == 0) revert WithdrawZeroAssets();
+
     if (_caller != _owner) {
       _spendAllowance(_owner, _caller, _shares);
     }
@@ -1020,8 +1062,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     _yieldVault.withdraw(_assets, address(this), address(this));
     SafeERC20.safeTransfer(IERC20(asset()), _receiver, _assets);
-
-    _updateExchangeRate();
 
     emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
   }
@@ -1048,7 +1088,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     address recipient;
 
     if (hooks.useBeforeClaimPrize) {
-      try hooks.implementation.beforeClaimPrize{gas: HOOK_GAS}(_winner, _tier, _prizeIndex, _fee, _feeRecipient) returns (address result) {
+      try
+        hooks.implementation.beforeClaimPrize{ gas: HOOK_GAS }(
+          _winner,
+          _tier,
+          _prizeIndex,
+          _fee,
+          _feeRecipient
+        )
+      returns (address result) {
         recipient = result;
       } catch (bytes memory reason) {
         revert BeforeClaimPrizeFailed(reason);
@@ -1067,8 +1115,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     );
 
     if (hooks.useAfterClaimPrize) {
-      try hooks.implementation.afterClaimPrize{gas: HOOK_GAS}(_winner, _tier, _prizeIndex, prizeTotal, recipient) {
-      } catch (bytes memory reason) {
+      try
+        hooks.implementation.afterClaimPrize{ gas: HOOK_GAS }(
+          _winner,
+          _tier,
+          _prizeIndex,
+          prizeTotal,
+          recipient
+        )
+      {} catch (bytes memory reason) {
         revert AfterClaimPrizeFailed(reason);
       }
     }
@@ -1104,26 +1159,18 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /* ============ State Functions ============ */
 
-  /// @notice Update exchange rate with the current exchange rate.
-  function _updateExchangeRate() internal {
-    _lastRecordedExchangeRate = _currentExchangeRate();
-    emit RecordedExchangeRate(_lastRecordedExchangeRate);
-  }
-
   /**
    * @notice Creates `_shares` tokens and assigns them to `_receiver`, increasing the total supply.
    * @param _receiver Address that will receive the minted shares
    * @param _shares Shares to mint
    * @dev Emits a {Transfer} event with `from` set to the zero address.
    * @dev `_receiver` cannot be the zero address.
-   * @dev Updates the exchange rate.
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
     if (_shares > maxMint(_receiver))
       revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
 
     _twabController.mint(_receiver, SafeCast.toUint96(_shares));
-    _updateExchangeRate();
 
     emit Transfer(address(0), _receiver, _shares);
   }
@@ -1135,7 +1182,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Emits a {Transfer} event with `to` set to the zero address.
    * @dev `_owner` cannot be the zero address.
    * @dev `_owner` must have at least `_shares` tokens.
-   * @dev Updates the exchange rate.
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
     _twabController.burn(_owner, SafeCast.toUint96(_shares));
@@ -1159,43 +1205,37 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Calculate exchange rate between the amount of assets withdrawable from the YieldVault
-   *         and the amount of shares minted by this Vault.
-   * @dev We exclude the amount of yield generated by the YieldVault, so users can only withdraw their share of deposits.
-   *      Except when the vault is undercollateralized, in this case, any unclaimed yield is included in the calculation.
-   * @dev We start with an exchange rate of 1 which is equal to 1 underlying asset unit.
-   * @return uint256 Exchange rate
+   * @notice Returns the quantity of withdrawable underlying assets held as collateral by the YieldVault.
+   * @dev When the Vault is collateralized, Vault shares are minted at a 1:1 ratio based on the user's deposited underlying assets.
+   *      The total supply of shares corresponds directly to the total amount of underlying assets deposited into the YieldVault.
+   *      Users have the ability to withdraw only the quantity of underlying assets they initially deposited,
+   *      without access to any of the accumulated yield within the YieldVault.
+   * @dev In case of undercollateralization, any remaining collateral within the YieldVault can be withdrawn.
+   *      Withdrawals can be made by users for their corresponding deposit shares.
+   * @return uint256 Available collateral
    */
-  function _currentExchangeRate() internal view returns (uint256) {
-    uint256 _totalSupplyAmount = _totalSupply();
-    uint256 _totalSupplyToAssets = _convertToAssets(
-      _totalSupplyAmount,
-      _lastRecordedExchangeRate,
-      Math.Rounding.Down
-    );
-
+  function _collateral() internal view returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
     uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
 
-    // If the Vault is collateralized, we exclude the yield from the calculation
-    // so users can only withdraw their share of deposits.
-    if (_withdrawableAssets > _totalSupplyToAssets) {
-      _withdrawableAssets = _withdrawableAssets - (_withdrawableAssets - _totalSupplyToAssets);
+    // If the Vault is collateralized, users can only withdraw the amount of underlying assets they deposited.
+    if (_withdrawableAssets >= _depositedAssets) {
+      return _depositedAssets;
     }
 
-    if (_totalSupplyAmount != 0 && _withdrawableAssets != 0) {
-      return _withdrawableAssets.mulDiv(_assetUnit, _totalSupplyAmount, Math.Rounding.Down);
-    }
-
-    return _assetUnit;
+    // Otherwise, any remaining collateral within the YieldVault is available
+    // and distributed proportionally among depositors.
+    return _withdrawableAssets;
   }
 
   /**
    * @notice Check if the Vault is collateralized.
-   * @dev The vault is collateralized if the exchange rate is greater than or equal to 1 underlying asset unit.
+   * @dev The vault is collateralized if the total amount of underlying assets currently held by the YieldVault
+   *      is greater than or equal to the total supply of shares minted by the Vault.
    * @return bool True if the vault is collateralized, false otherwise
    */
   function _isVaultCollateralized() internal view returns (bool) {
-    return _currentExchangeRate() >= _assetUnit;
+    return _yieldVault.maxWithdraw(address(this)) >= _totalSupply();
   }
 
   /// @notice Require reverting if the vault is under-collateralized.
@@ -1215,12 +1255,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Set yield fee percentage.
-   * @dev Yield fee is represented in 9 decimals and can't exceed `1e9`.
+   * @dev Yield fee is represented in 9 decimals and can't exceed or equal `1e9`.
    * @param yieldFeePercentage_ The new yield fee percentage to set
    */
   function _setYieldFeePercentage(uint256 yieldFeePercentage_) internal {
-    if (yieldFeePercentage_ > FEE_PRECISION) {
-      revert YieldFeePercentageGTPrecision(yieldFeePercentage_, FEE_PRECISION);
+    if (yieldFeePercentage_ >= FEE_PRECISION) {
+      revert YieldFeePercentageGtePrecision(yieldFeePercentage_, FEE_PRECISION);
     }
     _yieldFeePercentage = yieldFeePercentage_;
   }

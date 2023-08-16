@@ -29,8 +29,4 @@ contract VaultMock is Vault {
       _owner
     )
   {}
-
-  function totalShares() public view returns (uint256) {
-    return _totalShares();
-  }
 }

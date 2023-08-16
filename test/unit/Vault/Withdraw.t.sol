@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { UnitBaseSetup, IERC20 } from "../../utils/UnitBaseSetup.t.sol";
-import { WithdrawMoreThanMax, RedeemMoreThanMax } from "../../../src/Vault.sol";
+import "../../../src/Vault.sol";
 
 contract VaultWithdrawTest is UnitBaseSetup {
   /* ============ Events ============ */
@@ -43,21 +43,6 @@ contract VaultWithdrawTest is UnitBaseSetup {
     assertEq(yieldVault.balanceOf(address(vault)), 0);
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
     assertEq(vault.totalSupply(), 0);
-
-    vm.stopPrank();
-  }
-
-  function testWithdrawMoreThanMax() external {
-    vm.startPrank(alice);
-
-    uint256 _amount = 1000e18;
-    underlyingAsset.mint(alice, _amount);
-    _deposit(underlyingAsset, vault, _amount, alice);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(WithdrawMoreThanMax.selector, alice, _amount + 1, _amount)
-    );
-    vault.withdraw(_amount + 1, alice, alice);
 
     vm.stopPrank();
   }
@@ -169,7 +154,7 @@ contract VaultWithdrawTest is UnitBaseSetup {
     assertEq(vault.balanceOf(bob), _yield - _yieldFeeShares);
 
     // 1e18 have been allocated as yield fee
-    assertEq(vault.yieldFeeTotalSupply(), _yieldFeeShares);
+    assertEq(vault.yieldFeeShares(), _yieldFeeShares);
     assertEq(_yield, _liquidatedYield + _yieldFeeShares);
 
     vm.stopPrank();
@@ -181,14 +166,9 @@ contract VaultWithdrawTest is UnitBaseSetup {
     // We burn the accrued yield to set the Vault in an undercollateralized state
     underlyingAsset.burn(address(yieldVault), _yield);
 
-    assertLt(vault.exchangeRate(), 1e18);
-
     // The Vault is now undercollateralized, so users can withdraw their share of the deposits
-    // any unclaimed yield fee goes proportionally to each user
-
-    // We lose a bit of precision due to the exchange rate being below 1e18 and rounded down
-    assertApproxEqAbs(vault.maxWithdraw(bob), _getMaxWithdraw(bob, vault, yieldVault), 6);
-    assertApproxEqAbs(vault.maxWithdraw(alice), _getMaxWithdraw(alice, vault, yieldVault), 693);
+    assertEq(vault.maxWithdraw(bob), _getMaxWithdraw(bob, vault, yieldVault));
+    assertEq(vault.maxWithdraw(alice), _getMaxWithdraw(alice, vault, yieldVault));
 
     vm.startPrank(alice);
 
@@ -209,7 +189,7 @@ contract VaultWithdrawTest is UnitBaseSetup {
     assertEq(underlyingAsset.balanceOf(bob), _bobWithdrawableAmount);
 
     assertEq(vault.totalSupply(), 0);
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 7);
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
 
     vm.stopPrank();
   }
@@ -248,7 +228,36 @@ contract VaultWithdrawTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
+  /* ============ Withdraw - Errors ============ */
+
+  function testWithdrawMoreThanMax() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+    underlyingAsset.mint(alice, _amount);
+    _deposit(underlyingAsset, vault, _amount, alice);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(WithdrawMoreThanMax.selector, alice, _amount + 1, _amount)
+    );
+
+    vault.withdraw(_amount + 1, alice, alice);
+
+    vm.stopPrank();
+  }
+
+  function testWithdrawZeroAssets() external {
+    vm.startPrank(alice);
+
+    vm.expectRevert(abi.encodeWithSelector(WithdrawZeroAssets.selector));
+
+    vault.withdraw(0, alice, alice);
+
+    vm.stopPrank();
+  }
+
   /* ============ Redeem ============ */
+
   function testRedeemFullAmount() external {
     vm.startPrank(alice);
 
@@ -274,21 +283,6 @@ contract VaultWithdrawTest is UnitBaseSetup {
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
     assertEq(yieldVault.balanceOf(address(vault)), 0);
     assertEq(vault.totalSupply(), 0);
-
-    vm.stopPrank();
-  }
-
-  function testRedeemMoreThanMax() external {
-    vm.startPrank(alice);
-
-    uint256 _amount = 1000e18;
-    underlyingAsset.mint(alice, _amount);
-    uint256 _shares = _deposit(underlyingAsset, vault, _amount, alice);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RedeemMoreThanMax.selector, alice, _shares + 1, _shares)
-    );
-    vault.redeem(_shares + 1, alice, alice);
 
     vm.stopPrank();
   }
@@ -389,6 +383,33 @@ contract VaultWithdrawTest is UnitBaseSetup {
     assertEq(yieldVault.balanceOf(address(vault)), 0);
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
     assertEq(vault.totalSupply(), 0);
+
+    vm.stopPrank();
+  }
+
+  /* ============ Redeem - Errors ============ */
+
+  function testRedeemMoreThanMax() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = 1000e18;
+    underlyingAsset.mint(alice, _amount);
+    uint256 _shares = _deposit(underlyingAsset, vault, _amount, alice);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(RedeemMoreThanMax.selector, alice, _shares + 1, _shares)
+    );
+    vault.redeem(_shares + 1, alice, alice);
+
+    vm.stopPrank();
+  }
+
+  function testRedeemZeroShares() external {
+    vm.startPrank(alice);
+
+    vm.expectRevert(abi.encodeWithSelector(WithdrawZeroAssets.selector));
+
+    vault.redeem(0, alice, alice);
 
     vm.stopPrank();
   }

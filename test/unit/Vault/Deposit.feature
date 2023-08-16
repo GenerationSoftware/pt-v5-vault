@@ -44,15 +44,12 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
 
-  Scenario: Alice deposits with permit into the Vault on behalf of Bob
-    Given Alice owns 0 Vault shares and Bob owns 0 Vault shares
-    When Alice signs her transaction and deposits 1,000 underlying assets
-    Then Bob must receive an amount of Vault shares equivalent to Alice deposit
-    Then Alice must not receive any Vault shares
-    Then Alice `balance` must be equal to 0
-    Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to 1,000
-    Then Bob `delegateBalance` must be equal to 1,000
+  Scenario: Alice deposits with permit into the Vault via a third party
+    Given Alice owns 0 Vault shares
+    When Alice signs her permit and a third party uses it to deposit 1,000 underlying assets
+    Then Alice must receive an amount of Vault shares equivalent to her deposit
+    Then Alice `balance` must be equal to 1,000
+    Then Alice `delegateBalance` must be equal to 1,000
     Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
@@ -61,12 +58,22 @@ Feature: Deposit
   Scenario: Alice deposits into the Vault
     Given Alice owns 0 Vault shares
     When Alice deposits type(uint96).max + 1 underlying assets
-    Then the transaction reverts with the custom error DepositMoreThanMax
+    Then the transaction reverts with the custom error `DepositMoreThanMax`
 
   Scenario: Alice deposits into the Vault
     Given Alice owns 0 Vault shares and YieldVault's maxDeposit function returns type(uint88).max
     When Alice deposits type(uint88).max + 1 underlying assets
-    Then the transaction reverts with the custom error DepositMoreThanMax
+    Then the transaction reverts with the custom error `DepositMoreThanMax`
+
+  Scenario: Alice deposits into the Vault
+    Given Alice owns 0 Vault shares and the YieldVault's exchange rate has been manipulated
+    When Alice deposits 1,000 underlying assets
+    Then the transaction reverts with the custom error `YVWithdrawableAssetsLTExpected`
+
+  Scenario: Alice deposits into the Vault
+    Given Alice owns 0 Vault shares and the Vault is undercollateralized
+    When Alice deposits 1,000 underlying assets
+    Then the transaction reverts with the custom error `VaultUnderCollateralized`
 
   # Deposit - Attacks
   # Inflation attack
@@ -105,30 +112,6 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
 
-  # Mint with permit
-  Scenario: Alice mints with permit from the Vault
-    Given Alice owns 0 Vault shares
-    When Alice signs her transaction and mints 1,000 underlying assets
-    Then Alice must receive the amount of Vault shares requested
-    Then Alice `balance` must be equal to 1,000
-    Then Alice `delegateBalance` must be equal to 1,000
-    Then the YieldVault balance of underlying assets must increase by 1,000
-    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to 1,000
-
-  Scenario: Alice mints with permit from the Vault on behalf of Bob
-    Given Alice owns 0 Vault shares and Bob owns 0 Vault shares
-    When Alice signs her transaction and mints 1,000 shares
-    Then Bob must receive 1,000 Vault shares
-    Then Alice must not receive any Vault shares
-    Then Alice `balance` must be equal to 0
-    Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to 1,000
-    Then Bob `delegateBalance` must be equal to 1,000
-    Then the YieldVault balance of underlying assets must increase by 1,000
-    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to 1,000
-
   # Mint - Errors
   Scenario: Alice mints shares from the Vault
     Given Alice owns 0 Vault shares
@@ -139,6 +122,16 @@ Feature: Deposit
     Given Alice owns 0 Vault shares and YieldVault's maxMint function returns type(uint88).max
     When Alice mints type(uint88).max + 1 shares
     Then the transaction reverts with the custom error MintMoreThanMax
+
+  Scenario: Alice mints 0 shares from the Vault
+    Given Alice owns 0 Vault shares
+    When Alice mints 0 shares
+    Then the transaction reverts with the custom error MintZeroShares
+
+  Scenario: Alice mints 1,000 shares from the Vault
+    Given Alice owns 0 Vault shares and the Vault is undercollateralized
+    When Alice mints 1,000 shares
+    Then the transaction reverts with the custom error VaultUnderCollateralized
 
   # Sponsor
   Scenario: Alice sponsors the Vault
@@ -153,15 +146,12 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
 
-  Scenario: Alice sponsors the Vault on behalf of Bob
-    Given Alice owns 0 Vault shares and has not sponsored the Vault, Bob owns 0 Vault shares
+  Scenario: Alice sponsors the Vault
+    Given Alice owns 0 Vault shares and has already set the sponsorship address as delegate
     When Alice sponsors by depositing 1,000 underlying assets
-    Then Alice must not receive any Vault shares
-    Then Bob must receive 1,000 Vault shares
-    Then Alice `balance` must be equal to 0
+    Then Alice must receive an amount of Vault shares equivalent to her deposit
+    Then Alice `balance` must be equal to 1,000
     Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to 1,000
-    Then Bob `delegateBalance` must be equal to 0
     Then the `balance` of the sponsorship address must be 0
     Then the `delegateBalance` of the sponsorship address must be 0
     Then the YieldVault balance of underlying assets must increase by 1,000
@@ -181,20 +171,38 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
 
-  Scenario: Alice sponsors with permit the Vault on behalf of Bob
-    Given Alice owns 0 Vault shares and has not sponsored the Vault, Bob owns 0 Vault shares
-    When Alice signs her transaction and sponsors by depositing 1,000 underlying assets
-    Then Alice must not receive any Vault shares
-    Then Bob must receive an amount of Vault shares equivalent to Alice deposit
-    Then Alice `balance` must be equal to 0
+  Scenario: Alice sponsors with permit the Vault via a third party
+    Given Alice owns 0 Vault shares and has not sponsored the Vault
+    When Alice signs her permit and a third party uses it to sponsors by depositing 1,000 underlying assets
+    Then Alice must receive an amount of Vault shares equivalent to her deposit
+    Then Alice `balance` must be equal to 1,000
     Then Alice `delegateBalance` must be equal to 0
-    Then Bob `balance` must be equal to 1,000
-    Then Bob `delegateBalance` must be equal to 0
     Then the `balance` of the sponsorship address must be 0
     Then the `delegateBalance` of the sponsorship address must be 0
     Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
+
+  # Sweep
+  Scenario: Alice mistakenly sends 1,000 underlying assets to the Vault
+    Given Alice owns 0 Vault shares
+    When Bob calls the `sweep` function
+    Then Alice must not receive any Vault shares
+    Then Alice `balance` must be equal to 0
+    Then Alice `delegateBalance` must be equal to 0
+    Then Bob must not receive any Vault shares
+    Then Bob `balance` must be equal to 0
+    Then Bob `delegateBalance` must be equal to 0
+    Then the YieldVault balance of underlying assets must increase by 1,000
+    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
+    Then the Vault `totalSupply` must be equal to 0
+    Then the `availableYieldBalance` must be equalt to 1,000
+
+  # Sweep - Error
+  Scenario: Bob calls the `sweep` function
+    Given 0 underlying assets are currently held by the Vault
+    When Bob calls the `sweep` function
+    Then the transaction reverts with the custom error `SweepZeroAssets`
 
   # Delegate
   Scenario: Alice delegates to Bob

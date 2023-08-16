@@ -67,7 +67,6 @@ contract VaultTest is UnitBaseSetup {
     assertEq(testVault.name(), vaultName);
     assertEq(testVault.symbol(), vaultSymbol);
     assertEq(testVault.decimals(), assetDecimals);
-    assertEq(testVault.exchangeRate(), 10 ** assetDecimals);
     assertEq(testVault.twabController(), address(twabController));
     assertEq(testVault.yieldVault(), address(yieldVault));
     assertEq(testVault.prizePool(), address(prizePool));
@@ -140,6 +139,31 @@ contract VaultTest is UnitBaseSetup {
       address(this),
       YIELD_FEE_PERCENTAGE,
       address(0)
+    );
+  }
+
+  function testConstructorUnderlyingAssetMismatch() external {
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.asset.selector),
+      abi.encode(address(0))
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(UnderlyingAssetMismatch.selector, address(underlyingAsset), address(0))
+    );
+
+    new VaultMock(
+      IERC20(address(underlyingAsset)),
+      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+      "PTaEthDAI",
+      twabController,
+      yieldVault,
+      PrizePool(address(prizePool)),
+      claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
+      address(this)
     );
   }
 
@@ -372,7 +396,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetYieldFeePercentageGT1e9() public {
-    vm.expectRevert(abi.encodeWithSelector(YieldFeePercentageGTPrecision.selector, 1e10, 1e9));
+    vm.expectRevert(abi.encodeWithSelector(YieldFeePercentageGtePrecision.selector, 1e10, 1e9));
     vault.setYieldFeePercentage(1e10);
   }
 

@@ -5,10 +5,6 @@ import { UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
 import "../../../src/Vault.sol";
 
 contract VaultUndercollateralizationTest is UnitBaseSetup {
-  /* ============ Events ============ */
-
-  event RecordedExchangeRate(uint256 exchangeRate);
-
   /* ============ Tests ============ */
 
   /* ============ Undercollateralization without yield fees accrued ============ */
@@ -54,6 +50,8 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vm.stopPrank();
 
+    assertEq(vault.isVaultCollateralized(), false);
+
     vm.startPrank(bob);
 
     vault.withdraw(vault.maxWithdraw(bob), bob, bob);
@@ -61,15 +59,20 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vm.stopPrank();
 
+    // The Vault is now back to his initial state with no more shares
+    assertEq(vault.isVaultCollateralized(), true);
     assertEq(vault.totalSupply(), 0);
   }
 
-  /* ============ Undercollateralization exchange rate reset ============ */
-  function testUndercollateralizationExchangeRateReset() external {
-    uint256 _aliceAmount = 20_000_000e18;
-    uint256 _aliceAmountUndercollateralized = 10_000_000e18;
+  function testUndercollateralizationYieldVaultReCollateralized() external {
+    uint256 _aliceAmount = 15_000_000e18;
 
     underlyingAsset.mint(alice, _aliceAmount);
+
+    uint256 _bobAmount = 5_000_000e18;
+    uint256 _bobUndercollateralizedAmount = 2_500_000e18;
+
+    underlyingAsset.mint(bob, _bobAmount);
 
     vm.startPrank(alice);
 
@@ -78,30 +81,103 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vm.stopPrank();
 
+    vm.startPrank(bob);
+
+    _deposit(underlyingAsset, vault, _bobAmount, bob);
+    assertEq(vault.balanceOf(bob), _bobAmount);
+
     assertEq(vault.isVaultCollateralized(), true);
 
     // We burn underlying assets from the YieldVault to trigger the undercollateralization
-    underlyingAsset.burn(address(yieldVault), 10_000_000e18);
+    uint256 _undercollateralizedAmount = 10_000_000e18;
+    underlyingAsset.burn(address(yieldVault), _undercollateralizedAmount);
 
     assertEq(vault.isVaultCollateralized(), false);
 
-    assertEq(vault.maxWithdraw(alice), _aliceAmountUndercollateralized);
+    // Bob decides to take the loss and withdraw his shares of the deposit
+    assertEq(vault.maxWithdraw(bob), _bobUndercollateralizedAmount);
+
+    vault.withdraw(vault.maxWithdraw(bob), bob, bob);
+    assertEq(underlyingAsset.balanceOf(bob), _bobUndercollateralizedAmount);
+
+    vm.stopPrank();
+
+    // Funds are returned to the YieldVault
+    underlyingAsset.mint(address(yieldVault), _undercollateralizedAmount);
+
+    assertEq(vault.isVaultCollateralized(), true);
 
     vm.startPrank(alice);
 
-    vm.expectEmit();
-    emit RecordedExchangeRate(5e17); // 50%
-
-    // Trigger recorded exchange rate by depositing 0
-    vault.deposit(0, alice);
-
-    // After the next withdraw, there will be no assets left in the vault, so the exchange rate should be reset after the shares are burned
-    vm.expectEmit();
-    emit RecordedExchangeRate(1e18); // 100%
+    // Alice decided to wait and can now withdraw her full amount
+    assertEq(vault.maxWithdraw(alice), _aliceAmount);
 
     vault.withdraw(vault.maxWithdraw(alice), alice, alice);
-    assertEq(underlyingAsset.balanceOf(alice), _aliceAmountUndercollateralized);
+    assertEq(underlyingAsset.balanceOf(alice), _aliceAmount);
+
+    vm.stopPrank();
+
+    assertEq(vault.isVaultCollateralized(), true);
     assertEq(vault.totalSupply(), 0);
+  }
+
+  function testUndercollateralizationYieldVaultEmpty() external {
+    uint256 _aliceAmount = 15_000_000e18;
+
+    underlyingAsset.mint(alice, _aliceAmount);
+
+    uint256 _bobAmount = 5_000_000e18;
+
+    underlyingAsset.mint(bob, _bobAmount);
+
+    vm.startPrank(alice);
+
+    _deposit(underlyingAsset, vault, _aliceAmount, alice);
+    assertEq(vault.balanceOf(alice), _aliceAmount);
+
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+
+    _deposit(underlyingAsset, vault, _bobAmount, bob);
+    assertEq(vault.balanceOf(bob), _bobAmount);
+
+    assertEq(vault.isVaultCollateralized(), true);
+
+    // We burn all the underlying assets from the YieldVault to trigger the undercollateralization
+    uint256 _undercollateralizedAmount = 20_000_000e18;
+    underlyingAsset.burn(address(yieldVault), _undercollateralizedAmount);
+
+    assertEq(vault.isVaultCollateralized(), false);
+
+    uint256 _bobMaxWithdraw = vault.maxWithdraw(bob);
+
+    // Bob can't withdraw any assets
+    assertEq(_bobMaxWithdraw, 0);
+
+    vm.expectRevert(abi.encodeWithSelector(WithdrawZeroAssets.selector));
+
+    vault.withdraw(_bobMaxWithdraw, bob, bob);
+
+    vm.stopPrank();
+
+    vm.startPrank(alice);
+
+    uint256 _aliceMaxWithdraw = vault.maxWithdraw(alice);
+
+    // Alice can't withdraw any assets
+    assertEq(_aliceMaxWithdraw, 0);
+
+    vm.expectRevert(abi.encodeWithSelector(WithdrawZeroAssets.selector));
+
+    vault.withdraw(_aliceMaxWithdraw, alice, alice);
+
+    underlyingAsset.mint(alice, _aliceAmount);
+
+    // Alice can't deposit into an undercollateralized vault
+    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+
+    vault.deposit(_aliceAmount, alice);
 
     vm.stopPrank();
   }
@@ -212,7 +288,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     assertEq(vault.isVaultCollateralized(), false);
 
-    uint256 _yieldFeeShares = vault.yieldFeeTotalSupply();
+    uint256 _yieldFeeShares = vault.yieldFeeShares();
 
     // The Vault is now undercollateralized so we can't mint the yield fee
     vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
@@ -220,33 +296,112 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vm.startPrank(bob);
 
-    // We lose in precision because the Vault is undercollateralized
-    // and the exchange rate is below 1e18 and rounded down
     _bobAmount = _getMaxWithdraw(bob, vault, yieldVault);
-    assertApproxEqAbs(vault.maxWithdraw(bob), _bobAmount, 2382812);
+    assertEq(vault.maxWithdraw(bob), _bobAmount);
 
     vault.withdraw(vault.maxWithdraw(bob), bob, bob);
-    assertApproxEqAbs(underlyingAsset.balanceOf(bob), _bobAmount, 2382812);
+    assertEq(underlyingAsset.balanceOf(bob), _bobAmount);
 
     vm.stopPrank();
 
     vm.startPrank(alice);
 
     _aliceAmount = _getMaxWithdraw(alice, vault, yieldVault);
-    assertApproxEqAbs(vault.maxWithdraw(alice), _aliceAmount, 2382812);
+    assertEq(vault.maxWithdraw(alice), _aliceAmount);
 
-    vault.withdraw(vault.maxWithdraw(alice), alice, alice);
-    assertApproxEqAbs(underlyingAsset.balanceOf(alice), _aliceAmount, 2382812);
+    // Due to the undercollateralization `maxWithdraw` rounds down
+    // and Alice would still own 1 Vault share after withdrawing
+    // We use `redeem` instead to withdraw the full amount and burn all shares
+    vault.redeem(vault.maxRedeem(alice), alice, alice);
+    assertEq(underlyingAsset.balanceOf(alice), _aliceAmount);
 
     vm.stopPrank();
 
     uint256 _thisAmount = _getMaxWithdraw(address(this), vault, yieldVault);
-    assertApproxEqAbs(vault.maxWithdraw(address(this)), _thisAmount, 2440000);
+    assertEq(vault.maxWithdraw(address(this)), _thisAmount);
 
     vault.withdraw(vault.maxWithdraw(address(this)), address(this), address(this));
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(this)), _thisAmount, 2440000);
+    assertEq(underlyingAsset.balanceOf(address(this)), _thisAmount);
 
     assertEq(vault.totalSupply(), 0);
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 2440000);
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
+  }
+
+  function testPartialUndercollateralizationWithYieldFeesCaptured() external {
+    _setLiquidationPair();
+
+    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+    vault.setYieldFeeRecipient(address(this));
+
+    uint256 _aliceAmount = 1000e18;
+    underlyingAsset.mint(alice, _aliceAmount);
+
+    vm.startPrank(alice);
+
+    _deposit(underlyingAsset, vault, _aliceAmount, alice);
+    assertEq(vault.balanceOf(alice), _aliceAmount);
+
+    vm.stopPrank();
+
+    assertEq(vault.isVaultCollateralized(), true);
+
+    // We accrue yield...
+    uint256 _yield = 20e18;
+    _accrueYield(underlyingAsset, yieldVault, _yield);
+
+    assertEq(vault.availableYieldBalance(), 20e18);
+    assertEq(vault.availableYieldFeeBalance(), 2e18);
+
+    // ...and liquidate it
+    prizeToken.mint(bob, type(uint256).max);
+
+    vm.startPrank(bob);
+
+    uint256 _liquidatedYield = vault.liquidatableBalanceOf(address(vault));
+
+    _liquidate(liquidationRouter, liquidationPair, prizeToken, _liquidatedYield, bob);
+
+    vm.stopPrank();
+
+    assertEq(vault.balanceOf(bob), _liquidatedYield);
+
+    assertEq(vault.availableYieldBalance(), 0);
+    assertEq(vault.availableYieldFeeBalance(), 0);
+
+    // We burn 1e18 underlying assets from the YieldVault to trigger the partial undercollateralization
+    underlyingAsset.burn(address(yieldVault), 1e18);
+
+    assertEq(vault.isVaultCollateralized(), true);
+
+    uint256 _yieldFeeShares = vault.yieldFeeShares();
+
+    // The Vault is now partially undercollateralized so we can't mint the yield fee
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        YieldFeeGTAvailableYield.selector,
+        vault.convertToAssets(_yieldFeeShares),
+        yieldVault.maxWithdraw(address(vault)) - vault.convertToAssets(vault.totalSupply())
+      )
+    );
+
+    vault.mintYieldFee(_yieldFeeShares);
+
+    vm.startPrank(alice);
+
+    vault.withdraw(vault.maxWithdraw(alice), alice, alice);
+
+    assertEq(underlyingAsset.balanceOf(alice), _aliceAmount);
+
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+
+    vault.withdraw(vault.maxWithdraw(bob), bob, bob);
+
+    assertEq(underlyingAsset.balanceOf(bob), _yield - _yieldFeeShares);
+
+    vm.stopPrank();
+
+    assertEq(vault.totalSupply(), 0);
   }
 }

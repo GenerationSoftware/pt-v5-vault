@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
+import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
@@ -42,6 +43,12 @@ contract VaultFactoryTest is Test {
     // We don't know the vault address in advance, so we don't check topic 1
     vm.expectEmit(false, true, true, true);
     emit NewFactoryVault(Vault(_vault), vaultFactory);
+
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.asset.selector),
+      abi.encode(address(asset))
+    );
 
     _vault = vaultFactory.deployVault(
       asset,
