@@ -250,16 +250,6 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testClaimPrize_INTERNAL_USE_ONLY_notCallable() public {
-    vm.startPrank(address(claimer));
-
-    mockPrizePoolClaimPrize(uint8(1), alice, 0, 0, address(claimer));
-    vm.expectRevert();
-    vault.claimPrize_INTERNAL_USE_ONLY(alice, uint8(1), 0, 0, address(claimer));
-
-    vm.stopPrank();
-  }
-
   /* ============ Getters ============ */
   function testGetTwabController() external {
     assertEq(vault.twabController(), address(twabController));
@@ -441,12 +431,7 @@ contract VaultTest is UnitBaseSetup {
     uint96 fee,
     address feeRecipient
   ) public returns (uint256) {
-    address[] memory winners = new address[](1);
-    winners[0] = winner;
-    uint32[][] memory prizeIndices = new uint32[][](1);
-    prizeIndices[0] = new uint32[](1);
-    prizeIndices[0][0] = prizeIndex;
-    return vault.claimPrizes(tier, winners, prizeIndices, fee, feeRecipient);
+    return vault.claimPrize(winner, tier, prizeIndex, fee, feeRecipient);
   }
 
   /* ============ mocks ============ */

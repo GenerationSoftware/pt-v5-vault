@@ -637,50 +637,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /* ============ Claim Functions ============ */
 
-  /**
-   * @notice Claim prizes for the `_winners`
-   * @dev The caller must be the claimer
-   * @param _tier Tier to claim prize for
-   * @param _winners Addresses of the winners to claim prizes
-   * @param _prizeIndices The prizes to claim for each winner
-   * @param _feePerClaim Fee to be charged per prize claim
-   * @param _feeRecipient Address that will receive `_claimFee` amount
-   * @return uint256 The total prize amounts claimed
-   */
-  function claimPrizes(
-    uint8 _tier,
-    address[] calldata _winners,
-    uint32[][] calldata _prizeIndices,
-    uint96 _feePerClaim,
-    address _feeRecipient
-  ) external onlyClaimer returns (uint256) {
-    uint totalPrizes;
-
-    for (uint w = 0; w < _winners.length; w++) {
-      uint prizeIndicesLength = _prizeIndices[w].length;
-      for (uint p = 0; p < prizeIndicesLength; p++) {
-        try this.claimPrize_INTERNAL_USE_ONLY(
-          _winners[w],
-          _tier,
-          _prizeIndices[w][p],
-          _feePerClaim,
-          _feeRecipient
-        ) returns (uint256 prize) {
-          totalPrizes += prize;
-        } catch (bytes memory reason) {
-          emit ClaimFailed(
-            _winners[w],
-            _tier,
-            _prizeIndices[w][p],
-            reason
-          );
-        }
-      }
-    }
-
-    return totalPrizes;
-  }
-
   /* ============ Setter Functions ============ */
 
   /**
@@ -1071,6 +1027,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /* ============ Claim Functions ============ */
+
   /**
    * @notice Claim prize for a winner
    * @param _winner The winner of the prize
@@ -1087,27 +1044,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint96 _fee,
     address _feeRecipient
   ) external onlyClaimer returns (uint256) {
-    return this.claimPrize_INTERNAL_USE_ONLY(_winner, _tier, _prizeIndex, _fee, _feeRecipient);
-  }
-
-  /**
-   * @notice Claim prize for `_winner`.
-   * @param _winner Address of the winner to claim the prize for
-   * @param _tier Tier of the prize
-   * @param _prizeIndex The prize index to claim
-   * @param _fee Fee to be charged for the claim
-   * @param _feeRecipient Address that will receive the fee
-   * @return uint256 The total prize amount claimed
-   */
-  function claimPrize_INTERNAL_USE_ONLY(
-    address _winner,
-    uint8 _tier,
-    uint32 _prizeIndex,
-    uint96 _fee,
-    address _feeRecipient
-  ) external returns (uint256) {
-    assert(msg.sender == address(this));
-
     VaultHooks memory hooks = _hooks[_winner];
     address recipient;
 
@@ -1131,7 +1067,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     );
 
     if (hooks.useAfterClaimPrize) {
-      try hooks.implementation.afterClaimPrize{gas: HOOK_GAS}(_winner, _tier, _prizeIndex, prizeTotal - _fee, recipient) {
+      try hooks.implementation.afterClaimPrize{gas: HOOK_GAS}(_winner, _tier, _prizeIndex, prizeTotal, recipient) {
       } catch (bytes memory reason) {
         revert AfterClaimPrizeFailed(reason);
       }

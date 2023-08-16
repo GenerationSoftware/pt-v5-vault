@@ -31,13 +31,13 @@ interface IVaultHooks {
   /// @param winner The user who won the prize and for whom this hook is attached
   /// @param tier The tier of the prize
   /// @param prizeIndex The index of the prize
-  /// @param payout The amount of tokens paid out to the recipient
+  /// @param prize The total size of the prize (payout + fee)
   /// @param recipient The recipient of the prize
   function afterClaimPrize(
     address winner,
     uint8 tier,
     uint32 prizeIndex,
-    uint256 payout,
+    uint256 prize,
     address recipient
   ) external;
 }

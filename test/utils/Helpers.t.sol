@@ -209,34 +209,4 @@ contract Helpers is Test {
   ) internal pure returns (uint256) {
     return _availableYield -= (_availableYield * _feePercentage) / FEE_PRECISION;
   }
-
-  /* ============ Claim ============ */
-  function _claim(
-    address _claimer,
-    Vault _vault,
-    PrizePool _prizePool,
-    address _user,
-    uint8[] memory _tiers
-  ) internal returns (uint256) {
-    // Claim[] memory claims = new Claim[](1);
-    // claims[0] = Claim({ vault: IVault(address(_vault)), winner: _user, tier: _tiers[0] });
-    // uint32 _drawPeriodSeconds = _prizePool.drawPeriodSeconds();
-    // vm.warp(
-    //   _drawPeriodSeconds /
-    //     _prizePool.estimatedPrizeCount() +
-    //     _prizePool.lastCompletedDrawStartedAt() +
-    //     _drawPeriodSeconds +
-    //     10
-    // );
-    // vm.startPrank(_claimer);
-    // _vault.claimPrizes(
-    // )
-    // (, uint256 _totalFees) = _claimer.claimPrizes(0, claims, address(this));
-    // uint8 _tier,
-    // address[] calldata _winners,
-    // uint32[][] calldata _prizeIndices,
-    // uint96 _feePerClaim,
-    // address _claimFeeRecipient
-    // return _totalFees;
-  }
 }
