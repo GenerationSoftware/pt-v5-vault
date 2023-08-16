@@ -166,14 +166,9 @@ contract VaultWithdrawTest is UnitBaseSetup {
     // We burn the accrued yield to set the Vault in an undercollateralized state
     underlyingAsset.burn(address(yieldVault), _yield);
 
-    assertLt(vault.exchangeRate(), 1e18);
-
     // The Vault is now undercollateralized, so users can withdraw their share of the deposits
-    // any unclaimed yield fee goes proportionally to each user
-
-    // We lose a bit of precision due to the exchange rate being below 1e18 and rounded down
-    assertApproxEqAbs(vault.maxWithdraw(bob), _getMaxWithdraw(bob, vault, yieldVault), 6);
-    assertApproxEqAbs(vault.maxWithdraw(alice), _getMaxWithdraw(alice, vault, yieldVault), 693);
+    assertEq(vault.maxWithdraw(bob), _getMaxWithdraw(bob, vault, yieldVault));
+    assertEq(vault.maxWithdraw(alice), _getMaxWithdraw(alice, vault, yieldVault));
 
     vm.startPrank(alice);
 
@@ -194,7 +189,7 @@ contract VaultWithdrawTest is UnitBaseSetup {
     assertEq(underlyingAsset.balanceOf(bob), _bobWithdrawableAmount);
 
     assertEq(vault.totalSupply(), 0);
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 7);
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
 
     vm.stopPrank();
   }

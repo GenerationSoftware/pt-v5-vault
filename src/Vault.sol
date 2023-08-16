@@ -284,9 +284,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Address of the ILiquidationPair used to liquidate yield for prize token.
   ILiquidationPair private _liquidationPair;
 
-  /// @notice Underlying asset unit (i.e. 10 ** 18 for DAI).
-  uint256 private _assetUnit;
-
   /// @notice Yield fee percentage represented in integer format with 9 decimal places (i.e. 10000000 = 0.01 = 1%).
   uint256 private _yieldFeePercentage;
 
@@ -344,8 +341,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _setClaimer(claimer_);
     _setYieldFeeRecipient(yieldFeeRecipient_);
     _setYieldFeePercentage(yieldFeePercentage_);
-
-    _assetUnit = 10 ** super.decimals();
 
     // Approve once for max amount
     asset_.safeApprove(address(yieldVault_), type(uint256).max);
@@ -424,15 +419,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Current exchange rate between the amount of underlying assets withdrawable from the YieldVault
-   *         and the total supply of shares minted by this Vault.
-   * @return uint256 Current exchange rate
-   */
-  function exchangeRate() public view returns (uint256) {
-    return _exchangeRate();
-  }
-
-  /**
    * @notice Check if the Vault is collateralized.
    * @return bool True if the vault is collateralized, false otherwise
    */
@@ -447,7 +433,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function maxDeposit(address recipient) public view virtual override returns (uint256) {
     if (!_isVaultCollateralized()) return 0;
 
-    uint256 _vaultMaxDeposit = type(uint96).max - _convertToAssets(balanceOf(recipient), Math.Rounding.Up);
+    uint256 _vaultMaxDeposit = type(uint96).max -
+      _convertToAssets(balanceOf(recipient), Math.Rounding.Up);
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
     return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
@@ -898,10 +885,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _assets,
     Math.Rounding _rounding
   ) internal view virtual override returns (uint256) {
+    uint256 _collateralAssets = _collateral();
+    uint256 _depositedAssets = _totalSupply();
+
+    if (_assets == 0 || _depositedAssets == 0) {
+      return _assets;
+    }
+
     return
-      (_assets == 0 || _totalSupply() == 0)
-        ? _assets
-        : _assets.mulDiv(_assetUnit, _exchangeRate(), _rounding);
+      _collateralAssets == 0 ? 0 : _assets.mulDiv(_depositedAssets, _collateralAssets, _rounding);
   }
 
   /**
@@ -914,10 +906,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _shares,
     Math.Rounding _rounding
   ) internal view virtual override returns (uint256) {
+    uint256 _collateralAssets = _collateral();
+    uint256 _depositedAssets = _totalSupply();
+
+    if (_shares == 0 || _depositedAssets == 0) {
+      return _shares;
+    }
+
     return
-      (_shares == 0 || _totalSupply() == 0)
-        ? _shares
-        : _shares.mulDiv(_exchangeRate(), _assetUnit, _rounding);
+      _collateralAssets == 0 ? 0 : _shares.mulDiv(_collateralAssets, _depositedAssets, _rounding);
   }
 
   /* ============ Deposit Functions ============ */
@@ -1072,7 +1069,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     address recipient;
 
     if (hooks.useBeforeClaimPrize) {
-      try hooks.implementation.beforeClaimPrize{gas: HOOK_GAS}(_winner, _tier, _prizeIndex, _fee, _feeRecipient) returns (address result) {
+      try
+        hooks.implementation.beforeClaimPrize{ gas: HOOK_GAS }(
+          _winner,
+          _tier,
+          _prizeIndex,
+          _fee,
+          _feeRecipient
+        )
+      returns (address result) {
         recipient = result;
       } catch (bytes memory reason) {
         revert BeforeClaimPrizeFailed(reason);
@@ -1091,8 +1096,15 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     );
 
     if (hooks.useAfterClaimPrize) {
-      try hooks.implementation.afterClaimPrize{gas: HOOK_GAS}(_winner, _tier, _prizeIndex, prizeTotal, recipient) {
-      } catch (bytes memory reason) {
+      try
+        hooks.implementation.afterClaimPrize{ gas: HOOK_GAS }(
+          _winner,
+          _tier,
+          _prizeIndex,
+          prizeTotal,
+          recipient
+        )
+      {} catch (bytes memory reason) {
         revert AfterClaimPrizeFailed(reason);
       }
     }
@@ -1134,7 +1146,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _shares Shares to mint
    * @dev Emits a {Transfer} event with `from` set to the zero address.
    * @dev `_receiver` cannot be the zero address.
-   * @dev Updates the exchange rate.
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
     if (_shares > maxMint(_receiver))
@@ -1152,7 +1163,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Emits a {Transfer} event with `to` set to the zero address.
    * @dev `_owner` cannot be the zero address.
    * @dev `_owner` must have at least `_shares` tokens.
-   * @dev Updates the exchange rate.
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
     _twabController.burn(_owner, SafeCast.toUint96(_shares));
@@ -1176,37 +1186,27 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Calculates the exchange rate between the amount of underlying assets withdrawable from the YieldVault
-   *         and the total supply of shares minted by this Vault.
-   * @dev The initial exchange rate is 1, representing 1 unit of underlying asset.
+   * @notice Returns the quantity of withdrawable underlying assets held as collateral by the YieldVault.
    * @dev When the Vault is collateralized, Vault shares are minted at a 1:1 ratio based on the user's deposited underlying assets.
    *      The total supply of shares corresponds directly to the total amount of underlying assets deposited into the YieldVault.
    *      Users have the ability to withdraw only the quantity of underlying assets they initially deposited,
    *      without access to any of the accumulated yield within the YieldVault.
-   * @dev When the Vault is undercollateralized, the exchange rate diminishes below 1.
-   *      Withdrawals can be made by users for their corresponding deposit shares,
-   *      and any remaining unclaimed yield is distributed proportionally among depositors.
-   * @return uint256 Current exchange rate
+   * @dev In case of undercollateralization, any remaining collateral within the YieldVault can be withdrawn.
+   *      Withdrawals can be made by users for their corresponding deposit shares.
+   * @return uint256 Available collateral
    */
-  function _exchangeRate() internal view returns (uint256) {
+  function _collateral() internal view returns (uint256) {
     uint256 _depositedAssets = _totalSupply();
     uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
 
     // If the Vault is collateralized, users can only withdraw the amount of underlying assets they deposited.
-    // An exchange rate of 1 is returned to exclude the amount of yield generated by the YieldVault.
     if (_withdrawableAssets >= _depositedAssets) {
-      return _assetUnit;
+      return _depositedAssets;
     }
 
-    // Otherwise, users can withdraw their corresponding deposit shares and
-    // any unclaimed yield is factored in and distributed proportionally among depositors.
-    if (_depositedAssets != 0 && _withdrawableAssets != 0) {
-      return _withdrawableAssets.mulDiv(_assetUnit, _depositedAssets, Math.Rounding.Down);
-    }
-
-    // Case when `_withdrawableAssets == 0` but `_depositedAssets != 0`.
-    // The Vault is entirely undercollateralized and shares can't be redeemed.
-    return 0;
+    // Otherwise, any remaining collateral within the YieldVault is available
+    // and distributed proportionally among depositors.
+    return _withdrawableAssets;
   }
 
   /**

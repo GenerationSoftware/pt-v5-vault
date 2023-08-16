@@ -306,14 +306,11 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
      */
     assertEq(underlyingAsset.balanceOf(alice), _attackAmount);
 
-    // The exchange rate has not been manipulated and is still equal to 1 unit of asset
-    assertEq(vault.exchangeRate(), 10 ** 18);
-
     /**
      * Alice receives back the same amount of Vault shares than underlying assets deposited
      * despite the attempt by Bob to inflate the exchange rate.
-     * This is because the exchange rate does not take into account
-     * the amount of underlying assets living in the Vault.
+     * This is because the Vault is collateralized
+     * and Alice can only withdraw the amount she deposited.
      */
     assertEq(vault.balanceOf(alice), _amount);
     assertEq(IERC20(vault).balanceOf(alice), _amount);
@@ -339,7 +336,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
      * Bob tries to redeem 1.99 shares to benefit from the attack
      * but it reverts cause he can only withdraw 1 wei of shares.
      */
-    vault.redeem(vault.exchangeRate() * 2 - 1, bob, bob);
+    vault.redeem(2e18 - 1, bob, bob);
     assertEq(underlyingAsset.balanceOf(bob), 0);
 
     vm.stopPrank();

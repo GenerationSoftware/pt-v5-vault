@@ -37,7 +37,6 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     underlyingAsset.burn(address(yieldVault), 10_000_000e18);
 
     assertEq(vault.isVaultCollateralized(), false);
-    assertEq(vault.exchangeRate(), 5e17); // 50%
 
     assertEq(vault.maxWithdraw(alice), _aliceAmountUndercollateralized);
     assertEq(vault.maxWithdraw(bob), _bobAmountUndercollateralized);
@@ -52,7 +51,6 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     vm.stopPrank();
 
     assertEq(vault.isVaultCollateralized(), false);
-    assertEq(vault.exchangeRate(), 5e17); // 50%
 
     vm.startPrank(bob);
 
@@ -61,10 +59,8 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vm.stopPrank();
 
-    // The Vault is now back to his initial state with no more shares,
-    // so the exchange rate is reset and the Vault is no longer undercollateralized
+    // The Vault is now back to his initial state with no more shares
     assertEq(vault.isVaultCollateralized(), true);
-    assertEq(vault.exchangeRate(), 1e18); // 100%
     assertEq(vault.totalSupply(), 0);
   }
 
@@ -97,7 +93,6 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     underlyingAsset.burn(address(yieldVault), _undercollateralizedAmount);
 
     assertEq(vault.isVaultCollateralized(), false);
-    assertEq(vault.exchangeRate(), 5e17); // 50%
 
     // Bob decides to take the loss and withdraw his shares of the deposit
     assertEq(vault.maxWithdraw(bob), _bobUndercollateralizedAmount);
@@ -111,7 +106,6 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     underlyingAsset.mint(address(yieldVault), _undercollateralizedAmount);
 
     assertEq(vault.isVaultCollateralized(), true);
-    assertEq(vault.exchangeRate(), 1e18); // 100%
 
     vm.startPrank(alice);
 
@@ -155,7 +149,6 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     underlyingAsset.burn(address(yieldVault), _undercollateralizedAmount);
 
     assertEq(vault.isVaultCollateralized(), false);
-    assertEq(vault.exchangeRate(), 0);
 
     uint256 _bobMaxWithdraw = vault.maxWithdraw(bob);
 
@@ -303,34 +296,35 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
 
     vm.startPrank(bob);
 
-    // We lose in precision because the Vault is undercollateralized
-    // and the exchange rate is below 1e18 and rounded down
     _bobAmount = _getMaxWithdraw(bob, vault, yieldVault);
-    assertApproxEqAbs(vault.maxWithdraw(bob), _bobAmount, 2382812);
+    assertEq(vault.maxWithdraw(bob), _bobAmount);
 
     vault.withdraw(vault.maxWithdraw(bob), bob, bob);
-    assertApproxEqAbs(underlyingAsset.balanceOf(bob), _bobAmount, 2382812);
+    assertEq(underlyingAsset.balanceOf(bob), _bobAmount);
 
     vm.stopPrank();
 
     vm.startPrank(alice);
 
     _aliceAmount = _getMaxWithdraw(alice, vault, yieldVault);
-    assertApproxEqAbs(vault.maxWithdraw(alice), _aliceAmount, 2382812);
+    assertEq(vault.maxWithdraw(alice), _aliceAmount);
 
-    vault.withdraw(vault.maxWithdraw(alice), alice, alice);
-    assertApproxEqAbs(underlyingAsset.balanceOf(alice), _aliceAmount, 2382812);
+    // Due to the undercollateralization `maxWithdraw` rounds down
+    // and Alice would still own 1 Vault share after withdrawing
+    // We use `redeem` instead to withdraw the full amount and burn all shares
+    vault.redeem(vault.maxRedeem(alice), alice, alice);
+    assertEq(underlyingAsset.balanceOf(alice), _aliceAmount);
 
     vm.stopPrank();
 
     uint256 _thisAmount = _getMaxWithdraw(address(this), vault, yieldVault);
-    assertApproxEqAbs(vault.maxWithdraw(address(this)), _thisAmount, 2440000);
+    assertEq(vault.maxWithdraw(address(this)), _thisAmount);
 
     vault.withdraw(vault.maxWithdraw(address(this)), address(this), address(this));
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(this)), _thisAmount, 2440000);
+    assertEq(underlyingAsset.balanceOf(address(this)), _thisAmount);
 
     assertEq(vault.totalSupply(), 0);
-    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 2440000);
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
   }
 
   function testPartialUndercollateralizationWithYieldFeesCaptured() external {
