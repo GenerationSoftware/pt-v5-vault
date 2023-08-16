@@ -57,6 +57,17 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
 
+  # Deposit - Errors
+  Scenario: Alice deposits into the Vault
+    Given Alice owns 0 Vault shares
+    When Alice deposits type(uint96).max + 1 underlying assets
+    Then the transaction reverts with the custom error DepositMoreThanMax
+
+  Scenario: Alice deposits into the Vault
+    Given Alice owns 0 Vault shares and YieldVault's maxDeposit function returns type(uint88).max
+    When Alice deposits type(uint88).max + 1 underlying assets
+    Then the transaction reverts with the custom error DepositMoreThanMax
+
   # Deposit - Attacks
   # Inflation attack
   Scenario: Bob front runs Alice deposits into the Vault
@@ -117,6 +128,17 @@ Feature: Deposit
     Then the YieldVault balance of underlying assets must increase by 1,000
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
+
+  # Mint - Errors
+  Scenario: Alice mints shares from the Vault
+    Given Alice owns 0 Vault shares
+    When Alice mints type(uint96).max + 1 shares
+    Then the transaction reverts with the custom error MintMoreThanMax
+
+  Scenario: Alice mints shares from the Vault
+    Given Alice owns 0 Vault shares and YieldVault's maxMint function returns type(uint88).max
+    When Alice mints type(uint88).max + 1 shares
+    Then the transaction reverts with the custom error MintMoreThanMax
 
   # Sponsor
   Scenario: Alice sponsors the Vault

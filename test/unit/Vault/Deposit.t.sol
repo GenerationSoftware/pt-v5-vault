@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.19;
 
-import { MintMoreThanMax, DepositMoreThanMax } from "../../../src/Vault.sol";
-
 import { BrokenToken } from "brokentoken/BrokenToken.sol";
+import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { IERC20, UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
-import { console2 } from "forge-std/Test.sol";
+import { MintMoreThanMax, DepositMoreThanMax } from "../../../src/Vault.sol";
 
 contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
@@ -47,20 +46,6 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
     assertEq(yieldVault.totalSupply(), _amount);
-
-    vm.stopPrank();
-  }
-
-  function testDepositMoreThanMax() external {
-    vm.startPrank(alice);
-
-    uint256 _moreThanMax = uint256(type(uint96).max) + 1;
-    uint256 _amount = _moreThanMax;
-    underlyingAsset.mint(alice, _amount);
-    underlyingAsset.approve(address(vault), type(uint256).max);
-
-    vm.expectRevert(abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint96).max));
-    vault.deposit(_amount, alice);
 
     vm.stopPrank();
   }
@@ -183,6 +168,45 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
     assertEq(yieldVault.balanceOf(address(vault)), _amount);
     assertEq(yieldVault.totalSupply(), _amount);
+
+    vm.stopPrank();
+  }
+
+  /* ============ Deposit - Errors ============ */
+  function testDepositMoreThanMax() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = uint256(type(uint96).max) + 1;
+
+    underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint96).max)
+    );
+    vault.deposit(_amount, alice);
+
+    vm.stopPrank();
+  }
+
+  function testDepositMoreThanYieldVaultMax() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = uint256(type(uint88).max) + 1;
+
+    underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.maxDeposit.selector, address(vault)),
+      abi.encode(type(uint88).max)
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint88).max)
+    );
+    vault.deposit(_amount, alice);
 
     vm.stopPrank();
   }
@@ -385,14 +409,41 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
+  /* ============ Mint - Errors ============ */
   function testMintMoreThanMax() external {
     vm.startPrank(alice);
 
     uint256 _amount = uint256(type(uint96).max) + 1;
+
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    vm.expectRevert(abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint96).max));
+    vm.expectRevert(
+      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint96).max)
+    );
+
+    vault.mint(_amount, alice);
+
+    vm.stopPrank();
+  }
+
+  function testMintMoreThanYieldVaultMax() external {
+    vm.startPrank(alice);
+
+    uint256 _amount = uint256(type(uint88).max) + 1;
+
+    underlyingAsset.mint(alice, _amount);
+    underlyingAsset.approve(address(vault), type(uint256).max);
+
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.maxMint.selector, address(vault)),
+      abi.encode(type(uint88).max)
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint88).max)
+    );
 
     vault.mint(_amount, alice);
 
