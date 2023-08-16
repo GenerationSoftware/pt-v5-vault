@@ -149,11 +149,11 @@ error YieldFeeGTAvailableYield(uint256 assets, uint256 availableYield);
 error LPZeroAddress();
 
 /**
- * @notice Emitted when the yield fee percentage being set is greater than 1.
+ * @notice Emitted when the yield fee percentage being set is greater than or equal to 1.
  * @param yieldFeePercentage The yield fee percentage in integer format
  * @param maxYieldFeePercentage The max yield fee percentage in integer format (this value is equal to 1 in decimal format)
  */
-error YieldFeePercentageGTPrecision(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
+error YieldFeePercentageGtePrecision(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
 
 /// @notice Emitted when the BeforeClaim prize hook fails
 /// @param reason The revert reason that was thrown
@@ -1236,12 +1236,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Set yield fee percentage.
-   * @dev Yield fee is represented in 9 decimals and can't exceed `1e9`.
+   * @dev Yield fee is represented in 9 decimals and can't exceed or equal `1e9`.
    * @param yieldFeePercentage_ The new yield fee percentage to set
    */
   function _setYieldFeePercentage(uint256 yieldFeePercentage_) internal {
-    if (yieldFeePercentage_ > FEE_PRECISION) {
-      revert YieldFeePercentageGTPrecision(yieldFeePercentage_, FEE_PRECISION);
+    if (yieldFeePercentage_ >= FEE_PRECISION) {
+      revert YieldFeePercentageGtePrecision(yieldFeePercentage_, FEE_PRECISION);
     }
     _yieldFeePercentage = yieldFeePercentage_;
   }
