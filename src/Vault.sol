@@ -694,15 +694,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   ) external onlyOwner returns (address) {
     if (address(liquidationPair_) == address(0)) revert LPZeroAddress();
 
-    IERC20 _asset = IERC20(asset());
-    address _previousLiquidationPair = address(_liquidationPair);
-
-    if (_previousLiquidationPair != address(0)) {
-      _asset.safeApprove(_previousLiquidationPair, 0);
-    }
-
-    _asset.safeApprove(address(liquidationPair_), type(uint256).max);
-
     _liquidationPair = liquidationPair_;
 
     emit LiquidationPairSet(liquidationPair_);
