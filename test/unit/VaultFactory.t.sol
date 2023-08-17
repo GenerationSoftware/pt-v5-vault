@@ -34,6 +34,13 @@ contract VaultFactoryTest is Test {
   /* ============ Setup ============ */
   function setUp() public {
     vaultFactory = new VaultFactory();
+
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.asset.selector),
+      abi.encode(address(asset))
+    );
+
   }
 
   /* ============ deployVault ============ */
@@ -43,12 +50,6 @@ contract VaultFactoryTest is Test {
     // We don't know the vault address in advance, so we don't check topic 1
     vm.expectEmit(false, true, true, true);
     emit NewFactoryVault(Vault(_vault), vaultFactory);
-
-    vm.mockCall(
-      address(yieldVault),
-      abi.encodeWithSelector(IERC4626.asset.selector),
-      abi.encode(address(asset))
-    );
 
     _vault = vaultFactory.deployVault(
       asset,
