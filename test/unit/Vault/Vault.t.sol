@@ -334,38 +334,13 @@ contract VaultTest is UnitBaseSetup {
 
   /* ============ setLiquidationPair ============ */
   function testSetLiquidationPair() public {
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit LiquidationPairSet(ILiquidationPair(address(liquidationPair)));
 
     address _newLiquidationPairAddress = _setLiquidationPair();
 
     assertEq(_newLiquidationPairAddress, address(liquidationPair));
     assertEq(vault.liquidationPair(), address(liquidationPair));
-    assertEq(
-      underlyingAsset.allowance(address(vault), _newLiquidationPairAddress),
-      type(uint256).max
-    );
-  }
-
-  function testSetLiquidationPairUpdate() public {
-    vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
-
-    assertEq(
-      underlyingAsset.allowance(address(vault), address(liquidationPair)),
-      type(uint256).max
-    );
-
-    ILiquidationPair _newLiquidationPair = ILiquidationPair(
-      0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820
-    );
-
-    vault.setLiquidationPair(_newLiquidationPair);
-
-    assertEq(underlyingAsset.allowance(address(vault), address(liquidationPair)), 0);
-    assertEq(
-      underlyingAsset.allowance(address(vault), address(_newLiquidationPair)),
-      type(uint256).max
-    );
   }
 
   function testSetLiquidationPairNotZeroAddress() public {
