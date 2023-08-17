@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import { Create2 } from "openzeppelin/utils/Create2.sol";
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
@@ -35,6 +36,11 @@ contract VaultFactory {
    */
   mapping(Vault => bool) public deployedVaults;
 
+  /**
+   * @notice Mapping to store deployer nonces for CREATE2
+   */
+  mapping(address => uint) public deployerNonces;
+
   /* ============ External Functions ============ */
 
   /**
@@ -64,18 +70,27 @@ contract VaultFactory {
     uint256 _yieldFeePercentage,
     address _owner
   ) external returns (address) {
-    Vault _vault = new Vault(
-      _asset,
-      _name,
-      _symbol,
-      _twabController,
-      _yieldVault,
-      _prizePool,
-      _claimer,
-      _yieldFeeRecipient,
-      _yieldFeePercentage,
-      _owner
+    bytes memory bytecode = abi.encodePacked(
+      type(Vault).creationCode,
+      abi.encode(
+        _asset,
+        _name,
+        _symbol,
+        _twabController,
+        _yieldVault,
+        _prizePool,
+        _claimer,
+        _yieldFeeRecipient,
+        _yieldFeePercentage,
+        _owner
+      )
     );
+
+    Vault _vault = Vault(Create2.deploy(
+      0,
+      keccak256(abi.encode(msg.sender, deployerNonces[msg.sender]++)),
+      bytecode
+    ));
 
     allVaults.push(_vault);
     deployedVaults[_vault] = true;
