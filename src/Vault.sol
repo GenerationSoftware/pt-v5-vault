@@ -167,6 +167,8 @@ error AfterClaimPrizeFailed(bytes reason);
 // This should be enough gas to mint an NFT if needed.
 uint256 constant HOOK_GAS = 150_000;
 
+uint96 constant UINT96_MAX = type(uint96).max;
+
 /**
  * @title  PoolTogether V5 Vault
  * @author PoolTogether Inc Team, Generation Software Team
@@ -281,6 +283,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Address of the claimer.
   address private _claimer;
 
+  address private immutable THIS;
+
   /// @notice Address of the ILiquidationPair used to liquidate yield for prize token.
   ILiquidationPair private _liquidationPair;
 
@@ -327,6 +331,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 yieldFeePercentage_,
     address owner_
   ) ERC4626(asset_) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(owner_) {
+    THIS = address(this);
     if (address(twabController_) == address(0)) revert TwabControllerZeroAddress();
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
@@ -400,7 +405,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function balanceOf(
     address _account
   ) public view virtual override(ERC20, IERC20) returns (uint256) {
-    return _twabController.balanceOf(address(this), _account);
+    return _twabController.balanceOf(THIS, _account);
   }
 
   /// @inheritdoc ERC4626
@@ -433,9 +438,9 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function maxDeposit(address recipient) public view virtual override returns (uint256) {
     if (!_isVaultCollateralized()) return 0;
 
-    uint256 _vaultMaxDeposit = type(uint96).max -
+    uint256 _vaultMaxDeposit = UINT96_MAX -
       _convertToAssets(balanceOf(recipient), Math.Rounding.Up);
-    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
+    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(THIS);
 
     return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
   }
@@ -447,8 +452,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function maxMint(address recipient) public view virtual override returns (uint256) {
     if (!_isVaultCollateralized()) return 0;
 
-    uint256 _vaultMaxMint = type(uint96).max - balanceOf(recipient);
-    uint256 _yieldVaultMaxMint = _yieldVault.maxMint(address(this));
+    uint256 _vaultMaxMint = UINT96_MAX - balanceOf(recipient);
+    uint256 _yieldVaultMaxMint = _yieldVault.maxMint(THIS);
 
     return _yieldVaultMaxMint < _vaultMaxMint ? _yieldVaultMaxMint : _vaultMaxMint;
   }
@@ -464,7 +469,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _requireVaultCollateralized();
 
     uint256 _assets = _convertToAssets(_shares, Math.Rounding.Down);
-    uint256 _availableYield = _yieldVault.maxWithdraw(address(this)) -
+    uint256 _availableYield = _yieldVault.maxWithdraw(THIS) -
       _convertToAssets(_totalSupply(), Math.Rounding.Down);
 
     if (_assets > _availableYield) revert YieldFeeGTAvailableYield(_assets, _availableYield);
@@ -503,7 +508,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    _permit(IERC20Permit(asset()), _owner, THIS, _assets, _deadline, _v, _r, _s);
     return _depositAssets(_assets, _owner, _owner);
   }
 
@@ -544,7 +549,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    _permit(IERC20Permit(asset()), _owner, THIS, _assets, _deadline, _v, _r, _s);
     return _sponsor(_assets, _owner);
   }
 
@@ -554,10 +559,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Amount of underlying assets deposited
    */
   function sweep() external returns (uint256) {
-    uint256 _assets = IERC20(asset()).balanceOf(address(this));
+    uint256 _assets = IERC20(asset()).balanceOf(THIS);
     if (_assets == 0) revert SweepZeroAssets();
 
-    _yieldVault.deposit(_assets, address(this));
+    _yieldVault.deposit(_assets, THIS);
 
     emit Sweep(msg.sender, _assets);
 
@@ -623,8 +628,8 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_tokenIn != address(_prizePool.prizeToken()))
       revert LiquidationTokenInNotPrizeToken(_tokenIn, address(_prizePool.prizeToken()));
 
-    if (_tokenOut != address(this))
-      revert LiquidationTokenOutNotVaultShare(_tokenOut, address(this));
+    if (_tokenOut != THIS)
+      revert LiquidationTokenOutNotVaultShare(_tokenOut, THIS);
 
     if (_amountOut == 0) revert LiquidationAmountOutZero();
 
@@ -634,7 +639,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_assetAmountOut > _liquidatableYield)
       revert LiquidationAmountOutGTYield(_assetAmountOut, _liquidatableYield);
 
-    _prizePool.contributePrizeTokens(address(this), _amountIn);
+    _prizePool.contributePrizeTokens(THIS, _amountIn);
 
     // Distributes the specified yield fee percentage.
     // For instance, with a yield fee percentage of 20% and 8e18 Vault shares being liquidated,
@@ -814,7 +819,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Total amount of assets
    */
   function _totalAssets() internal view returns (uint256) {
-    return _yieldVault.maxWithdraw(address(this));
+    return _yieldVault.maxWithdraw(THIS);
   }
 
   /**
@@ -822,7 +827,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Total amount of shares
    */
   function _totalSupply() internal view returns (uint256) {
-    return _twabController.totalSupply(address(this));
+    return _twabController.totalSupply(THIS);
   }
 
   /* ============ Liquidation Functions ============ */
@@ -833,7 +838,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 Available amount of `_token`
    */
   function _liquidatableBalanceOf(address _token) internal view returns (uint256) {
-    if (_token != address(this)) revert LiquidationTokenOutNotVaultShare(_token, address(this));
+    if (_token != THIS) revert LiquidationTokenOutNotVaultShare(_token, THIS);
 
     uint256 _availableYield = availableYieldBalance();
 
@@ -931,7 +936,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_shares == 0) revert MintZeroShares();
 
     IERC20 _asset = IERC20(asset());
-    uint256 _vaultAssets = _asset.balanceOf(address(this));
+    uint256 _vaultAssets = _asset.balanceOf(THIS);
 
     // If _asset is ERC777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
     // `tokensToSend` hook. On the other hand, the `tokenReceived` hook that is triggered after the transfer
@@ -953,17 +958,17 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       SafeERC20.safeTransferFrom(
         _asset,
         _caller,
-        address(this),
+        THIS,
         _assetsDeposit != 0 ? _assetsDeposit : _assets
       );
     }
 
-    uint256 _withdrawableAssetsBefore = _yieldVault.maxWithdraw(address(this));
+    uint256 _withdrawableAssetsBefore = _yieldVault.maxWithdraw(THIS);
 
-    _yieldVault.deposit(_assets, address(this));
+    _yieldVault.deposit(_assets, THIS);
 
     uint256 _expectedWithdrawableAssets = _withdrawableAssetsBefore + _assets;
-    uint256 _withdrawableAssetsAfter = _yieldVault.maxWithdraw(address(this));
+    uint256 _withdrawableAssetsAfter = _yieldVault.maxWithdraw(THIS);
 
     if (_withdrawableAssetsAfter < _expectedWithdrawableAssets)
       revert YVWithdrawableAssetsLTExpected(_withdrawableAssetsAfter, _expectedWithdrawableAssets);
@@ -1009,7 +1014,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _shares = _depositAssets(_assets, _owner, _owner);
 
     if (
-      _twabController.delegateOf(address(this), _owner) != _twabController.SPONSORSHIP_ADDRESS()
+      _twabController.delegateOf(THIS, _owner) != _twabController.SPONSORSHIP_ADDRESS()
     ) {
       _twabController.sponsor(_owner);
     }
@@ -1051,7 +1056,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     // shares are burned and after the assets are transferred, which is a valid state.
     _burn(_owner, _shares);
 
-    _yieldVault.withdraw(_assets, address(this), address(this));
+    _yieldVault.withdraw(_assets, THIS, THIS);
     SafeERC20.safeTransfer(IERC20(asset()), _receiver, _assets);
 
     emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
@@ -1207,7 +1212,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   function _collateral() internal view returns (uint256) {
     uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(address(this));
+    uint256 _withdrawableAssets = _yieldVault.maxWithdraw(THIS);
 
     // If the Vault is collateralized, users can only withdraw the amount of underlying assets they deposited.
     if (_withdrawableAssets >= _depositedAssets) {
@@ -1226,7 +1231,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return bool True if the vault is collateralized, false otherwise
    */
   function _isVaultCollateralized() internal view returns (bool) {
-    return _yieldVault.maxWithdraw(address(this)) >= _totalSupply();
+    return _yieldVault.maxWithdraw(THIS) >= _totalSupply();
   }
 
   /// @notice Require reverting if the vault is under-collateralized.
