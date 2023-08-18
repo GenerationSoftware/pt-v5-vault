@@ -938,8 +938,12 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _depositedAssets = _totalSupply();
     uint256 _redeemableShares = _yieldVault.maxRedeem(address(this));
 
-    if (_shares == 0 || _depositedAssets == 0) {
+    if (_shares == 0) {
       return _shares;
+    }
+
+    if (_depositedAssets == 0) {
+      return _yieldVault.convertToShares(_shares);
     }
 
     return
