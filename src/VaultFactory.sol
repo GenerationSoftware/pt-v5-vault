@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 import { Create2 } from "openzeppelin/utils/Create2.sol";
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
-import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
@@ -86,11 +85,9 @@ contract VaultFactory {
       )
     );
 
-    Vault _vault = Vault(Create2.deploy(
-      0,
-      keccak256(abi.encode(msg.sender, deployerNonces[msg.sender]++)),
-      bytecode
-    ));
+    Vault _vault = Vault(
+      Create2.deploy(0, keccak256(abi.encode(msg.sender, deployerNonces[msg.sender]++)), bytecode)
+    );
 
     allVaults.push(_vault);
     deployedVaults[_vault] = true;

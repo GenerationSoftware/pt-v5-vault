@@ -40,7 +40,6 @@ contract VaultFactoryTest is Test {
       abi.encodeWithSelector(IERC4626.asset.selector),
       abi.encode(address(asset))
     );
-
   }
 
   /* ============ deployVault ============ */
@@ -71,31 +70,35 @@ contract VaultFactoryTest is Test {
   }
 
   function testDeployVault_secondDeployShouldHaveDiffAddress() public {
-    Vault _vault1 = Vault(vaultFactory.deployVault(
-      asset,
-      name,
-      symbol,
-      twabController,
-      yieldVault,
-      prizePool,
-      claimer,
-      address(this),
-      0,
-      address(this)
-    ));
+    Vault _vault1 = Vault(
+      vaultFactory.deployVault(
+        asset,
+        name,
+        symbol,
+        twabController,
+        yieldVault,
+        prizePool,
+        claimer,
+        address(this),
+        0,
+        address(this)
+      )
+    );
 
-    Vault _vault2 = Vault(vaultFactory.deployVault(
-      asset,
-      name,
-      symbol,
-      twabController,
-      yieldVault,
-      prizePool,
-      claimer,
-      address(this),
-      0,
-      address(this)
-    ));
+    Vault _vault2 = Vault(
+      vaultFactory.deployVault(
+        asset,
+        name,
+        symbol,
+        twabController,
+        yieldVault,
+        prizePool,
+        claimer,
+        address(this),
+        0,
+        address(this)
+      )
+    );
 
     assertNotEq(address(_vault1), address(_vault2));
   }
