@@ -46,7 +46,7 @@ contract LiquidationPairMock {
     uint256 _amountOut,
     uint256 _amountInMax
   ) external returns (uint256) {
-    ILiquidationSource(_source).liquidate(_account, _tokenIn, _amountInMax, _tokenOut, _amountOut);
+    ILiquidationSource(_source).liquidate(_account, _account, _tokenIn, _amountInMax, _tokenOut, _amountOut, "");
 
     return _amountInMax;
   }

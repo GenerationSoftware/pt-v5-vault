@@ -332,7 +332,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
 
-    vault.liquidate(address(this), address(prizeToken), 1e18, address(vault), 1e18);
+    vault.liquidate(address(this), address(this), address(prizeToken), 1e18, address(vault), 1e18, "");
 
     vm.stopPrank();
   }
@@ -346,7 +346,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
       abi.encodeWithSelector(LiquidationCallerNotLP.selector, bob, address(liquidationPair))
     );
 
-    vault.liquidate(address(this), address(prizeToken), 0, address(vault), 0);
+    vault.liquidate(address(this), address(this), address(prizeToken), 0, address(vault), 0, "");
 
     vm.stopPrank();
   }
@@ -364,7 +364,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
       )
     );
 
-    vault.liquidate(address(this), address(0), 0, address(vault), 0);
+    vault.liquidate(address(this), address(this), address(0), 0, address(vault), 0, "");
 
     vm.stopPrank();
   }
@@ -378,7 +378,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
       abi.encodeWithSelector(LiquidationTokenOutNotVaultShare.selector, address(0), address(vault))
     );
 
-    vault.liquidate(address(this), address(prizeToken), 0, address(0), 0);
+    vault.liquidate(address(this), address(this), address(prizeToken), 0, address(0), 0, "");
 
     vm.stopPrank();
   }
@@ -389,7 +389,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.startPrank(address(liquidationPair));
 
     vm.expectRevert(abi.encodeWithSelector(LiquidationAmountOutZero.selector));
-    vault.liquidate(address(this), address(prizeToken), 0, address(vault), 0);
+    vault.liquidate(address(this), address(this), address(prizeToken), 0, address(vault), 0, "");
 
     vm.stopPrank();
   }
@@ -403,7 +403,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
       abi.encodeWithSelector(LiquidationAmountOutGTYield.selector, type(uint256).max, 0)
     );
 
-    vault.liquidate(address(this), address(prizeToken), 0, address(vault), type(uint256).max);
+    vault.liquidate(address(this), address(this), address(prizeToken), 0, address(vault), type(uint256).max, "");
 
     vm.stopPrank();
   }
@@ -436,8 +436,39 @@ contract VaultLiquidateTest is UnitBaseSetup {
       abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amountOut, type(uint96).max)
     );
 
-    vault.liquidate(alice, address(prizeToken), _amountIn, address(vault), _amountOut);
+    vault.liquidate(address(this), alice, address(prizeToken), _amountIn, address(vault), _amountOut, "");
 
+    vm.stopPrank();
+  }
+
+  function testLiquidate_triggerCallback() public {
+    _setLiquidationPair();
+
+    uint256 _amount = 1000e18;
+
+    underlyingAsset.mint(address(this), _amount);
+    _sponsor(underlyingAsset, vault, _amount);
+
+    uint256 _amountOut = type(uint104).max;
+    _accrueYield(underlyingAsset, yieldVault, _amountOut);
+
+    address receiver = makeAddr("receiver");
+    vm.mockCallRevert(
+      receiver,
+      abi.encodeWithSelector(
+        IFlashSwapCallback.flashSwapCallback.selector,
+        address(liquidationPair),
+        address(this),
+        11e18,
+        22e18,
+        abi.encode("testing")
+      ),
+      abi.encodePacked("whoa")
+    );
+
+    vm.expectRevert(abi.encodePacked("whoa"));
+    vm.startPrank(address(liquidationPair));
+    vault.liquidate(address(this), receiver, address(prizeToken), 11e18, address(vault), 22e18, abi.encode("testing"));
     vm.stopPrank();
   }
 
