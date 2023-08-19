@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { ERC4626, ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
-import { ERC20Permit, IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
+import { ERC20Permit, IERC20Permit } from "openzeppelin/token/ERC20/extensions/ERC20Permit.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { SafeCast } from "openzeppelin/utils/math/SafeCast.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
@@ -344,7 +344,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _setYieldFeePercentage(yieldFeePercentage_);
 
     // Approve once for max amount
-    asset_.safeApprove(address(yieldVault_), type(uint256).max);
+    asset_.safeIncreaseAllowance(address(yieldVault_), type(uint256).max);
 
     emit NewVault(
       asset_,
