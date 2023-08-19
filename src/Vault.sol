@@ -10,6 +10,7 @@ import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
 import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
+import { IFlashSwapCallback } from "pt-v5-liquidator-interfaces/IFlashSwapCallback.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
@@ -609,11 +610,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev If assets are living in the Vault, we deposit it in the YieldVault.
    */
   function liquidate(
-    address _account,
+    address _sender,
+    address _receiver,
     address _tokenIn,
     uint256 _amountIn,
     address _tokenOut,
-    uint256 _amountOut
+    uint256 _amountOut,
+    bytes memory _flashSwapData
   ) public virtual override returns (bool) {
     _requireVaultCollateralized();
 
@@ -634,8 +637,6 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_assetAmountOut > _liquidatableYield)
       revert LiquidationAmountOutGTYield(_assetAmountOut, _liquidatableYield);
 
-    _prizePool.contributePrizeTokens(address(this), _amountIn);
-
     // Distributes the specified yield fee percentage.
     // For instance, with a yield fee percentage of 20% and 8e18 Vault shares being liquidated,
     // this calculation assigns 2e18 Vault shares to the yield fee recipient.
@@ -646,13 +647,19 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       );
     }
 
-    _mint(_account, _amountOut);
+    _mint(_receiver, _amountOut);
+
+    if (_flashSwapData.length > 0) {
+      IFlashSwapCallback(_receiver).flashSwapCallback(msg.sender, _sender, _amountIn, _amountOut, _flashSwapData);
+    }
+
+    _prizePool.contributePrizeTokens(address(this), _amountIn);
 
     return true;
   }
 
   /// @inheritdoc ILiquidationSource
-  function targetOf(address _token) external view returns (address) {
+  function targetOf(address) external view returns (address) {
     return address(_prizePool);
   }
 
