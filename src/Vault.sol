@@ -216,20 +216,20 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param previousClaimer Address of the previous claimer
    * @param newClaimer Address of the new claimer
    */
-  event ClaimerSet(address previousClaimer, address newClaimer);
+  event ClaimerSet(address indexed previousClaimer, address indexed newClaimer);
 
   /**
    * @notice Emitted when an account sets new hooks
    * @param account The account whose hooks are being configured
    * @param hooks The hooks being set
    */
-  event SetHooks(address account, VaultHooks hooks);
+  event SetHooks(address indexed account, VaultHooks indexed hooks);
 
   /**
    * @notice Emitted when a new LiquidationPair has been set.
    * @param newLiquidationPair Address of the new liquidationPair
    */
-  event LiquidationPairSet(ILiquidationPair newLiquidationPair);
+  event LiquidationPairSet(ILiquidationPair indexed newLiquidationPair);
 
   /**
    * @notice Emitted when yield fee is minted to the yield recipient.
@@ -244,7 +244,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param previousYieldFeeRecipient Address of the previous yield fee recipient
    * @param newYieldFeeRecipient Address of the new yield fee recipient
    */
-  event YieldFeeRecipientSet(address previousYieldFeeRecipient, address newYieldFeeRecipient);
+  event YieldFeeRecipientSet(address indexed previousYieldFeeRecipient, address indexed newYieldFeeRecipient);
 
   /**
    * @notice Emitted when a new yield fee percentage has been set.
