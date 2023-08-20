@@ -331,7 +331,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (address(twabController_) == address(0)) revert TwabControllerZeroAddress();
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
-    if (address(owner_) == address(0)) revert OwnerZeroAddress();
+    if (owner_ == address(0)) revert OwnerZeroAddress();
     if (address(asset_) != yieldVault_.asset())
       revert UnderlyingAssetMismatch(address(asset_), yieldVault_.asset());
 
