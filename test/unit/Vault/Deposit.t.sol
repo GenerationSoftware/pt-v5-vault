@@ -521,7 +521,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    twabController.delegate(address(vault), twabController.SPONSORSHIP_ADDRESS());
+    twabController.delegate(address(vault), SPONSORSHIP_ADDRESS);
 
     vm.expectEmit();
     emit Transfer(address(0), alice, _amount);

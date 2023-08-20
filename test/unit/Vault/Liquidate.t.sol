@@ -433,7 +433,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.startPrank(address(liquidationPair));
 
     vm.expectRevert(
-      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amountOut, type(uint96).max)
+      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amountOut, type(uint96).max - _amount)
     );
 
     vault.liquidate(address(this), alice, address(prizeToken), _amountIn, address(vault), _amountOut, "");

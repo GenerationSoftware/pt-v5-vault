@@ -12,7 +12,7 @@ import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.s
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { IFlashSwapCallback } from "pt-v5-liquidator-interfaces/IFlashSwapCallback.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
-import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
+import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
 /// @notice Emitted when the TWAB controller is set to the zero address.
@@ -435,7 +435,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (!_isVaultCollateralized()) return 0;
 
     uint256 _vaultMaxDeposit = type(uint96).max -
-      _convertToAssets(balanceOf(recipient), Math.Rounding.Up);
+      _convertToAssets(_totalSupply(), Math.Rounding.Up);
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
     return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
@@ -448,7 +448,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function maxMint(address recipient) public view virtual override returns (uint256) {
     if (!_isVaultCollateralized()) return 0;
 
-    uint256 _vaultMaxMint = type(uint96).max - balanceOf(recipient);
+    uint256 _vaultMaxMint = type(uint96).max - _totalSupply();
     uint256 _yieldVaultMaxMint = _yieldVault.maxMint(address(this));
 
     return _yieldVaultMaxMint < _vaultMaxMint ? _yieldVaultMaxMint : _vaultMaxMint;
@@ -1016,7 +1016,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _shares = _depositAssets(_assets, _owner, _owner);
 
     if (
-      _twabController.delegateOf(address(this), _owner) != _twabController.SPONSORSHIP_ADDRESS()
+      _twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS
     ) {
       _twabController.sponsor(_owner);
     }
