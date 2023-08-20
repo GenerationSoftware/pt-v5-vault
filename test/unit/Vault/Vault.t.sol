@@ -21,15 +21,15 @@ contract VaultTest is UnitBaseSetup {
     address owner
   );
 
-  event ClaimerSet(address previousClaimer, address newClaimer);
+  event ClaimerSet(address indexed previousClaimer, address indexed newClaimer);
 
-  event LiquidationPairSet(ILiquidationPair newLiquidationPair);
+  event LiquidationPairSet(ILiquidationPair indexed newLiquidationPair);
 
-  event YieldFeeRecipientSet(address previousYieldFeeRecipient, address newYieldFeeRecipient);
+  event YieldFeeRecipientSet(address indexed previousYieldFeeRecipient, address indexed newYieldFeeRecipient);
 
   event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
 
-  event SetHooks(address account, VaultHooks hooks);
+  event SetHooks(address indexed account, VaultHooks indexed hooks);
 
   /* ============ Constructor ============ */
 
