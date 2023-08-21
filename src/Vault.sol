@@ -252,7 +252,10 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param previousYieldFeeRecipient Address of the previous yield fee recipient
    * @param newYieldFeeRecipient Address of the new yield fee recipient
    */
-  event YieldFeeRecipientSet(address indexed previousYieldFeeRecipient, address indexed newYieldFeeRecipient);
+  event YieldFeeRecipientSet(
+    address indexed previousYieldFeeRecipient,
+    address indexed newYieldFeeRecipient
+  );
 
   /**
    * @notice Emitted when a new yield fee percentage has been set.
@@ -381,18 +384,21 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev This amount includes the liquidatable yield + yield fee amount.
    * @dev The available yield is equal to the total amount of assets managed by this Vault
    *      minus the total amount of assets supplied to the Vault and current allocated `_yieldFeeShares`.
-   * @dev If `_assetsAllocated` is greater than `_assets`, it means that the Vault is undercollateralized.
+   * @dev If `_assetsAllocated` is greater than `_withdrawableAssets`, it means that the Vault is undercollateralized.
    *      We must not mint more shares than underlying assets available so we return 0.
    * @return uint256 Total yield amount
    */
   function availableYieldBalance() public view returns (uint256) {
-    uint256 _assets = _totalAssets();
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
     uint256 _assetsAllocated = _convertToAssets(
-      _totalSupply() + _yieldFeeShares,
+      _depositedAssets + _yieldFeeShares,
+      _depositedAssets,
+      _withdrawableAssets,
       Math.Rounding.Down
     );
 
-    return _assetsAllocated > _assets ? 0 : _assets - _assetsAllocated;
+    return _assetsAllocated > _withdrawableAssets ? 0 : _withdrawableAssets - _assetsAllocated;
   }
 
   /**
@@ -436,7 +442,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return bool True if the vault is collateralized, false otherwise
    */
   function isVaultCollateralized() public view returns (bool) {
-    return _isVaultCollateralized();
+    return _isVaultCollateralized(_totalAssets(), _totalSupply());
   }
 
   /* ============ Max Functions ============ */
@@ -445,11 +451,19 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @inheritdoc ERC4626
    * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
    */
-  function maxDeposit(address _recipient) public view virtual override returns (uint256) {
-    if (!_isVaultCollateralized()) return 0;
+  function maxDeposit(address) public view virtual override returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
+    if (!_isVaultCollateralized(_withdrawableAssets, _depositedAssets)) return 0;
 
     uint256 _vaultMaxDeposit = type(uint96).max -
-      _convertToAssets(_totalSupply(), Math.Rounding.Up);
+      _convertToAssets(
+        _depositedAssets,
+        _depositedAssets,
+        _withdrawableAssets,
+        Math.Rounding.Up
+      );
 
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
@@ -460,26 +474,85 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @inheritdoc ERC4626
    * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
    */
-  function maxMint(address _recipient) public view virtual override returns (uint256) {
-    if (!_isVaultCollateralized()) return 0;
+  function maxMint(address) public view virtual override returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
 
-    uint256 _vaultMaxMint = type(uint96).max - _totalSupply();
+    if (!_isVaultCollateralized(_totalAssets(), _depositedAssets)) return 0;
+
+    uint256 _vaultMaxMint = type(uint96).max - _depositedAssets;
     uint256 _yieldVaultMaxMint = _yieldVault.maxMint(address(this));
 
     return _yieldVaultMaxMint < _vaultMaxMint ? _yieldVaultMaxMint : _vaultMaxMint;
   }
 
+  /// @inheritdoc ERC4626
+  function maxWithdraw(address _owner) public view virtual override returns (uint256) {
+    return _convertToAssets(
+      balanceOf(_owner),
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Down
+    );
+  }
+
   /* ============ Preview Functions ============ */
 
   /// @inheritdoc ERC4626
+  function previewDeposit(uint256 _assets) public view virtual override returns (uint256) {
+    return _convertToShares(
+      _assets,
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Down
+    );
+  }
+
+  /// @inheritdoc ERC4626
+  function previewMint(uint256 _shares) public view virtual override returns (uint256) {
+    return _convertToAssets(
+      _shares,
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Up
+    );
+  }
+
+
+  /// @inheritdoc ERC4626
   function previewWithdraw(uint256 _assets) public view virtual override returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+    uint256 _maxRedeemableYVShares = _yieldVault.maxRedeem(address(this));
+
     return
-      _convertToShares(_convertToYieldVaultAssets(_assets, Math.Rounding.Down), Math.Rounding.Up);
+      _convertYVAssetsToShares(
+        _yieldVault.previewRedeem(
+          _convertAssetsToYVShares(
+            _assets,
+            _depositedAssets,
+            _withdrawableAssets,
+            _maxRedeemableYVShares,
+            Math.Rounding.Up
+          )
+        ),
+        _depositedAssets,
+        _withdrawableAssets,
+        _maxRedeemableYVShares,
+        Math.Rounding.Down
+      );
   }
 
   /// @inheritdoc ERC4626
   function previewRedeem(uint256 _shares) public view virtual override returns (uint256) {
-    return _yieldVault.previewRedeem(_convertToYieldVaultShares(_shares, Math.Rounding.Up));
+    return _yieldVault.previewRedeem(
+      _convertSharesToYVShares(
+        _shares,
+        _totalSupply(),
+        _totalAssets(),
+        _yieldVault.maxRedeem(address(this)),
+        Math.Rounding.Up
+      )
+    );
   }
 
   /* ============ Deposit Functions ============ */
@@ -514,10 +587,14 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /// @inheritdoc ERC4626
-  function mint(uint256 _shares, address _receiver) public virtual override returns (uint256) {
-    _requireVaultCollateralized();
+  function mint(uint256 _shares, address _receiver) public virtual override onlyVaultCollateralized returns (uint256) {
+    uint256 _assets = _convertToAssets(
+      _shares,
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Up
+    );
 
-    uint256 _assets = _convertToAssets(_shares, Math.Rounding.Up);
     _deposit(msg.sender, _receiver, _assets, _shares);
 
     return _assets;
@@ -581,7 +658,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_assets > maxWithdraw(_owner))
       revert WithdrawMoreThanMax(_owner, _assets, maxWithdraw(_owner));
 
-    uint256 _shares = _convertToShares(_assets, Math.Rounding.Down);
+    uint256 _shares = _convertToShares(
+      _assets,
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Down
+    );
+
     uint256 _withdrawnAssets = _redeem(msg.sender, _receiver, _owner, _shares);
 
     if (_withdrawnAssets < _assets) revert WithdrawAssetsLTRequested(_assets, _withdrawnAssets);
@@ -607,11 +690,23 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Will revert if there is not enough yield available in the YieldVault to back `_shares`.
    * @param _shares Amount of shares to mint
    */
-  function mintYieldFee(uint256 _shares) external {
-    _requireVaultCollateralized();
+  function mintYieldFee(uint256 _shares) external onlyVaultCollateralized {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
 
-    uint256 _assets = _convertToAssets(_shares, Math.Rounding.Down);
-    uint256 _availableYield = _totalAssets() - _convertToAssets(_totalSupply(), Math.Rounding.Down);
+    uint256 _assets = _convertToAssets(
+      _shares,
+      _depositedAssets,
+      _withdrawableAssets,
+      Math.Rounding.Down
+    );
+
+    uint256 _availableYield = _withdrawableAssets - _convertToAssets(
+      _depositedAssets,
+      _depositedAssets,
+      _withdrawableAssets,
+      Math.Rounding.Down
+    );
 
     if (_assets > _availableYield) revert YieldFeeGTAvailableYield(_assets, _availableYield);
     if (_shares > _yieldFeeShares) revert YieldFeeGTAvailableShares(_shares, _yieldFeeShares);
@@ -643,9 +738,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     address _tokenOut,
     uint256 _amountOut,
     bytes memory _flashSwapData
-  ) public virtual override returns (bool) {
-    _requireVaultCollateralized();
-
+  ) public virtual override onlyVaultCollateralized returns (bool) {
     if (msg.sender != address(_liquidationPair))
       revert LiquidationCallerNotLP(msg.sender, address(_liquidationPair));
 
@@ -657,7 +750,14 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     if (_amountOut == 0) revert LiquidationAmountOutZero();
 
-    uint256 _assetAmountOut = _convertToAssets(_amountOut, Math.Rounding.Down);
+    uint256 _assetAmountOut =
+    _convertToAssets(
+      _amountOut,
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Down
+    );
+
     uint256 _liquidatableYield = _liquidatableBalanceOf(_tokenOut);
 
     if (_assetAmountOut > _liquidatableYield)
@@ -676,7 +776,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _mint(_receiver, _amountOut);
 
     if (_flashSwapData.length > 0) {
-      IFlashSwapCallback(_receiver).flashSwapCallback(msg.sender, _sender, _amountIn, _amountOut, _flashSwapData);
+      IFlashSwapCallback(_receiver).flashSwapCallback(
+        msg.sender,
+        _sender,
+        _amountIn,
+        _amountOut,
+        _flashSwapData
+      );
     }
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
@@ -894,18 +1000,41 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /* ============ Conversion Functions ============ */
 
+  /// @inheritdoc IERC4626
+  function convertToShares(uint256 _assets) public view virtual override returns (uint256) {
+    return _convertToShares(
+      _assets,
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Down
+    );
+  }
+
+  /// @inheritdoc IERC4626
+  function convertToAssets(uint256 shares) public view virtual override returns (uint256) {
+    return _convertToAssets(
+      shares,
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Down
+    );
+  }
+
   /**
-   * @inheritdoc ERC4626
+   * @notice Convert assets to shares.
    * @param _assets Amount of assets to convert
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
    * @param _rounding Rounding mode (i.e. down or up)
    * @return uint256 Amount of shares corresponding to the assets
    */
   function _convertToShares(
     uint256 _assets,
+    uint256 _depositedAssets,
+    uint256 _withdrawableAssets,
     Math.Rounding _rounding
-  ) internal view virtual override returns (uint256) {
-    uint256 _collateralAssets = _collateral();
-    uint256 _depositedAssets = _totalSupply();
+  ) internal pure returns (uint256) {
+    uint256 _collateralAssets = _collateral(_depositedAssets, _withdrawableAssets);
 
     if (_assets == 0 || _depositedAssets == 0) {
       return _assets;
@@ -916,17 +1045,20 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @inheritdoc ERC4626
+   * @notice Convert shares to assets.
    * @param _shares Amount of shares to convert
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
    * @param _rounding Rounding mode (i.e. down or up)
    * @return uint256 Amount of assets corresponding to the shares
    */
   function _convertToAssets(
     uint256 _shares,
+    uint256 _depositedAssets,
+    uint256 _withdrawableAssets,
     Math.Rounding _rounding
-  ) internal view virtual override returns (uint256) {
-    uint256 _collateralAssets = _collateral();
-    uint256 _depositedAssets = _totalSupply();
+  ) internal pure returns (uint256) {
+    uint256 _collateralAssets = _collateral(_depositedAssets, _withdrawableAssets);
 
     if (_shares == 0 || _depositedAssets == 0) {
       return _shares;
@@ -937,22 +1069,42 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
+   * @notice Calculates the amount of YieldVault shares that can be redeemed.
+   * @dev When the Vault is collateralized, the yield is excluded from the redeemable amount
+   *      so users can only withdraw up to the amount they deposited
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
+   * @param _maxRedeemableYVShares Maximum amount of shares that can be redeemed from the YieldVault
+   * @return uint256 Amount of redeemable YieldVault shares
+   */
+  function _redeemableYVShares(
+    uint256 _depositedAssets,
+    uint256 _withdrawableAssets,
+    uint256 _maxRedeemableYVShares
+  ) internal view returns (uint256) {
+    return _isVaultCollateralized(_withdrawableAssets, _depositedAssets)
+      ? _maxRedeemableYVShares -
+        (_yieldVault.convertToShares(_withdrawableAssets - _depositedAssets))
+      : _maxRedeemableYVShares;
+  }
+
+  /**
    * @notice Convert Vault shares to YieldVault shares.
    * @param _shares Vault shares to convert
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
+   * @param _maxRedeemableYVShares Maximum amount of shares that can be redeemed from the YieldVault
    * @param _rounding Rounding mode (i.e. down or up)
    * @return uint256 YieldVault shares
    */
-  function _convertToYieldVaultShares(
+  function _convertSharesToYVShares(
     uint256 _shares,
+    uint256 _depositedAssets,
+    uint256 _withdrawableAssets,
+    uint256 _maxRedeemableYVShares,
     Math.Rounding _rounding
   ) internal view returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-
-    // When the Vault is collateralized, the yield is excluded from the redeemable amount
-    uint256 _redeemableShares = _isVaultCollateralized()
-      ? _yieldVault.maxRedeem(address(this)) -
-        (_yieldVault.convertToShares(_totalAssets() - _depositedAssets))
-      : _yieldVault.maxRedeem(address(this));
+    uint256 _redeemableShares = _redeemableYVShares(_depositedAssets, _withdrawableAssets, _maxRedeemableYVShares);
 
     if (_shares == 0 || _depositedAssets == 0) {
       return _shares;
@@ -963,30 +1115,55 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Convert Vault assets to YieldVault assets.
-   * @param _assets Vault assets to convert
+   * @notice Convert YieldVault assets to Vault shares.
+   * @param _assets YieldVault assets to convert
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
+   * @param _maxRedeemableYVShares Maximum amount of shares that can be redeemed from the YieldVault
    * @param _rounding Rounding mode (i.e. down or up)
-   * @return uint256 YieldVault assets
+   * @return uint256 Vault shares
    */
-  function _convertToYieldVaultAssets(
+  function _convertYVAssetsToShares(
     uint256 _assets,
+    uint256 _depositedAssets,
+    uint256 _withdrawableAssets,
+    uint256 _maxRedeemableYVShares,
     Math.Rounding _rounding
   ) internal view returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-
-    // When the Vault is collateralized, the yield is excluded from the withdrawable amount
-    uint256 _withdrawableAssets = _isVaultCollateralized()
-      ? _totalAssets() - (_totalAssets() - _depositedAssets)
-      : _totalAssets();
+    uint256 _redeemableShares = _redeemableYVShares(_depositedAssets, _withdrawableAssets, _maxRedeemableYVShares);
 
     if (_assets == 0 || _depositedAssets == 0) {
       return _assets;
     }
 
     return
-      _withdrawableAssets == 0
-        ? 0
-        : _assets.mulDiv(_withdrawableAssets, _depositedAssets, _rounding);
+      _redeemableShares == 0 ? 0 : _assets.mulDiv(_redeemableShares, _withdrawableAssets, _rounding);
+  }
+
+    /**
+   * @notice Convert Vault assets to YieldVault shares.
+   * @param _assets Vault assets to convert
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
+   * @param _maxRedeemableYVShares Maximum amount of shares that can be redeemed from the YieldVault
+   * @param _rounding Rounding mode (i.e. down or up)
+   * @return uint256 YieldVault shares
+   */
+  function _convertAssetsToYVShares(
+    uint256 _assets,
+    uint256 _depositedAssets,
+    uint256 _withdrawableAssets,
+    uint256 _maxRedeemableYVShares,
+    Math.Rounding _rounding
+  ) internal view returns (uint256) {
+    uint256 _redeemableShares = _redeemableYVShares(_depositedAssets, _withdrawableAssets, _maxRedeemableYVShares);
+
+    if (_assets == 0 || _depositedAssets == 0) {
+      return _assets;
+    }
+
+    return
+      _withdrawableAssets == 0 ? 0 : _assets.mulDiv(_withdrawableAssets, _redeemableShares, _rounding);
   }
 
   /* ============ Deposit Functions ============ */
@@ -1044,11 +1221,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       );
     }
 
-    uint256 _withdrawableAssetsBefore = _totalAssets();
+    uint256 _withdrawableAssets = _totalAssets();
 
     _yieldVault.deposit(_assets, address(this));
 
-    uint256 _expectedWithdrawableAssets = _withdrawableAssetsBefore + _assets;
+    uint256 _expectedWithdrawableAssets = _withdrawableAssets + _assets;
     uint256 _withdrawableAssetsAfter = _totalAssets();
 
     if (_withdrawableAssetsAfter < _expectedWithdrawableAssets)
@@ -1070,13 +1247,17 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _assets,
     address _owner,
     address _receiver
-  ) internal returns (uint256) {
-    _requireVaultCollateralized();
-
+  ) internal onlyVaultCollateralized returns (uint256) {
     if (_assets > maxDeposit(_receiver))
       revert DepositMoreThanMax(_receiver, _assets, maxDeposit(_receiver));
 
-    uint256 _shares = _convertToShares(_assets, Math.Rounding.Down);
+    uint256 _shares = _convertToShares(
+      _assets,
+      _totalSupply(),
+      _totalAssets(),
+      Math.Rounding.Down
+    );
+
     _deposit(_owner, _receiver, _assets, _shares);
 
     return _shares;
@@ -1094,9 +1275,7 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function _sponsor(uint256 _assets, address _owner) internal returns (uint256) {
     uint256 _shares = _depositAssets(_assets, _owner, _owner);
 
-    if (
-      _twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS
-    ) {
+    if (_twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS) {
       _twabController.sponsor(_owner);
     }
 
@@ -1124,7 +1303,13 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
       _spendAllowance(_owner, _caller, _shares);
     }
 
-    uint256 _yieldVaultShares = _convertToYieldVaultShares(_shares, Math.Rounding.Up);
+    uint256 _yieldVaultShares = _convertSharesToYVShares(
+      _shares,
+      _totalSupply(),
+      _totalAssets(),
+      _yieldVault.maxRedeem(address(this)),
+      Math.Rounding.Up
+    );
 
     // If _asset is ERC777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
     // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
@@ -1291,12 +1476,11 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *      without access to any of the accumulated yield within the YieldVault.
    * @dev In case of undercollateralization, any remaining collateral within the YieldVault can be withdrawn.
    *      Withdrawals can be made by users for their corresponding deposit shares.
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
    * @return uint256 Available collateral
    */
-  function _collateral() internal view returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-
+  function _collateral(uint256 _depositedAssets, uint256 _withdrawableAssets) internal pure returns (uint256) {
     // If the Vault is collateralized, users can only withdraw the amount of underlying assets they deposited.
     if (_withdrawableAssets >= _depositedAssets) {
       return _depositedAssets;
@@ -1311,15 +1495,18 @@ contract Vault is ERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Check if the Vault is collateralized.
    * @dev The vault is collateralized if the total amount of underlying assets currently held by the YieldVault
    *      is greater than or equal to the total supply of shares minted by the Vault.
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
    * @return bool True if the vault is collateralized, false otherwise
    */
-  function _isVaultCollateralized() internal view returns (bool) {
-    return _totalAssets() >= _totalSupply();
+  function _isVaultCollateralized(uint256 _withdrawableAssets, uint256 _depositedAssets) internal pure returns (bool) {
+    return _withdrawableAssets >= _depositedAssets;
   }
 
   /// @notice Require reverting if the vault is under-collateralized.
-  function _requireVaultCollateralized() internal view {
-    if (!_isVaultCollateralized()) revert VaultUnderCollateralized();
+  modifier onlyVaultCollateralized() {
+    if (!_isVaultCollateralized(_totalAssets(), _totalSupply())) revert VaultUnderCollateralized();
+    _;
   }
 
   /* ============ Setter Functions ============ */

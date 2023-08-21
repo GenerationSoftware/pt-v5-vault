@@ -183,7 +183,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     assertEq(vault.previewRedeem(vault.maxRedeem(bob)), _bobWithdrawableAmount);
     assertEq(vault.previewWithdraw(vault.maxWithdraw(bob)), _bobWithdrawableAmount);
 
-    vault.withdraw(vault.maxWithdraw(bob), bob, bob);
+    vault.redeem(vault.maxRedeem(bob), bob, bob);
 
     // Bob has withdrawn 2_500_000e18 assets and burnt all his shares
     assertEq(underlyingAsset.balanceOf(bob), _bobWithdrawableAmount);

@@ -25,7 +25,10 @@ contract VaultTest is UnitBaseSetup {
 
   event LiquidationPairSet(ILiquidationPair indexed newLiquidationPair);
 
-  event YieldFeeRecipientSet(address indexed previousYieldFeeRecipient, address indexed newYieldFeeRecipient);
+  event YieldFeeRecipientSet(
+    address indexed previousYieldFeeRecipient,
+    address indexed newYieldFeeRecipient
+  );
 
   event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
 
