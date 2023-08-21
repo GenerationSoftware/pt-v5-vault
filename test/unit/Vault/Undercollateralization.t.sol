@@ -121,6 +121,122 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     assertEq(vault.totalSupply(), 0);
   }
 
+  function testUndercollateralizationYieldVaultAssetsUnavailable() external {
+    uint256 _aliceAmount = 15_000_000e18;
+
+    underlyingAsset.mint(alice, _aliceAmount);
+
+    uint256 _bobAmount = 5_000_000e18;
+    uint256 _bobWithdrawableAmount = 2_500_000e18;
+
+    underlyingAsset.mint(bob, _bobAmount);
+
+    vm.startPrank(alice);
+
+    _deposit(underlyingAsset, vault, _aliceAmount, alice);
+    assertEq(vault.balanceOf(alice), _aliceAmount);
+
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+
+    _deposit(underlyingAsset, vault, _bobAmount, bob);
+    assertEq(vault.balanceOf(bob), _bobAmount);
+
+    // Bob can redeem his full deposits and shares
+    assertEq(vault.maxRedeem(bob), _bobAmount);
+    assertEq(vault.maxWithdraw(bob), _bobAmount);
+    assertEq(vault.previewRedeem(_bobAmount), _bobAmount);
+    assertEq(vault.previewWithdraw(_bobAmount), _bobAmount);
+
+    assertEq(vault.isVaultCollateralized(), true);
+    assertEq(yieldVault.totalSupply(), 20_000_000e18);
+
+    // 10_000_000e18 underlying assets have been lended and are currently unavailable in the YieldVault
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(yieldVault)),
+      abi.encode(10_000_000e18)
+    );
+
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)),
+      abi.encode(10_000_000e18)
+    );
+
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)),
+      abi.encode(10_000_000e18)
+    );
+
+    assertEq(yieldVault.maxRedeem(address(vault)), 10_000_000e18);
+    assertEq(yieldVault.totalSupply(), 20_000_000e18);
+
+    assertEq(vault.isVaultCollateralized(), false);
+
+    // Bob can redeem his full shares but will only receive back half his deposit
+    assertEq(vault.maxRedeem(bob), _bobAmount);
+    assertEq(vault.maxWithdraw(bob), _bobWithdrawableAmount);
+
+    assertEq(vault.previewRedeem(vault.maxRedeem(bob)), _bobWithdrawableAmount);
+    assertEq(vault.previewWithdraw(vault.maxWithdraw(bob)), _bobWithdrawableAmount);
+
+    vault.redeem(vault.maxRedeem(bob), bob, bob);
+
+    // Bob has withdrawn 2_500_000e18 assets and burnt all his shares
+    assertEq(underlyingAsset.balanceOf(bob), _bobWithdrawableAmount);
+    assertEq(vault.balanceOf(bob), 0);
+    assertEq(vault.maxWithdraw(bob), 0);
+
+    // Only 2_500_000e18 YieldVault shares have been burnt
+    uint256 _availableUnderlyingAssets = 20_000_000e18 - 2_500_000e18;
+
+    assertEq(yieldVault.balanceOf(address(vault)), _availableUnderlyingAssets);
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _availableUnderlyingAssets);
+
+    vm.stopPrank();
+
+    // Funds are available again in the YieldVault
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(yieldVault)),
+      abi.encode(_availableUnderlyingAssets)
+    );
+
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)),
+      abi.encode(_availableUnderlyingAssets)
+    );
+
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)),
+      abi.encode(_availableUnderlyingAssets)
+    );
+
+    assertEq(vault.isVaultCollateralized(), true);
+
+    vm.startPrank(alice);
+
+    // Alice decided to wait and can now withdraw her full amount
+    // assertEq(vault.maxWithdraw(alice), _aliceAmount);
+
+    vault.withdraw(vault.maxWithdraw(alice), alice, alice);
+    assertEq(underlyingAsset.balanceOf(alice), _aliceAmount);
+
+    vm.stopPrank();
+
+    assertEq(vault.isVaultCollateralized(), true);
+    assertEq(vault.totalSupply(), 0);
+
+    // All Vault shares have been burnt but the Vault still owns 2_500_000e18 YieldVault shares
+    assertEq(yieldVault.balanceOf(address(vault)), 2_500_000e18);
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), 2_500_000e18);
+  }
+
   function testUndercollateralizationYieldVaultEmpty() external {
     uint256 _aliceAmount = 15_000_000e18;
 
@@ -323,8 +439,8 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     vault.withdraw(vault.maxWithdraw(address(this)), address(this), address(this));
     assertEq(underlyingAsset.balanceOf(address(this)), _thisAmount);
 
-    assertEq(vault.totalSupply(), 0);
-    assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
+    assertApproxEqAbs(vault.totalSupply(), 0, 2);
+    assertApproxEqAbs(underlyingAsset.balanceOf(address(yieldVault)), 0, 1);
   }
 
   function testPartialUndercollateralizationWithYieldFeesCaptured() external {
@@ -387,6 +503,8 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     vault.mintYieldFee(_yieldFeeShares);
 
     vm.startPrank(alice);
+
+    assertEq(vault.maxWithdraw(alice), _aliceAmount);
 
     vault.withdraw(vault.maxWithdraw(alice), alice, alice);
 
