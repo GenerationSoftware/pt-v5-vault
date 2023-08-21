@@ -327,6 +327,8 @@ contract VaultWithdrawTest is UnitBaseSetup {
 
     _deposit(underlyingAsset, vault, _amount, alice);
 
+    assertEq(vault.balanceOf(alice), _amount);
+
     vm.stopPrank();
 
     uint256 _yield = 10e18;
