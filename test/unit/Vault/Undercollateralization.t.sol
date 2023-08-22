@@ -181,7 +181,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     assertEq(vault.maxWithdraw(bob), _bobWithdrawableAmount);
 
     assertEq(vault.previewRedeem(vault.maxRedeem(bob)), _bobWithdrawableAmount);
-    assertEq(vault.previewWithdraw(vault.maxWithdraw(bob)), _bobWithdrawableAmount);
+    assertEq(vault.previewWithdraw(vault.maxWithdraw(bob)), _bobAmount);
 
     vault.redeem(vault.maxRedeem(bob), bob, bob);
 
@@ -222,7 +222,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     vm.startPrank(alice);
 
     // Alice decided to wait and can now withdraw her full amount
-    // assertEq(vault.maxWithdraw(alice), _aliceAmount);
+    assertEq(vault.maxWithdraw(alice), _aliceAmount);
 
     vault.withdraw(vault.maxWithdraw(alice), alice, alice);
     assertEq(underlyingAsset.balanceOf(alice), _aliceAmount);

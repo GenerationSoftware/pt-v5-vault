@@ -339,8 +339,8 @@ contract VaultWithdrawTest is UnitBaseSetup {
     vm.expectEmit();
     emit Transfer(alice, address(0), _amount);
 
-    // vm.expectEmit();
-    // emit Withdraw(alice, alice, alice, _amount, _amount);
+    vm.expectEmit();
+    emit Withdraw(alice, alice, alice, _amount, _amount);
 
     assertEq(vault.maxRedeem(alice), _amount);
 
@@ -349,12 +349,12 @@ contract VaultWithdrawTest is UnitBaseSetup {
     assertEq(vault.balanceOf(alice), 0);
     assertEq(underlyingAsset.balanceOf(alice), _amount);
 
-    // assertEq(twabController.balanceOf(address(vault), alice), 0);
-    // assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
+    assertEq(twabController.balanceOf(address(vault), alice), 0);
+    assertEq(twabController.delegateBalanceOf(address(vault), alice), 0);
 
-    // assertEq(yieldVault.balanceOf(address(vault)), yieldVault.convertToShares(_yield));
-    // assertEq(underlyingAsset.balanceOf(address(yieldVault)), _yield);
-    // assertEq(vault.totalSupply(), 0);
+    assertEq(yieldVault.balanceOf(address(vault)), yieldVault.convertToShares(_yield));
+    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _yield);
+    assertEq(vault.totalSupply(), 0);
 
     vm.stopPrank();
   }
