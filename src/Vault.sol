@@ -1277,27 +1277,21 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     // shares are burned and after the assets are transferred, which is a valid state.
     _burn(_owner, _shares);
 
-    uint256 _withdrawnAssets;
-
     // If the Vault is collateralized, users can withdraw their deposit 1:1
     if (_vaultCollateralized) {
-      uint256 _assetsBalanceBefore = _asset.balanceOf(address(this));
-
       _yieldVault.withdraw(_assets, address(this), address(this));
-
-      _withdrawnAssets = _asset.balanceOf(address(this)) - _assetsBalanceBefore;
     } else {
       // Otherwise, redeem is used to avoid burning too many YieldVault shares
-      _withdrawnAssets = _yieldVault.redeem(_yieldVaultShares, address(this), address(this));
+      _assets = _yieldVault.redeem(_yieldVaultShares, address(this), address(this));
     }
 
-    if (_withdrawnAssets == 0) revert WithdrawZeroAssets();
+    if (_assets == 0) revert WithdrawZeroAssets();
 
-    SafeERC20.safeTransfer(_asset, _receiver, _withdrawnAssets);
+    SafeERC20.safeTransfer(_asset, _receiver, _assets);
 
-    emit Withdraw(_caller, _receiver, _owner, _withdrawnAssets, _shares);
+    emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
 
-    return _withdrawnAssets;
+    return _assets;
   }
 
   /* ============ Claim Functions ============ */
