@@ -753,7 +753,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     address _tokenOut,
     uint256 _amountOut,
     bytes memory _flashSwapData
-  ) public virtual override onlyVaultCollateralized returns (bool) {
+  ) public virtual override onlyVaultCollateralized {
     if (msg.sender != address(_liquidationPair))
       revert LiquidationCallerNotLP(msg.sender, address(_liquidationPair));
 
@@ -793,8 +793,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     }
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
-
-    return true;
   }
 
   /// @inheritdoc ILiquidationSource
