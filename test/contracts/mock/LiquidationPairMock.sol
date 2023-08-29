@@ -26,15 +26,21 @@ contract LiquidationPairMock {
     return ILiquidationSource(_source).liquidatableBalanceOf(_tokenOut);
   }
 
-  function liquidate(
-    address account,
-    address /* tokenIn */,
-    uint256 /* amountIn */,
-    address tokenOut,
-    uint256 amountOut
-  ) external returns (bool) {
-    ERC20Mock(tokenOut).transfer(account, amountOut);
-    return true;
+  function transferTokensOut(
+    address _sender,
+    address _receiver,
+    address _tokenOut,
+    uint256 _amountOut
+  ) public virtual {
+    ERC20Mock(_tokenOut).transfer(_receiver, _amountOut);
+  }
+
+  function verifyTokensIn(
+    address,
+    address,
+    address _tokenIn,
+    uint256 _amountIn
+  ) public virtual {
   }
 
   function computeExactAmountIn(uint256 _amountOut) external returns (uint256) {
@@ -46,15 +52,7 @@ contract LiquidationPairMock {
     uint256 _amountOut,
     uint256 _amountInMax
   ) external returns (uint256) {
-    ILiquidationSource(_source).liquidate(
-      _account,
-      _account,
-      _tokenIn,
-      _amountInMax,
-      _tokenOut,
-      _amountOut,
-      ""
-    );
+    ILiquidationSource(_source).transferTokensOut(_account, _account, _tokenOut, _amountOut);
 
     return _amountInMax;
   }

@@ -11,7 +11,6 @@ import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
 import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
-import { IFlashSwapCallback } from "pt-v5-liquidator-interfaces/IFlashSwapCallback.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
@@ -89,7 +88,7 @@ error SweepZeroAssets();
  * @param caller The caller address
  * @param liquidationPair The LP address
  */
-error LiquidationCallerNotLP(address caller, address liquidationPair);
+error CallerNotLP(address caller, address liquidationPair);
 
 /**
  * @notice Emitted during the liquidation process when the token in is not the prize token.
@@ -743,23 +742,13 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    *      So `_amountOut` does not need to be converted to assets.
    * @dev User provides prize tokens and receives in exchange Vault shares.
    * @dev The yield fee can serve as a buffer in case of undercollateralization of the Vault.
-   * @dev If assets are living in the Vault, we deposit it in the YieldVault.
    */
-  function liquidate(
+  function transferTokensOut(
     address _sender,
     address _receiver,
-    address _tokenIn,
-    uint256 _amountIn,
     address _tokenOut,
-    uint256 _amountOut,
-    bytes memory _flashSwapData
-  ) public virtual override onlyVaultCollateralized {
-    if (msg.sender != address(_liquidationPair))
-      revert LiquidationCallerNotLP(msg.sender, address(_liquidationPair));
-
-    if (_tokenIn != address(_prizePool.prizeToken()))
-      revert LiquidationTokenInNotPrizeToken(_tokenIn, address(_prizePool.prizeToken()));
-
+    uint256 _amountOut
+  ) public virtual override onlyLiquidationPair onlyVaultCollateralized {
     if (_tokenOut != address(this))
       revert LiquidationTokenOutNotVaultShare(_tokenOut, address(this));
 
@@ -781,16 +770,19 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     }
 
     _mint(_receiver, _amountOut);
+  }
 
-    if (_flashSwapData.length > 0) {
-      IFlashSwapCallback(_receiver).flashSwapCallback(
-        msg.sender,
-        _sender,
-        _amountIn,
-        _amountOut,
-        _flashSwapData
-      );
-    }
+  /**
+   * @inheritdoc ILiquidationSource
+   */
+  function verifyTokensIn(
+    address,
+    address,
+    address _tokenIn,
+    uint256 _amountIn
+  ) public virtual override onlyLiquidationPair {
+    if (_tokenIn != address(_prizePool.prizeToken()))
+      revert LiquidationTokenInNotPrizeToken(_tokenIn, address(_prizePool.prizeToken()));
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
   }
@@ -1512,6 +1504,14 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    */
   modifier onlyClaimer() {
     if (msg.sender != _claimer) revert CallerNotClaimer(msg.sender, _claimer);
+    _;
+  }
+
+  /**
+   * @notice Requires the caller to be the liquidation pair
+   */
+  modifier onlyLiquidationPair() {
+    if (msg.sender != address(_liquidationPair)) revert CallerNotLP(msg.sender, address(_liquidationPair));
     _;
   }
 }

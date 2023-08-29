@@ -9,7 +9,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
   event MintYieldFee(address indexed caller, address indexed recipient, uint256 shares);
 
   /* ============ Without fees ============ */
-  function testLiquidateFullYield() external {
+  function testTransferTokensOut_FullYield() external {
     _setLiquidationPair();
 
     uint256 _amount = 1000e18;
@@ -43,7 +43,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testLiquidateQuarterYield() external {
+  function testTransferTokensOut_QuarterYield() external {
     _setLiquidationPair();
 
     uint256 _amount = 1000e18;
@@ -79,7 +79,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
   }
 
   /* ============ With fees ============ */
-  function testLiquidateFullYieldWithFees() external {
+  function testTransferTokensOut_FullYieldWithFees() external {
     _setLiquidationPair();
 
     vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
@@ -122,7 +122,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testLiquidateFullYieldWithFeesLowDecimals() external {
+  function testTransferTokensOut_FullYieldWithFeesLowDecimals() external {
     _setLiquidationPair();
 
     vault.setYieldFeePercentage(LOW_YIELD_FEE_PERCENTAGE);
@@ -165,7 +165,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testLiquidateQuarterYieldWithFees() external {
+  function testTransferTokensOut_QuarterYieldWithFees() external {
     _setLiquidationPair();
 
     vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
@@ -220,7 +220,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testLiquidateQuarterYieldWithFeesLowDecimals() external {
+  function testTransferTokensOut_QuarterYieldWithFeesLowDecimals() external {
     _setLiquidationPair();
 
     vault.setYieldFeePercentage(LOW_YIELD_FEE_PERCENTAGE);
@@ -275,7 +275,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testLiquidateAndMintFees() external {
+  function testTransferTokensOut_AndMintFees() external {
     _setLiquidationPair();
 
     vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
@@ -318,7 +318,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
   }
 
   /* ============ Liquidate - Errors ============ */
-  function testLiquidateYieldVaultUndercollateralized() public {
+  function testTransferTokensOut_YieldVaultUndercollateralized() public {
     _setLiquidationPair();
 
     uint256 _amount = 1000e18;
@@ -332,34 +332,59 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
 
-    vault.liquidate(
-      address(this),
-      address(this),
-      address(prizeToken),
-      1e18,
-      address(vault),
-      1e18,
-      ""
-    );
+    vault.transferTokensOut(address(this), address(this), address(vault), 1e18);
 
     vm.stopPrank();
   }
 
-  function testLiquidateCallerNotLP() public {
+  function testTransferTokensOut_CallerNotLP() public {
     _setLiquidationPair();
 
     vm.startPrank(bob);
 
     vm.expectRevert(
-      abi.encodeWithSelector(LiquidationCallerNotLP.selector, bob, address(liquidationPair))
+      abi.encodeWithSelector(CallerNotLP.selector, bob, address(liquidationPair))
     );
 
-    vault.liquidate(address(this), address(this), address(prizeToken), 0, address(vault), 0, "");
+    vault.transferTokensOut(address(this), address(this), address(vault), 1e18);
 
     vm.stopPrank();
   }
 
-  function testLiquidateTokenInNotPrizeToken() public {
+  function testVerifyTokensIn_success() public {
+    _setLiquidationPair();
+
+    vm.mockCall(
+      address(prizePool),
+      abi.encodeCall(
+        PrizePool.contributePrizeTokens,
+        (address(vault), 1e18)
+      ),
+      abi.encode(0)
+    );
+
+    vm.startPrank(address(liquidationPair));
+    vault.verifyTokensIn(address(this), address(this), address(prizeToken), 1e18);
+    vm.stopPrank();
+  }
+
+  function testVerifyTokensIn_CallerNotLP() public {
+    _setLiquidationPair();
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        CallerNotLP.selector,
+        address(bob),
+        address(liquidationPair)
+      )
+    );
+
+    vm.startPrank(address(bob));
+    vault.verifyTokensIn(address(this), address(this), address(0), 1e18);
+    vm.stopPrank();
+  }
+
+  function testVerifyTokensIn_TokenInNotPrizeToken() public {
     _setLiquidationPair();
 
     vm.startPrank(address(liquidationPair));
@@ -372,12 +397,12 @@ contract VaultLiquidateTest is UnitBaseSetup {
       )
     );
 
-    vault.liquidate(address(this), address(this), address(0), 0, address(vault), 0, "");
+    vault.verifyTokensIn(address(this), address(this), address(0), 1e18);
 
     vm.stopPrank();
   }
 
-  function testLiquidateTokenOutNotVaultShare() public {
+  function testTransferTokensOut_TokenOutNotVaultShare() public {
     _setLiquidationPair();
 
     vm.startPrank(address(liquidationPair));
@@ -386,23 +411,24 @@ contract VaultLiquidateTest is UnitBaseSetup {
       abi.encodeWithSelector(LiquidationTokenOutNotVaultShare.selector, address(0), address(vault))
     );
 
-    vault.liquidate(address(this), address(this), address(prizeToken), 0, address(0), 0, "");
+    vault.transferTokensOut(address(this), address(this), address(0), 0);
 
     vm.stopPrank();
   }
 
-  function testLiquidateAmountOutNotZero() public {
+  function testTransferTokensOut_AmountOutNotZero() public {
     _setLiquidationPair();
 
     vm.startPrank(address(liquidationPair));
 
     vm.expectRevert(abi.encodeWithSelector(LiquidationAmountOutZero.selector));
-    vault.liquidate(address(this), address(this), address(prizeToken), 0, address(vault), 0, "");
+
+    vault.transferTokensOut(address(this), address(this), address(vault), 0);
 
     vm.stopPrank();
   }
 
-  function testLiquidateAmountGTAvailableYield() public {
+  function testTransferTokensOut_AmountGTAvailableYield() public {
     _setLiquidationPair();
 
     vm.startPrank(address(liquidationPair));
@@ -411,20 +437,12 @@ contract VaultLiquidateTest is UnitBaseSetup {
       abi.encodeWithSelector(LiquidationAmountOutGTYield.selector, type(uint256).max, 0)
     );
 
-    vault.liquidate(
-      address(this),
-      address(this),
-      address(prizeToken),
-      0,
-      address(vault),
-      type(uint256).max,
-      ""
-    );
+    vault.transferTokensOut(address(this), address(this), address(vault), type(uint256).max);
 
     vm.stopPrank();
   }
 
-  function testLiquidateAmountOutGTMaxMint() public {
+  function testTransferTokensOut_AmountOutGTMaxMint() public {
     _setLiquidationPair();
 
     uint256 _amount = 1000e18;
@@ -457,55 +475,8 @@ contract VaultLiquidateTest is UnitBaseSetup {
       )
     );
 
-    vault.liquidate(
-      address(this),
-      alice,
-      address(prizeToken),
-      _amountIn,
-      address(vault),
-      _amountOut,
-      ""
-    );
+    vault.transferTokensOut(address(this), alice, address(vault), _amountOut);
 
-    vm.stopPrank();
-  }
-
-  function testLiquidate_triggerCallback() public {
-    _setLiquidationPair();
-
-    uint256 _amount = 1000e18;
-
-    underlyingAsset.mint(address(this), _amount);
-    _sponsor(underlyingAsset, vault, _amount);
-
-    uint256 _amountOut = type(uint104).max;
-    _accrueYield(underlyingAsset, yieldVault, _amountOut);
-
-    address receiver = makeAddr("receiver");
-    vm.mockCallRevert(
-      receiver,
-      abi.encodeWithSelector(
-        IFlashSwapCallback.flashSwapCallback.selector,
-        address(liquidationPair),
-        address(this),
-        11e18,
-        22e18,
-        abi.encode("testing")
-      ),
-      abi.encodePacked("whoa")
-    );
-
-    vm.expectRevert(abi.encodePacked("whoa"));
-    vm.startPrank(address(liquidationPair));
-    vault.liquidate(
-      address(this),
-      receiver,
-      address(prizeToken),
-      11e18,
-      address(vault),
-      22e18,
-      abi.encode("testing")
-    );
     vm.stopPrank();
   }
 
