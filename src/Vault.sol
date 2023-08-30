@@ -176,6 +176,8 @@ error BeforeClaimPrizeFailed(bytes reason);
  */
 error AfterClaimPrizeFailed(bytes reason);
 
+uint256 constant UINT112_MAX = type(uint112).max;
+
 /**
  * @title  PoolTogether V5 Vault
  * @author PoolTogether Inc Team, Generation Software Team
@@ -490,7 +492,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     if (!_isVaultCollateralized(_depositedAssets, _withdrawableAssets)) return 0;
 
-    uint256 _vaultMaxDeposit = type(uint96).max -
+    uint256 _vaultMaxDeposit = UINT112_MAX -
       _convertToAssets(_depositedAssets, _depositedAssets, _withdrawableAssets, Math.Rounding.Up);
 
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
@@ -507,7 +509,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     if (!_isVaultCollateralized(_depositedAssets, _totalAssets())) return 0;
 
-    uint256 _vaultMaxMint = type(uint96).max - _depositedAssets;
+    uint256 _vaultMaxMint = UINT112_MAX - _depositedAssets;
     uint256 _yieldVaultMaxMint = _yieldVault.maxMint(address(this));
 
     return _yieldVaultMaxMint < _vaultMaxMint ? _yieldVaultMaxMint : _vaultMaxMint;
@@ -744,7 +746,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev The yield fee can serve as a buffer in case of undercollateralization of the Vault.
    */
   function transferTokensOut(
-    address _sender,
+    address,
     address _receiver,
     address _tokenOut,
     uint256 _amountOut
@@ -1388,7 +1390,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_shares > maxMint(_receiver))
       revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
 
-    _twabController.mint(_receiver, SafeCast.toUint96(_shares));
+    _twabController.mint(_receiver, SafeCast.toUint112(_shares));
 
     emit Transfer(address(0), _receiver, _shares);
   }
@@ -1402,7 +1404,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev `_owner` must have at least `_shares` tokens.
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
-    _twabController.burn(_owner, SafeCast.toUint96(_shares));
+    _twabController.burn(_owner, SafeCast.toUint112(_shares));
 
     emit Transfer(_owner, address(0), _shares);
   }
@@ -1417,7 +1419,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev `_from` must have a balance of at least `_shares`.
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
-    _twabController.transfer(_from, _to, SafeCast.toUint96(_shares));
+    _twabController.transfer(_from, _to, SafeCast.toUint112(_shares));
 
     emit Transfer(_from, _to, _shares);
   }
