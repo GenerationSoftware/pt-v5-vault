@@ -1373,7 +1373,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_shares > maxMint(_receiver))
       revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
 
-    _twabController.mint(_receiver, SafeCast.toUint96(_shares));
+    _twabController.mint(_receiver, SafeCast.toUint112(_shares));
 
     emit Transfer(address(0), _receiver, _shares);
   }
