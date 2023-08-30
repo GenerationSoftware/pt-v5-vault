@@ -58,14 +58,6 @@ error WithdrawMoreThanMax(address owner, uint256 amount, uint256 max);
  */
 error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
 
-/**
- * @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed.
- * @param receiver The receiver address
- * @param shares The shares being minted
- * @param max The max amount of shares that can be minted to the receiver
- */
-error MintMoreThanMax(address receiver, uint256 shares, uint256 max);
-
 /// @notice Emitted when `_deposit` is called but no shares are minted back to the receiver.
 error MintZeroShares();
 
@@ -1155,9 +1147,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_withdrawableAssetsAfter < _expectedWithdrawableAssets)
       revert YVWithdrawableAssetsLTExpected(_withdrawableAssetsAfter, _expectedWithdrawableAssets);
 
-    if (_assets > maxMint(_receiver))
-      revert MintMoreThanMax(_receiver, _assets, maxMint(_receiver));
-
     _mint(_receiver, _assets);
 
     emit Deposit(_caller, _receiver, _assets, _assets);
@@ -1370,11 +1359,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param _shares Shares to mint
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
-    if (_shares > maxMint(_receiver))
-      revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
-
     _twabController.mint(_receiver, SafeCast.toUint112(_shares));
-
     emit Transfer(address(0), _receiver, _shares);
   }
 

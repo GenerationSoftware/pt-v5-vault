@@ -88,7 +88,7 @@ Feature: Liquidate
   Scenario: Alice swaps prize tokens in exchange of Vault shares
     Given type(uint104).max underlying assets have accrued in the YieldVault
     When Alice swaps type(uint104).max prize tokens for type(uint104).max Vault shares
-    Then the transaction reverts with the custom error `MintMoreThanMax`
+    Then the transaction reverts with the error SafeCast: value doesn't fit in 112 bits
 
 
   # MintYieldFee - Errors
@@ -100,4 +100,4 @@ Feature: Liquidate
   Scenario: Bob mints 1e18 yield fee shares
     Given Bob owns type(uint112).max Vault shares and 10e18 of yield fee shares have accrued
     When Bob mints 1e18 yield fee shares
-    Then the transaction reverts with the custom error `MintMoreThanMax`
+    Then the transaction reverts with the error SafeCast: value doesn't fit in 112 bits
