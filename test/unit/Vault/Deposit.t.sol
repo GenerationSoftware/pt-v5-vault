@@ -193,6 +193,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectRevert(
       abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
     );
+
     vault.deposit(_amount, alice);
 
     vm.stopPrank();
