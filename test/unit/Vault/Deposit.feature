@@ -57,7 +57,7 @@ Feature: Deposit
   # Deposit - Errors
   Scenario: Alice deposits into the Vault
     Given Alice owns 0 Vault shares
-    When Alice deposits type(uint96).max + 1 underlying assets
+    When Alice deposits type(uint112).max + 1 underlying assets
     Then the transaction reverts with the custom error `DepositMoreThanMax`
 
   Scenario: Alice deposits into the Vault
@@ -115,13 +115,13 @@ Feature: Deposit
   # Mint - Errors
   Scenario: Alice mints shares from the Vault
     Given Alice owns 0 Vault shares
-    When Alice mints type(uint96).max + 1 shares
-    Then the transaction reverts with the custom error MintMoreThanMax
+    When Alice mints type(uint112).max + 1 shares
+    Then the transaction reverts with the error SafeCast: value doesn't fit in 112 bits
 
   Scenario: Alice mints shares from the Vault
     Given Alice owns 0 Vault shares and YieldVault's maxMint function returns type(uint88).max
     When Alice mints type(uint88).max + 1 shares
-    Then the transaction reverts with the custom error MintMoreThanMax
+    Then the transaction reverts with the error ERC4626: deposit more than max
 
   Scenario: Alice mints 0 shares from the Vault
     Given Alice owns 0 Vault shares

@@ -193,6 +193,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.expectRevert(
       abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
     );
+
     vault.deposit(_amount, alice);
 
     vm.stopPrank();
@@ -422,9 +423,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint112).max)
-    );
+    vm.expectRevert(bytes("SafeCast: value doesn't fit in 112 bits"));
 
     vault.mint(_amount, alice);
 
@@ -439,15 +438,15 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    vm.mockCall(
+    bytes memory _errorMessage = bytes("ERC4626: deposit more than max");
+
+    vm.mockCallRevert(
       address(yieldVault),
-      abi.encodeWithSelector(IERC4626.maxMint.selector, address(vault)),
-      abi.encode(type(uint88).max)
+      abi.encodeWithSelector(IERC4626.deposit.selector, _amount, address(vault)),
+      _errorMessage
     );
 
-    vm.expectRevert(
-      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint88).max)
-    );
+    vm.expectRevert(_errorMessage);
 
     vault.mint(_amount, alice);
 

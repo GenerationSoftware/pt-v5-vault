@@ -317,6 +317,76 @@ contract VaultLiquidateTest is UnitBaseSetup {
     assertEq(vault.yieldFeeShares(), 0);
   }
 
+  function testTransferTokensOut_AndMintFees_YieldVaultMaxMintReached() external {
+    _setLiquidationPair();
+
+    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+    vault.setYieldFeeRecipient(bob);
+
+    uint256 _yield = 10e18;
+    uint256 _amount = type(uint112).max - _yield;
+
+    underlyingAsset.mint(address(this), _amount);
+    _sponsor(underlyingAsset, vault, _amount);
+
+    _accrueYield(underlyingAsset, yieldVault, _yield);
+
+    vm.startPrank(alice);
+
+    prizeToken.mint(alice, 1000e18);
+
+    uint256 _liquidatedYield = vault.liquidatableBalanceOf(address(vault));
+
+    // Yield Vault has reached its max mint limit
+    vm.mockCall(
+      address(yieldVault),
+      abi.encodeWithSelector(IERC4626.maxMint.selector, address(vault)),
+      abi.encode(type(uint104).max)
+    );
+
+    // Yield has accrued, so despite the max mint limit reached,
+    // we should still be able to liquidate prize tokens in exchange of Vault shares
+    _liquidate(liquidationRouter, liquidationPair, prizeToken, _liquidatedYield, alice);
+
+    assertEq(vault.balanceOf(alice), _liquidatedYield);
+
+    vault.withdraw(_liquidatedYield, alice, alice);
+
+    assertEq(vault.balanceOf(alice), 0);
+    assertEq(underlyingAsset.balanceOf(alice), _liquidatedYield);
+
+    vm.stopPrank();
+
+    uint256 _yieldFeeShares = _getYieldFeeShares(_liquidatedYield, YIELD_FEE_PERCENTAGE);
+
+    assertEq(vault.balanceOf(bob), 0);
+
+    // _yieldFeeShares has not been minted yet, so totatSupply is type(uint112).max - _yield
+    assertEq(vault.totalSupply(), _amount);
+    assertEq(vault.yieldFeeShares(), _yieldFeeShares);
+
+    vm.expectEmit();
+    emit MintYieldFee(address(this), bob, _yieldFeeShares);
+
+    vault.mintYieldFee(_yieldFeeShares);
+
+    assertEq(vault.balanceOf(bob), _yieldFeeShares);
+
+    assertEq(vault.totalSupply(), _amount + _yieldFeeShares);
+    assertEq(vault.yieldFeeShares(), 0);
+
+    vm.startPrank(bob);
+
+    vault.withdraw(_yieldFeeShares, bob, bob);
+
+    assertEq(vault.totalSupply(), _amount);
+
+    assertEq(vault.balanceOf(bob), 0);
+    assertEq(underlyingAsset.balanceOf(bob), _yieldFeeShares);
+
+    vm.stopPrank();
+  }
+
   /* ============ Liquidate - Errors ============ */
   function testTransferTokensOut_YieldVaultUndercollateralized() public {
     _setLiquidationPair();
@@ -433,7 +503,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testTransferTokensOut_AmountOutGTMaxMint() public {
+  function testTransferTokensOut_AmountOutGTUint112() public {
     _setLiquidationPair();
 
     uint256 _amount = 1000e18;
@@ -457,14 +527,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        MintMoreThanMax.selector,
-        alice,
-        _amountOut,
-        type(uint112).max - _amount
-      )
-    );
+    vm.expectRevert(bytes("SafeCast: value doesn't fit in 112 bits"));
 
     vault.transferTokensOut(address(this), alice, address(vault), _amountOut);
 
@@ -515,7 +578,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vault.deposit(vault.maxDeposit(bob), bob);
 
-    vm.expectRevert(abi.encodeWithSelector(MintMoreThanMax.selector, bob, 1e18, 0));
+    vm.expectRevert();
 
     vault.mintYieldFee(1e18);
 

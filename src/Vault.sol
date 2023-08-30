@@ -58,14 +58,6 @@ error WithdrawMoreThanMax(address owner, uint256 amount, uint256 max);
  */
 error RedeemMoreThanMax(address owner, uint256 amount, uint256 max);
 
-/**
- * @notice Emitted when the amount of shares being minted to the receiver is greater than the max amount allowed.
- * @param receiver The receiver address
- * @param shares The shares being minted
- * @param max The max amount of shares that can be minted to the receiver
- */
-error MintMoreThanMax(address receiver, uint256 shares, uint256 max);
-
 /// @notice Emitted when `_deposit` is called but no shares are minted back to the receiver.
 error MintZeroShares();
 
@@ -149,10 +141,10 @@ error YieldFeeGTAvailableShares(uint256 shares, uint256 yieldFeeShares);
 
 /**
  * @notice Emitted when the minted yield exceeds the amount of available yield in the YieldVault.
- * @param assets The amount of yield assets requested
+ * @param shares The amount of yield shares to mint
  * @param availableYield The amount of yield available
  */
-error YieldFeeGTAvailableYield(uint256 assets, uint256 availableYield);
+error YieldFeeGTAvailableYield(uint256 shares, uint256 availableYield);
 
 /// @notice Emitted when the Liquidation Pair being set is the zero address.
 error LPZeroAddress();
@@ -485,7 +477,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @inheritdoc IERC4626
-   * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
+   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
   function maxDeposit(address) public view virtual override returns (uint256) {
     uint256 _depositedAssets = _totalSupply();
@@ -503,7 +495,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @inheritdoc IERC4626
-   * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
+   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
   function maxMint(address) public view virtual override returns (uint256) {
     uint256 _depositedAssets = _totalSupply();
@@ -511,9 +503,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (!_isVaultCollateralized(_depositedAssets, _totalAssets())) return 0;
 
     uint256 _vaultMaxMint = UINT112_MAX - _depositedAssets;
-    uint256 _yieldVaultMaxMint = _yieldVault.maxMint(address(this));
+    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
-    return _yieldVaultMaxMint < _vaultMaxMint ? _yieldVaultMaxMint : _vaultMaxMint;
+    return _yieldVaultMaxDeposit < _vaultMaxMint ? _yieldVaultMaxDeposit : _vaultMaxMint;
   }
 
   /// @inheritdoc IERC4626
@@ -1361,27 +1353,23 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Creates `_shares` tokens and assigns them to `_receiver`, increasing the total supply.
-   * @param _receiver Address that will receive the minted shares
-   * @param _shares Shares to mint
    * @dev Emits a {Transfer} event with `from` set to the zero address.
    * @dev `_receiver` cannot be the zero address.
+   * @param _receiver Address that will receive the minted shares
+   * @param _shares Shares to mint
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
-    if (_shares > maxMint(_receiver))
-      revert MintMoreThanMax(_receiver, _shares, maxMint(_receiver));
-
     _twabController.mint(_receiver, SafeCast.toUint112(_shares));
-
     emit Transfer(address(0), _receiver, _shares);
   }
 
   /**
    * @notice Destroys `_shares` tokens from `_owner`, reducing the total supply.
-   * @param _owner The owner of the shares
-   * @param _shares The shares to burn
    * @dev Emits a {Transfer} event with `to` set to the zero address.
    * @dev `_owner` cannot be the zero address.
    * @dev `_owner` must have at least `_shares` tokens.
+   * @param _owner The owner of the shares
+   * @param _shares The shares to burn
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
     _twabController.burn(_owner, SafeCast.toUint112(_shares));
@@ -1391,12 +1379,12 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Updates `_from` and `_to` TWAB balance for a transfer.
-   * @param _from Address to transfer from
-   * @param _to Address to transfer to
-   * @param _shares Shares to transfer
    * @dev `_from` cannot be the zero address.
    * @dev `_to` cannot be the zero address.
    * @dev `_from` must have a balance of at least `_shares`.
+   * @param _from Address to transfer from
+   * @param _to Address to transfer to
+   * @param _shares Shares to transfer
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
     _twabController.transfer(_from, _to, SafeCast.toUint112(_shares));
@@ -1444,6 +1432,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
   ) internal pure returns (bool) {
     return _withdrawableAssets >= _depositedAssets;
   }
+
+  /* ============ Modifiers ============ */
 
   /// @notice Require reverting if the vault is under-collateralized.
   modifier onlyVaultCollateralized() {
