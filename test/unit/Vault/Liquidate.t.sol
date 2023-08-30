@@ -359,7 +359,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     );
 
     vm.startPrank(address(liquidationPair));
-    vault.verifyTokensIn(address(this), address(this), address(prizeToken), 1e18);
+    vault.verifyTokensIn(address(prizeToken), 1e18, "");
     vm.stopPrank();
   }
 
@@ -371,7 +371,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     );
 
     vm.startPrank(address(bob));
-    vault.verifyTokensIn(address(this), address(this), address(0), 1e18);
+    vault.verifyTokensIn(address(0), 1e18, "");
     vm.stopPrank();
   }
 
@@ -388,7 +388,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
       )
     );
 
-    vault.verifyTokensIn(address(this), address(this), address(0), 1e18);
+    vault.verifyTokensIn(address(0), 1e18, "");
 
     vm.stopPrank();
   }
