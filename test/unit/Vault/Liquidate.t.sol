@@ -342,9 +342,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(bob);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(CallerNotLP.selector, bob, address(liquidationPair))
-    );
+    vm.expectRevert(abi.encodeWithSelector(CallerNotLP.selector, bob, address(liquidationPair)));
 
     vault.transferTokensOut(address(this), address(this), address(vault), 1e18);
 
@@ -356,10 +354,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.mockCall(
       address(prizePool),
-      abi.encodeCall(
-        PrizePool.contributePrizeTokens,
-        (address(vault), 1e18)
-      ),
+      abi.encodeCall(PrizePool.contributePrizeTokens, (address(vault), 1e18)),
       abi.encode(0)
     );
 
@@ -372,11 +367,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     _setLiquidationPair();
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        CallerNotLP.selector,
-        address(bob),
-        address(liquidationPair)
-      )
+      abi.encodeWithSelector(CallerNotLP.selector, address(bob), address(liquidationPair))
     );
 
     vm.startPrank(address(bob));

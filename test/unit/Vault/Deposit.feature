@@ -158,31 +158,6 @@ Feature: Deposit
     Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
     Then the Vault `totalSupply` must be equal to 1,000
 
-  # Sponsor with permit
-  Scenario: Alice sponsors with permit the Vault
-    Given Alice owns 0 Vault shares and has not sponsored the Vault
-    When Alice signs her transaction and sponsors by depositing 1,000 underlying assets
-    Then Alice must receive an amount of Vault shares equivalent to her deposit
-    Then Alice `balance` must be equal to 1,000
-    Then Alice `delegateBalance` must be equal to 0
-    Then the `balance` of the sponsorship address must be 0
-    Then the `delegateBalance` of the sponsorship address must be 0
-    Then the YieldVault balance of underlying assets must increase by 1,000
-    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to 1,000
-
-  Scenario: Alice sponsors with permit the Vault via a third party
-    Given Alice owns 0 Vault shares and has not sponsored the Vault
-    When Alice signs her permit and a third party uses it to sponsors by depositing 1,000 underlying assets
-    Then Alice must receive an amount of Vault shares equivalent to her deposit
-    Then Alice `balance` must be equal to 1,000
-    Then Alice `delegateBalance` must be equal to 0
-    Then the `balance` of the sponsorship address must be 0
-    Then the `delegateBalance` of the sponsorship address must be 0
-    Then the YieldVault balance of underlying assets must increase by 1,000
-    Then the YieldVault must mint to the Vault an amount of shares equivalent to the amount of underlying assets deposited
-    Then the Vault `totalSupply` must be equal to 1,000
-
   # Sweep
   Scenario: Alice mistakenly sends 1,000 underlying assets to the Vault
     Given Alice owns 0 Vault shares

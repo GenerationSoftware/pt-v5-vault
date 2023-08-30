@@ -27,7 +27,7 @@ contract LiquidationPairMock {
   }
 
   function transferTokensOut(
-    address _sender,
+    address,
     address _receiver,
     address _tokenOut,
     uint256 _amountOut
@@ -35,13 +35,7 @@ contract LiquidationPairMock {
     ERC20Mock(_tokenOut).transfer(_receiver, _amountOut);
   }
 
-  function verifyTokensIn(
-    address,
-    address,
-    address _tokenIn,
-    uint256 _amountIn
-  ) public virtual {
-  }
+  function verifyTokensIn(address, address, address _tokenIn, uint256 _amountIn) public virtual {}
 
   function computeExactAmountIn(uint256 _amountOut) external returns (uint256) {
     return _liquidatorLib.computeExactAmountIn(100, 50, _availableReserveOut(), _amountOut);

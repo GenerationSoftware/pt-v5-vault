@@ -616,28 +616,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
   }
 
   /**
-   * @notice Deposit assets into the Vault and delegate to the sponsorship address.
-   * @param _assets Amount of assets to deposit
-   * @param _owner Address of the owner depositing `_assets` and signing the permit
-   * @param _deadline Timestamp after which the approval is no longer valid
-   * @param _v V part of the secp256k1 signature
-   * @param _r R part of the secp256k1 signature
-   * @param _s S part of the secp256k1 signature
-   * @return uint256 Amount of shares minted to caller.
-   */
-  function sponsorWithPermit(
-    uint256 _assets,
-    address _owner,
-    uint256 _deadline,
-    uint8 _v,
-    bytes32 _r,
-    bytes32 _s
-  ) external returns (uint256) {
-    _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
-    return _sponsor(_assets, _owner);
-  }
-
-  /**
    * @notice Deposit underlying assets that have been mistakenly sent to the Vault into the YieldVault.
    * @dev The deposited assets will contribute to the yield of the YieldVault.
    * @return uint256 Amount of underlying assets deposited
@@ -1514,7 +1492,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Requires the caller to be the liquidation pair
    */
   modifier onlyLiquidationPair() {
-    if (msg.sender != address(_liquidationPair)) revert CallerNotLP(msg.sender, address(_liquidationPair));
+    if (msg.sender != address(_liquidationPair))
+      revert CallerNotLP(msg.sender, address(_liquidationPair));
     _;
   }
 }
