@@ -176,6 +176,7 @@ error BeforeClaimPrizeFailed(bytes reason);
  */
 error AfterClaimPrizeFailed(bytes reason);
 
+// The maximum amount of shares that can be minted.
 uint256 constant UINT112_MAX = type(uint112).max;
 
 /**

@@ -450,7 +450,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     underlyingAsset.mint(address(this), _amount);
     _sponsor(underlyingAsset, vault, _amount);
 
-    uint256 _amountOut = type(uint112).max;
+    uint256 _amountOut = type(uint120).max;
     _accrueYield(underlyingAsset, yieldVault, _amountOut);
 
     vm.startPrank(address(alice));
