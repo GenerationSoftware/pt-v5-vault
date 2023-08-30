@@ -102,17 +102,6 @@ contract Helpers is Test {
     return _vault.sponsor(_assets);
   }
 
-  function _sponsorWithPermit(
-    Vault _vault,
-    uint256 _assets,
-    address _owner,
-    uint8 _v,
-    bytes32 _r,
-    bytes32 _s
-  ) internal returns (uint256) {
-    return _vault.sponsorWithPermit(_assets, _owner, block.timestamp, _v, _r, _s);
-  }
-
   /* ============ Undercollateralization ============ */
   function _getMaxWithdraw(
     address _user,
