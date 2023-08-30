@@ -185,13 +185,13 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   function testDepositMoreThanMax() external {
     vm.startPrank(alice);
 
-    uint256 _amount = uint256(type(uint96).max) + 1;
+    uint256 _amount = uint256(type(uint112).max) + 1;
 
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectRevert(
-      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint96).max)
+      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
     );
     vault.deposit(_amount, alice);
 
@@ -417,13 +417,13 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   function testMintMoreThanMax() external {
     vm.startPrank(alice);
 
-    uint256 _amount = uint256(type(uint96).max) + 1;
+    uint256 _amount = uint256(type(uint112).max) + 1;
 
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectRevert(
-      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint96).max)
+      abi.encodeWithSelector(MintMoreThanMax.selector, alice, _amount, type(uint112).max)
     );
 
     vault.mint(_amount, alice);
