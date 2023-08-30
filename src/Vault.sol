@@ -511,9 +511,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (!_isVaultCollateralized(_depositedAssets, _totalAssets())) return 0;
 
     uint256 _vaultMaxMint = UINT112_MAX - _depositedAssets;
-    uint256 _yieldVaultMaxMint = _yieldVault.maxMint(address(this));
+    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
-    return _yieldVaultMaxMint < _vaultMaxMint ? _yieldVaultMaxMint : _vaultMaxMint;
+    return _yieldVaultMaxDeposit < _vaultMaxMint ? _yieldVaultMaxDeposit : _vaultMaxMint;
   }
 
   /// @inheritdoc IERC4626

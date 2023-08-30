@@ -442,7 +442,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     vm.mockCall(
       address(yieldVault),
-      abi.encodeWithSelector(IERC4626.maxMint.selector, address(vault)),
+      abi.encodeWithSelector(IERC4626.maxDeposit.selector, address(vault)),
       abi.encode(type(uint88).max)
     );
 
