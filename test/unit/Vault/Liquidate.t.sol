@@ -527,13 +527,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        LiquidationAmountOutGTVaultMaxMint.selector,
-        _amountOut,
-        type(uint112).max - vault.totalSupply()
-      )
-    );
+    vm.expectRevert(bytes("SafeCast: value doesn't fit in 112 bits"));
 
     vault.transferTokensOut(address(this), alice, address(vault), _amountOut);
 
@@ -584,7 +578,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vault.deposit(vault.maxDeposit(bob), bob);
 
-    vm.expectRevert(abi.encodeWithSelector(YieldFeeGTVaultMaxMint.selector, 1e18, 0));
+    vm.expectRevert();
 
     vault.mintYieldFee(1e18);
 

@@ -114,13 +114,6 @@ error LiquidationAmountOutZero();
  */
 error LiquidationAmountOutGTYield(uint256 amountOut, uint256 availableYield);
 
-/**
- * @notice Emitted during the liquidation process if the amount out is greater than the maximum amount of Vault shares mintable.
- * @param amountOut The amount out
- * @param vaultMaxMint The maxmimum amount of Vault shares mintable
- */
-error LiquidationAmountOutGTVaultMaxMint(uint256 amountOut, uint256 vaultMaxMint);
-
 /// @notice Emitted when the Vault is under-collateralized.
 error VaultUnderCollateralized();
 
@@ -160,13 +153,6 @@ error YieldFeeGTAvailableShares(uint256 shares, uint256 yieldFeeShares);
  * @param availableYield The amount of yield available
  */
 error YieldFeeGTAvailableYield(uint256 shares, uint256 availableYield);
-
-/**
- * @notice Emitted when the minted yield exceeds the maximum amount of Vault shares mintable.
- * @param shares The amount of yield shares to mint
- * @param vaultMaxMint The maxmimum amount of Vault shares mintable
- */
-error YieldFeeGTVaultMaxMint(uint256 shares, uint256 vaultMaxMint);
 
 /// @notice Emitted when the Liquidation Pair being set is the zero address.
 error LPZeroAddress();
@@ -718,9 +704,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_shares > _availableYield) revert YieldFeeGTAvailableYield(_shares, _availableYield);
     if (_shares > _yieldFeeShares) revert YieldFeeGTAvailableShares(_shares, _yieldFeeShares);
 
-    uint256 _vaultMaxMint = _getVaultMaxMint(_depositedAssets);
-    if (_shares > _vaultMaxMint) revert YieldFeeGTVaultMaxMint(_shares, _vaultMaxMint);
-
     _yieldFeeShares -= _shares;
     _mint(_yieldFeeRecipient, _shares);
 
@@ -756,10 +739,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
     if (_amountOut > _liquidatableYield)
       revert LiquidationAmountOutGTYield(_amountOut, _liquidatableYield);
-
-    uint256 _vaultMaxMint = _getVaultMaxMint(_totalSupply());
-    if (_amountOut > _vaultMaxMint)
-      revert LiquidationAmountOutGTVaultMaxMint(_amountOut, _vaultMaxMint);
 
     // Distributes the specified yield fee percentage.
     // For instance, with a yield fee percentage of 20% and 8e18 Vault shares being liquidated,
@@ -1467,15 +1446,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 _withdrawableAssets
   ) internal pure returns (bool) {
     return _withdrawableAssets >= _depositedAssets;
-  }
-
-  /**
-   * @notice Returns the maximum amount of Vault shares that can be minted.
-   * @dev It would overflow if minting more shares than the TwabController uint112 max type.
-   * @param _depositedAssets Assets deposited into the YieldVault
-   */
-  function _getVaultMaxMint(uint256 _depositedAssets) internal pure returns (uint256) {
-    return type(uint112).max - _depositedAssets;
   }
 
   /* ============ Modifiers ============ */
