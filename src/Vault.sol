@@ -780,7 +780,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
   function verifyTokensIn(
     address _tokenIn,
     uint256 _amountIn,
-    bytes calldata transferTokensOutData
+    bytes calldata
   ) public virtual override onlyLiquidationPair {
     if (_tokenIn != address(_prizePool.prizeToken()))
       revert LiquidationTokenInNotPrizeToken(_tokenIn, address(_prizePool.prizeToken()));
