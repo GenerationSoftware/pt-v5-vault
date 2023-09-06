@@ -35,6 +35,13 @@ error OwnerZeroAddress();
 error UnderlyingAssetMismatch(address asset, address yieldVaultAsset);
 
 /**
+ * @notice Emitted when the TWAB controller passed to the constructor is different from the PrizePool one.
+ * @param vaultTwabController Address of the TwabController passed to the constructor
+ * @param prizePoolTwabController Address of the PrizePool TwabController
+ */
+error TwabControllerMismatch(address vaultTwabController, address prizePoolTwabController);
+
+/**
  * @notice Emitted when the amount being deposited for the receiver is greater than the max amount allowed.
  * @param receiver The receiver of the deposit
  * @param amount The amount to deposit
@@ -354,8 +361,14 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
     if (owner_ == address(0)) revert OwnerZeroAddress();
+
     if (address(asset_) != yieldVault_.asset())
       revert UnderlyingAssetMismatch(address(asset_), yieldVault_.asset());
+
+    address _prizePoolTwabController = address(prizePool_.twabController());
+
+    if (address(twabController_) != _prizePoolTwabController)
+      revert TwabControllerMismatch(address(twabController_), _prizePoolTwabController);
 
     _setClaimer(claimer_);
 

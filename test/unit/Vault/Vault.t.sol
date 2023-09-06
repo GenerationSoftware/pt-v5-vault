@@ -170,6 +170,25 @@ contract VaultTest is UnitBaseSetup {
     );
   }
 
+  function testConstructorTwabControllerMismatch() external {
+    vm.expectRevert(
+      abi.encodeWithSelector(TwabControllerMismatch.selector, address(1), address(twabController))
+    );
+
+    new VaultMock(
+      IERC20(address(underlyingAsset)),
+      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+      "PTaEthDAI",
+      TwabController(address(1)),
+      yieldVault,
+      PrizePool(address(prizePool)),
+      claimer,
+      address(this),
+      YIELD_FEE_PERCENTAGE,
+      address(this)
+    );
+  }
+
   function testConstructorClaimerZero() external {
     vm.expectRevert(abi.encodeWithSelector(ClaimerZeroAddress.selector));
 

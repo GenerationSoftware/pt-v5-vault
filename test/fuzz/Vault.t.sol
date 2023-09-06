@@ -48,7 +48,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
     twabController = new TwabController(1 days, uint32(block.timestamp));
 
-    prizePool = new PrizePoolMock(prizeToken);
+    prizePool = new PrizePoolMock(prizeToken, twabController);
 
     yieldVault = new YieldVault(
       _underlying_,
@@ -116,7 +116,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
         assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
 
-        if (oldAllowance != type(uint).max) {
+        if (oldAllowance != type(uint256).max) {
           assertApproxEqAbs(newAllowance, oldAllowance - assetsDeposit, _delta_, "allowance");
         }
       } else {
@@ -125,7 +125,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
         assertApproxEqAbs(newVaultAsset, oldVaultAsset - assets, _delta_, "vault asset");
         assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
 
-        if (oldAllowance != type(uint).max) {
+        if (oldAllowance != type(uint256).max) {
           assertApproxEqAbs(newAllowance, oldAllowance, _delta_, "allowance");
         }
       }
@@ -135,13 +135,17 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
       assertApproxEqAbs(newVaultAsset, oldVaultAsset, _delta_, "vault asset");
       assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
 
-      if (oldAllowance != type(uint).max) {
+      if (oldAllowance != type(uint256).max) {
         assertApproxEqAbs(newAllowance, oldAllowance - assets, _delta_, "allowance");
       }
     }
   }
 
-  function test_deposit(Init memory init, uint assets, uint allowance) public virtual override {
+  function test_deposit(
+    Init memory init,
+    uint256 assets,
+    uint256 allowance
+  ) public virtual override {
     setUpVault(init);
     address caller = init.user[0];
     address receiver = init.user[1];
@@ -151,19 +155,19 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
   }
 
   /* ============ Mint ============ */
-  function propMint(address caller, address receiver, uint shares) public {
-    uint oldCallerAsset = IERC20(_underlying_).balanceOf(caller);
+  function propMint(address caller, address receiver, uint256 shares) public {
+    uint256 oldCallerAsset = IERC20(_underlying_).balanceOf(caller);
     uint256 oldVaultAsset = IERC20(_underlying_).balanceOf(_vault_);
-    uint oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint oldAllowance = IERC20(_underlying_).allowance(caller, _vault_);
+    uint256 oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
+    uint256 oldAllowance = IERC20(_underlying_).allowance(caller, _vault_);
 
     vm.prank(caller);
-    uint assets = vault_mint(shares, receiver);
+    uint256 assets = vault_mint(shares, receiver);
 
-    uint newCallerAsset = IERC20(_underlying_).balanceOf(caller);
+    uint256 newCallerAsset = IERC20(_underlying_).balanceOf(caller);
     uint256 newVaultAsset = IERC20(_underlying_).balanceOf(_vault_);
-    uint newReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint newAllowance = IERC20(_underlying_).allowance(caller, _vault_);
+    uint256 newReceiverShare = IERC20(_vault_).balanceOf(receiver);
+    uint256 newAllowance = IERC20(_underlying_).allowance(caller, _vault_);
 
     // There are assets in the vault
     if (oldVaultAsset != 0) {
@@ -180,7 +184,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
         );
         assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
 
-        if (oldAllowance != type(uint).max) {
+        if (oldAllowance != type(uint256).max) {
           assertApproxEqAbs(newAllowance, oldAllowance - assetsDeposit, _delta_, "allowance");
         }
       } else {
@@ -189,7 +193,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
         assertApproxEqAbs(newVaultAsset, oldVaultAsset - assets, _delta_, "vault asset");
         assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
 
-        if (oldAllowance != type(uint).max) {
+        if (oldAllowance != type(uint256).max) {
           assertApproxEqAbs(newAllowance, oldAllowance, _delta_, "allowance");
         }
       }
@@ -199,13 +203,13 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
       assertApproxEqAbs(newVaultAsset, oldVaultAsset, _delta_, "vault asset");
       assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, "share");
 
-      if (oldAllowance != type(uint).max) {
+      if (oldAllowance != type(uint256).max) {
         assertApproxEqAbs(newAllowance, oldAllowance - assets, _delta_, "allowance");
       }
     }
   }
 
-  function test_mint(Init memory init, uint shares, uint allowance) public virtual override {
+  function test_mint(Init memory init, uint256 shares, uint256 allowance) public virtual override {
     setUpVault(init);
     address caller = init.user[0];
     address receiver = init.user[1];
@@ -215,17 +219,17 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
   }
 
   /* ============ Transfer ============ */
-  function propTransfer(address caller, address receiver, address owner, uint shares) public {
-    uint oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint oldOwnerShare = IERC20(_vault_).balanceOf(owner);
-    uint oldAllowance = IERC20(_vault_).allowance(owner, caller);
+  function propTransfer(address caller, address receiver, address owner, uint256 shares) public {
+    uint256 oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
+    uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
+    uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
 
     vm.prank(caller);
     _call_vault(abi.encodeWithSelector(IERC20.transferFrom.selector, owner, receiver, shares));
 
-    uint newReceiverShare = IERC20(_vault_).balanceOf(receiver);
-    uint newOwnerShare = IERC20(_vault_).balanceOf(owner);
-    uint newAllowance = IERC20(_vault_).allowance(owner, caller);
+    uint256 newReceiverShare = IERC20(_vault_).balanceOf(receiver);
+    uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
+    uint256 newAllowance = IERC20(_vault_).allowance(owner, caller);
 
     if (owner != receiver) {
       assertApproxEqAbs(newOwnerShare, oldOwnerShare - shares, _delta_, "owner shares");
@@ -235,14 +239,14 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
       assertApproxEqAbs(newReceiverShare, oldReceiverShare, _delta_, "receiver shares");
     }
 
-    if (caller != owner && oldAllowance != type(uint).max) {
+    if (caller != owner && oldAllowance != type(uint256).max) {
       assertApproxEqAbs(newAllowance, oldAllowance - shares, _delta_, "allowance");
     }
 
     assertTrue(caller == owner || oldAllowance != 0 || shares == 0, "access control");
   }
 
-  function test_transfer(Init memory init, uint shares, uint allowance) public virtual {
+  function test_transfer(Init memory init, uint256 shares, uint256 allowance) public virtual {
     setUpVault(init);
     address caller = init.user[0];
     address receiver = init.user[1];
@@ -264,7 +268,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     assertApproxEqAbs(liquidatableBalanceOf, totalAssets - depositedAssets, _delta_, "yield");
   }
 
-  function test_liquidatableBalanceOf(Init memory init, uint shares) public virtual {
+  function test_liquidatableBalanceOf(Init memory init, uint256 shares) public virtual {
     setUpVault(init);
 
     address caller = init.user[0];
@@ -336,7 +340,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
   function test_liquidate(Init memory init, uint256 shares) public virtual {
     // We set the higher bound to uint104 to avoid overflowing above uint112
-    init.yield = int(bound(shares, 10e18, type(uint104).max));
+    init.yield = int256(bound(shares, 10e18, type(uint104).max));
 
     setUpVault(init);
     vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
@@ -353,14 +357,14 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
   function setUpYield(Init memory init) public virtual override {
     if (init.yield >= 0) {
       // gain
-      uint gain = uint(init.yield);
+      uint256 gain = uint256(init.yield);
       try IMockERC20(_underlying_).mint(address(yieldVault), gain) {} catch {
         vm.assume(false);
       } // this can be replaced by calling yield generating functions if provided by the vault
     } else {
       // loss
-      vm.assume(init.yield > type(int).min); // avoid overflow in conversion
-      uint loss = uint(-1 * init.yield);
+      vm.assume(init.yield > type(int256).min); // avoid overflow in conversion
+      uint256 loss = uint256(-1 * init.yield);
       try IMockERC20(_underlying_).burn(address(yieldVault), loss) {} catch {
         vm.assume(false);
       } // this can be replaced by calling yield generating functions if provided by the vault
@@ -369,13 +373,13 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
   // We set the higher bound to uint104 to avoid overflowing above uint112
   function setUpVault(Init memory init) public virtual override {
-    for (uint i = 0; i < N; i++) {
+    for (uint256 i = 0; i < N; i++) {
       init.user[i] = makeAddr(Strings.toString(i));
       address user = init.user[i];
 
       vm.assume(_isEOA(user));
 
-      uint shares = bound(init.share[i], 0, type(uint104).max);
+      uint256 shares = bound(init.share[i], 0, type(uint104).max);
       try IMockERC20(_underlying_).mint(user, shares) {} catch {
         vm.assume(false);
       }
@@ -387,7 +391,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
         vm.assume(false);
       }
 
-      uint assets = bound(init.asset[i], 0, type(uint104).max);
+      uint256 assets = bound(init.asset[i], 0, type(uint104).max);
       try IMockERC20(_underlying_).mint(user, assets) {} catch {
         vm.assume(false);
       }
@@ -396,22 +400,22 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     setUpYield(init);
   }
 
-  function _max_deposit(address from) internal virtual override returns (uint) {
+  function _max_deposit(address from) internal virtual override returns (uint256) {
     if (_unlimitedAmount) return type(uint104).max;
     return uint104(IERC20(_underlying_).balanceOf(from));
   }
 
-  function _max_mint(address from) internal virtual override returns (uint) {
+  function _max_mint(address from) internal virtual override returns (uint256) {
     if (_unlimitedAmount) return type(uint112).max;
     return uint104(vault_convertToShares(IERC20(_underlying_).balanceOf(from)));
   }
 
-  function _max_withdraw(address from) internal virtual override returns (uint) {
+  function _max_withdraw(address from) internal virtual override returns (uint256) {
     if (_unlimitedAmount) return type(uint104).max;
     return uint104(vault_convertToAssets(IERC20(_vault_).balanceOf(from)));
   }
 
-  function _max_redeem(address from) internal virtual override returns (uint) {
+  function _max_redeem(address from) internal virtual override returns (uint256) {
     if (_unlimitedAmount) return type(uint104).max;
     return uint104(IERC20(_vault_).balanceOf(from));
   }

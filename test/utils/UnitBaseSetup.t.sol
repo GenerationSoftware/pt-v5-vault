@@ -67,7 +67,7 @@ contract UnitBaseSetup is Test, Helpers {
 
     twabController = new TwabController(1 days, uint32(block.timestamp));
 
-    prizePool = new PrizePoolMock(prizeToken);
+    prizePool = new PrizePoolMock(prizeToken, twabController);
 
     claimer = address(0xe291d9169F0316272482dD82bF297BB0a11D267f);
 
