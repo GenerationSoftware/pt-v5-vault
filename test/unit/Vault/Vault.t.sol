@@ -170,6 +170,23 @@ contract VaultTest is UnitBaseSetup {
     );
   }
 
+  function testConstructorClaimerZero() external {
+    vm.expectRevert(abi.encodeWithSelector(ClaimerZeroAddress.selector));
+
+    new VaultMock(
+      IERC20(address(underlyingAsset)),
+      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+      "PTaEthDAI",
+      twabController,
+      yieldVault,
+      PrizePool(address(prizePool)),
+      address(0),
+      address(this),
+      YIELD_FEE_PERCENTAGE,
+      address(this)
+    );
+  }
+
   /* ============ External functions ============ */
 
   /* ============ targetOf ============ */
@@ -246,14 +263,15 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testClaimPrizesClaimerNotSet() public {
-    vault.setClaimer(address(0));
-
     address _randomUser = address(0xFf107770b6a31261836307218997C66c34681B5A);
 
     vm.startPrank(_randomUser);
 
     mockPrizePoolClaimPrize(uint8(1), alice, 0, 0, address(0));
-    vm.expectRevert(abi.encodeWithSelector(CallerNotClaimer.selector, _randomUser, address(0)));
+    vm.expectRevert(
+      abi.encodeWithSelector(CallerNotClaimer.selector, _randomUser, address(claimer))
+    );
+
     claimPrize(uint8(1), alice, 0, 0, address(0));
 
     vm.stopPrank();
@@ -333,6 +351,11 @@ contract VaultTest is UnitBaseSetup {
     vault.setClaimer(_newClaimer);
 
     vm.stopPrank();
+  }
+
+  function testSetClaimerZeroAddress() public {
+    vm.expectRevert(abi.encodeWithSelector(ClaimerZeroAddress.selector));
+    vault.setClaimer(address(0));
   }
 
   /* ============ setLiquidationPair ============ */

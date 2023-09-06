@@ -125,6 +125,9 @@ error YVWithdrawableAssetsLTExpected(
  */
 error TargetTokenNotSupported(address token);
 
+/// @notice Emitted when the Claimer is set to the zero address.
+error ClaimerZeroAddress();
+
 /**
  * @notice Emitted when the caller is not the prize claimer.
  * @param caller The caller address
@@ -351,6 +354,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (address(asset_) != yieldVault_.asset())
       revert UnderlyingAssetMismatch(address(asset_), yieldVault_.asset());
 
+    _setClaimer(claimer_);
+
     (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(asset_);
     _underlyingDecimals = success ? assetDecimals : 18;
     _asset = asset_;
@@ -359,7 +364,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     _yieldVault = yieldVault_;
     _prizePool = prizePool_;
 
-    _setClaimer(claimer_);
     _setYieldFeeRecipient(yieldFeeRecipient_);
     _setYieldFeePercentage(yieldFeePercentage_);
 
@@ -1297,7 +1301,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
       recipient = _winner;
     }
 
-    uint prizeTotal = _prizePool.claimPrize(
+    uint256 prizeTotal = _prizePool.claimPrize(
       _winner,
       _tier,
       _prizeIndex,
@@ -1445,9 +1449,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Set claimer address.
+   * @dev Will revert if `claimer_` is address zero.
    * @param claimer_ Address of the claimer
    */
   function _setClaimer(address claimer_) internal {
+    if (claimer_ == address(0)) revert ClaimerZeroAddress();
     _claimer = claimer_;
   }
 
