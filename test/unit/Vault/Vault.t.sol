@@ -277,20 +277,40 @@ contract VaultTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testClaimPrizesCallerNotClaimer() public {
-    vm.startPrank(alice);
-
-    vm.expectRevert(abi.encodeWithSelector(CallerNotClaimer.selector, alice, claimer));
-    claimPrize(uint8(1), alice, 0, 0, address(0));
-
-    vm.stopPrank();
-  }
-
   function testClaimPrizeCallerNotClaimer() public {
     vm.startPrank(alice);
 
     vm.expectRevert(abi.encodeWithSelector(CallerNotClaimer.selector, alice, claimer));
     vault.claimPrize(alice, uint8(1), uint32(0), uint96(0), address(0));
+
+    vm.stopPrank();
+  }
+
+  function testClaimPrizeBeforeHookRecipientZeroAddress() public {
+    vm.startPrank(alice);
+
+    VaultHooks memory hooks = VaultHooks({
+      useBeforeClaimPrize: true,
+      useAfterClaimPrize: false,
+      implementation: IVaultHooks(makeAddr("hooks"))
+    });
+
+    vault.setHooks(hooks);
+
+    vm.stopPrank();
+
+    vm.mockCall(
+      address(hooks.implementation),
+      abi.encodeWithSelector(IVaultHooks.beforeClaimPrize.selector, alice, 1, 0),
+      abi.encode(address(0))
+    );
+
+    vm.startPrank(address(claimer));
+
+    mockPrizePoolClaimPrize(uint8(1), alice, 0, bob, 1e18, address(claimer));
+
+    vm.expectRevert(abi.encodeWithSelector(ClaimRecipientZeroAddress.selector));
+    claimPrize(uint8(1), alice, 0, 1e18, address(claimer));
 
     vm.stopPrank();
   }

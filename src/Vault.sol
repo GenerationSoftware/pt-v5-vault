@@ -171,6 +171,9 @@ error BeforeClaimPrizeFailed(bytes reason);
  */
 error AfterClaimPrizeFailed(bytes reason);
 
+/// @notice Emitted when a prize is claimed for the zero address.
+error ClaimRecipientZeroAddress();
+
 // The maximum amount of shares that can be minted.
 uint256 constant UINT112_MAX = type(uint112).max;
 
@@ -1300,6 +1303,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     } else {
       recipient = _winner;
     }
+
+    if (recipient == address(0)) revert ClaimRecipientZeroAddress();
 
     uint256 prizeTotal = _prizePool.claimPrize(
       _winner,
