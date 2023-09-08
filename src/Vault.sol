@@ -696,10 +696,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (_shares > _availableYield) revert YieldFeeGTAvailableYield(_shares, _availableYield);
     if (_shares > _yieldFeeShares) revert YieldFeeGTAvailableShares(_shares, _yieldFeeShares);
 
+    address yieldFeeRecipient_ = _yieldFeeRecipient;
     _yieldFeeShares -= _shares;
-    _mint(_yieldFeeRecipient, _shares);
+    _mint(yieldFeeRecipient_, _shares);
 
-    emit MintYieldFee(msg.sender, _yieldFeeRecipient, _shares);
+    emit MintYieldFee(msg.sender, yieldFeeRecipient_, _shares);
   }
 
   /* ============ Liquidation Functions ============ */
