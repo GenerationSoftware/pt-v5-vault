@@ -807,9 +807,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Sets the hooks for a winner.
    * @param hooks The hooks to set
    */
-  function setHooks(VaultHooks memory hooks) external {
+  function setHooks(VaultHooks calldata hooks) external {
     _hooks[msg.sender] = hooks;
-
     emit SetHooks(msg.sender, hooks);
   }
 
