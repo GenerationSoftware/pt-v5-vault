@@ -21,16 +21,13 @@ contract VaultTest is UnitBaseSetup {
     address owner
   );
 
-  event ClaimerSet(address indexed previousClaimer, address indexed newClaimer);
+  event ClaimerSet(address indexed claimer);
 
   event LiquidationPairSet(ILiquidationPair indexed newLiquidationPair);
 
-  event YieldFeeRecipientSet(
-    address indexed previousYieldFeeRecipient,
-    address indexed newYieldFeeRecipient
-  );
+  event YieldFeeRecipientSet(address indexed yieldFeeRecipient);
 
-  event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
+  event YieldFeePercentageSet(uint256 yieldFeePercentage);
 
   event SetHooks(address indexed account, VaultHooks indexed hooks);
 
@@ -372,7 +369,7 @@ contract VaultTest is UnitBaseSetup {
     address _newClaimer = makeAddr("claimer");
 
     vm.expectEmit(true, true, true, true);
-    emit ClaimerSet(claimer, _newClaimer);
+    emit ClaimerSet(_newClaimer);
 
     address _newClaimerAddress = vault.setClaimer(_newClaimer);
 
@@ -429,7 +426,7 @@ contract VaultTest is UnitBaseSetup {
   /* ============ testSetYieldFeePercentage ============ */
   function testSetYieldFeePercentage() public {
     vm.expectEmit();
-    emit YieldFeePercentageSet(0, YIELD_FEE_PERCENTAGE);
+    emit YieldFeePercentageSet(YIELD_FEE_PERCENTAGE);
 
     vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
     assertEq(vault.yieldFeePercentage(), YIELD_FEE_PERCENTAGE);
@@ -452,7 +449,7 @@ contract VaultTest is UnitBaseSetup {
   /* ============ setYieldFeeRecipient ============ */
   function testSetYieldFeeRecipient() public {
     vm.expectEmit(true, true, true, true);
-    emit YieldFeeRecipientSet(address(this), alice);
+    emit YieldFeeRecipientSet(alice);
 
     vault.setYieldFeeRecipient(alice);
     assertEq(vault.yieldFeeRecipient(), alice);

@@ -229,10 +229,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Emitted when a new claimer has been set.
-   * @param previousClaimer Address of the previous claimer
-   * @param newClaimer Address of the new claimer
+   * @param claimer Address of the new claimer
    */
-  event ClaimerSet(address indexed previousClaimer, address indexed newClaimer);
+  event ClaimerSet(address indexed claimer);
 
   /**
    * @notice Emitted when an account sets new hooks
@@ -257,20 +256,15 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Emitted when a new yield fee recipient has been set.
-   * @param previousYieldFeeRecipient Address of the previous yield fee recipient
-   * @param newYieldFeeRecipient Address of the new yield fee recipient
+   * @param yieldFeeRecipient Address of the new yield fee recipient
    */
-  event YieldFeeRecipientSet(
-    address indexed previousYieldFeeRecipient,
-    address indexed newYieldFeeRecipient
-  );
+  event YieldFeeRecipientSet(address indexed yieldFeeRecipient);
 
   /**
    * @notice Emitted when a new yield fee percentage has been set.
-   * @param previousYieldFeePercentage Previous yield fee percentage
-   * @param newYieldFeePercentage New yield fee percentage
+   * @param yieldFeePercentage New yield fee percentage
    */
-  event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
+  event YieldFeePercentageSet(uint256 yieldFeePercentage);
 
   /**
    * @notice Emitted when a user sponsors the Vault.
@@ -796,10 +790,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return address New claimer address
    */
   function setClaimer(address claimer_) external onlyOwner returns (address) {
-    address _previousClaimer = _claimer;
     _setClaimer(claimer_);
 
-    emit ClaimerSet(_previousClaimer, claimer_);
+    emit ClaimerSet(claimer_);
     return claimer_;
   }
 
@@ -836,10 +829,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return uint256 New yield fee percentage
    */
   function setYieldFeePercentage(uint256 yieldFeePercentage_) external onlyOwner returns (uint256) {
-    uint256 _previousYieldFeePercentage = _yieldFeePercentage;
     _setYieldFeePercentage(yieldFeePercentage_);
 
-    emit YieldFeePercentageSet(_previousYieldFeePercentage, yieldFeePercentage_);
+    emit YieldFeePercentageSet(yieldFeePercentage_);
     return yieldFeePercentage_;
   }
 
@@ -849,10 +841,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return address New fee recipient address
    */
   function setYieldFeeRecipient(address yieldFeeRecipient_) external onlyOwner returns (address) {
-    address _previousYieldFeeRecipient = _yieldFeeRecipient;
     _setYieldFeeRecipient(yieldFeeRecipient_);
 
-    emit YieldFeeRecipientSet(_previousYieldFeeRecipient, yieldFeeRecipient_);
+    emit YieldFeeRecipientSet(yieldFeeRecipient_);
     return yieldFeeRecipient_;
   }
 
