@@ -59,8 +59,8 @@ contract VaultFactory {
    */
   function deployVault(
     IERC20 _asset,
-    string calldata _name,
-    string calldata _symbol,
+    string memory _name,
+    string memory _symbol,
     TwabController _twabController,
     IERC4626 _yieldVault,
     PrizePool _prizePool,
