@@ -26,14 +26,14 @@ contract Helpers is Test {
 
   uint256 public constant FEE_PRECISION = 1e9;
 
-  uint256 public constant YIELD_FEE_PERCENTAGE = 100000000; // 0.1 = 10%
+  uint32 public constant YIELD_FEE_PERCENTAGE = 100000000; // 0.1 = 10%
 
   /**
    * For a token with 2 decimal places like gUSD, this is the minimum fee percentage that can be taken for a 2 figure yield.
    * This is because Solidity will truncate down the result to 0 since it won't fit in 2 decimal places.
    * i.e. 10 * 0.01% = 10 * 0.0001 = 1000 * 100000 / 1e9 = 0
    */
-  uint256 public constant LOW_YIELD_FEE_PERCENTAGE = 1000000; // 0.001 = 0.1%
+  uint32 public constant LOW_YIELD_FEE_PERCENTAGE = 1000000; // 0.001 = 0.1%
 
   /* ============ Permit ============ */
   function _signPermit(

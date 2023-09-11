@@ -279,6 +279,16 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Underlying asset decimals.
   uint8 private immutable _underlyingDecimals;
 
+  /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
+  uint32 private constant FEE_PRECISION = 1e9;
+
+  /// @notice Yield fee percentage represented in integer format with 9 decimal places (i.e. 10000000 = 0.01 = 1%).
+  uint32 private _yieldFeePercentage;
+
+  /// @notice The gas to give to each of the before and after prize claim hooks.
+  /// This should be enough gas to mint an NFT if needed.
+  uint24 constant HOOK_GAS = 150_000;
+
   /// @notice Address of the TwabController used to keep track of balances.
   TwabController private immutable _twabController;
 
@@ -294,21 +304,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Address of the ILiquidationPair used to liquidate yield for prize token.
   ILiquidationPair private _liquidationPair;
 
-  /// @notice Yield fee percentage represented in integer format with 9 decimal places (i.e. 10000000 = 0.01 = 1%).
-  uint256 private _yieldFeePercentage;
-
   /// @notice Address of the yield fee recipient. Receives Vault shares when `mintYieldFee` is called.
   address private _yieldFeeRecipient;
 
   /// @notice Total yield fee shares available. Can be minted to `_yieldFeeRecipient` by calling `mintYieldFee`.
   uint256 private _yieldFeeShares;
-
-  /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
-  uint256 private constant FEE_PRECISION = 1e9;
-
-  /// @notice The gas to give to each of the before and after prize claim hooks.
-  /// This should be enough gas to mint an NFT if needed.
-  uint256 constant HOOK_GAS = 150_000;
 
   /// @notice Maps user addresses to hooks that they want to execute when prizes are won.
   mapping(address => VaultHooks) internal _hooks;
@@ -336,7 +336,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     PrizePool prizePool_,
     address claimer_,
     address yieldFeeRecipient_,
-    uint256 yieldFeePercentage_,
+    uint32 yieldFeePercentage_,
     address owner_
   ) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(owner_) {
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
@@ -812,7 +812,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param yieldFeePercentage_ Yield fee percentage
    * @return uint256 New yield fee percentage
    */
-  function setYieldFeePercentage(uint256 yieldFeePercentage_) external onlyOwner returns (uint256) {
+  function setYieldFeePercentage(uint32 yieldFeePercentage_) external onlyOwner returns (uint256) {
     _setYieldFeePercentage(yieldFeePercentage_);
 
     emit YieldFeePercentageSet(yieldFeePercentage_);
@@ -1454,7 +1454,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Yield fee is represented in 9 decimals and can't exceed or equal `1e9`.
    * @param yieldFeePercentage_ The new yield fee percentage to set
    */
-  function _setYieldFeePercentage(uint256 yieldFeePercentage_) internal {
+  function _setYieldFeePercentage(uint32 yieldFeePercentage_) internal {
     if (yieldFeePercentage_ >= FEE_PRECISION) {
       revert YieldFeePercentageGtePrecision(yieldFeePercentage_, FEE_PRECISION);
     }

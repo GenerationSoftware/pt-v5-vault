@@ -392,8 +392,8 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetYieldFeePercentageGT1e9() public {
-    vm.expectRevert(abi.encodeWithSelector(YieldFeePercentageGtePrecision.selector, 1e10, 1e9));
-    vault.setYieldFeePercentage(1e10);
+    vm.expectRevert(abi.encodeWithSelector(YieldFeePercentageGtePrecision.selector, 2e9, 1e9));
+    vault.setYieldFeePercentage(2e9);
   }
 
   function testSetYieldFeePercentageOnlyOwner() public {
