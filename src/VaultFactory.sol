@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { Create2 } from "openzeppelin/utils/Create2.sol";
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
@@ -63,26 +62,21 @@ contract VaultFactory {
     PrizePool _prizePool,
     address _claimer,
     address _yieldFeeRecipient,
-    uint256 _yieldFeePercentage,
+    uint32 _yieldFeePercentage,
     address _owner
   ) external returns (address) {
-    bytes memory bytecode = abi.encodePacked(
-      type(Vault).creationCode,
-      abi.encode(
-        _asset,
-        _name,
-        _symbol,
-        _yieldVault,
-        _prizePool,
-        _claimer,
-        _yieldFeeRecipient,
-        _yieldFeePercentage,
-        _owner
-      )
-    );
-
-    Vault _vault = Vault(
-      Create2.deploy(0, keccak256(abi.encode(msg.sender, deployerNonces[msg.sender]++)), bytecode)
+    Vault _vault = new Vault{
+      salt: keccak256(abi.encode(msg.sender, deployerNonces[msg.sender]++))
+    }(
+      _asset,
+      _name,
+      _symbol,
+      _yieldVault,
+      _prizePool,
+      _claimer,
+      _yieldFeeRecipient,
+      _yieldFeePercentage,
+      _owner
     );
 
     allVaults.push(_vault);
