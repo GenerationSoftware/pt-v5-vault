@@ -29,6 +29,7 @@ contract VaultFactoryTest is Test {
     TwabController(address(0xDEBef0AD51fEF36a8ea13eEDA6B60Da2fef675cD));
 
   YieldVault public yieldVault = YieldVault(address(0xc24F43A638E2c32995108415fb3EB402Cd675580));
+
   PrizePoolMock public prizePool =
     new PrizePoolMock(IERC20(address(0x46fdfAdF967526047175693C751c920f786248C9)), twabController);
 
@@ -57,7 +58,6 @@ contract VaultFactoryTest is Test {
       asset,
       name,
       symbol,
-      twabController,
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
@@ -78,7 +78,6 @@ contract VaultFactoryTest is Test {
         asset,
         name,
         symbol,
-        twabController,
         yieldVault,
         PrizePool(address(prizePool)),
         claimer,
@@ -93,7 +92,6 @@ contract VaultFactoryTest is Test {
         asset,
         name,
         symbol,
-        twabController,
         yieldVault,
         PrizePool(address(prizePool)),
         claimer,

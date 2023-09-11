@@ -15,9 +15,6 @@ import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
-/// @notice Emitted when the TWAB controller is set to the zero address.
-error TwabControllerZeroAddress();
-
 /// @notice Emitted when the Yield Vault is set to the zero address.
 error YieldVaultZeroAddress();
 
@@ -33,13 +30,6 @@ error OwnerZeroAddress();
  * @param yieldVaultAsset Address of the YieldVault underlying asset
  */
 error UnderlyingAssetMismatch(address asset, address yieldVaultAsset);
-
-/**
- * @notice Emitted when the TWAB controller passed to the constructor is different from the PrizePool one.
- * @param vaultTwabController Address of the TwabController passed to the constructor
- * @param prizePoolTwabController Address of the PrizePool TwabController
- */
-error TwabControllerMismatch(address vaultTwabController, address prizePoolTwabController);
 
 /**
  * @notice Emitted when the amount being deposited for the receiver is greater than the max amount allowed.
@@ -331,7 +321,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param asset_ Address of the underlying asset used by the vault
    * @param name_ Name of the ERC20 share minted by the vault
    * @param symbol_ Symbol of the ERC20 share minted by the vault
-   * @param twabController_ Address of the TwabController used to keep track of balances
    * @param yieldVault_ Address of the ERC4626 vault in which assets are deposited to generate yield
    * @param prizePool_ Address of the PrizePool that computes prizes
    * @param claimer_ Address of the claimer
@@ -343,7 +332,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     IERC20 asset_,
     string memory name_,
     string memory symbol_,
-    TwabController twabController_,
     IERC4626 yieldVault_,
     PrizePool prizePool_,
     address claimer_,
@@ -351,7 +339,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 yieldFeePercentage_,
     address owner_
   ) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(owner_) {
-    if (address(twabController_) == address(0)) revert TwabControllerZeroAddress();
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
     if (owner_ == address(0)) revert OwnerZeroAddress();
@@ -359,18 +346,15 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     if (address(asset_) != yieldVault_.asset())
       revert UnderlyingAssetMismatch(address(asset_), yieldVault_.asset());
 
-    address _prizePoolTwabController = address(prizePool_.twabController());
-
-    if (address(twabController_) != _prizePoolTwabController)
-      revert TwabControllerMismatch(address(twabController_), _prizePoolTwabController);
-
     _setClaimer(claimer_);
 
     (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(asset_);
     _underlyingDecimals = success ? assetDecimals : 18;
     _asset = asset_;
 
+    TwabController twabController_ = prizePool_.twabController();
     _twabController = twabController_;
+
     _yieldVault = yieldVault_;
     _prizePool = prizePool_;
 

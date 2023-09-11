@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.19;
 
-import { UnitBaseSetup, ILiquidationPair, PrizePool, TwabController, VaultMock, ERC20, IERC20, IERC4626 } from "../../utils/UnitBaseSetup.t.sol";
+import { UnitBaseSetup, ILiquidationPair, PrizePool, TwabController, Vault, ERC20, IERC20, IERC4626 } from "../../utils/UnitBaseSetup.t.sol";
 import { IVaultHooks, VaultHooks } from "../../../src/interfaces/IVaultHooks.sol";
+
 import "../../../src/Vault.sol";
 
 contract VaultTest is UnitBaseSetup {
@@ -48,11 +49,10 @@ contract VaultTest is UnitBaseSetup {
       address(this)
     );
 
-    VaultMock testVault = new VaultMock(
+    Vault testVault = new Vault(
       IERC20(address(underlyingAsset)),
       vaultName,
       vaultSymbol,
-      twabController,
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
@@ -74,31 +74,13 @@ contract VaultTest is UnitBaseSetup {
     assertEq(testVault.owner(), address(this));
   }
 
-  function testConstructorTwabControllerZero() external {
-    vm.expectRevert(abi.encodeWithSelector(TwabControllerZeroAddress.selector));
-
-    new VaultMock(
-      IERC20(address(underlyingAsset)),
-      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
-      "PTaEthDAI",
-      TwabController(address(0)),
-      yieldVault,
-      PrizePool(address(prizePool)),
-      claimer,
-      address(this),
-      YIELD_FEE_PERCENTAGE,
-      address(this)
-    );
-  }
-
   function testConstructorYieldVaultZero() external {
     vm.expectRevert(abi.encodeWithSelector(YieldVaultZeroAddress.selector));
 
-    new VaultMock(
+    new Vault(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
-      twabController,
       IERC4626(address(0)),
       PrizePool(address(prizePool)),
       claimer,
@@ -111,11 +93,10 @@ contract VaultTest is UnitBaseSetup {
   function testConstructorPrizePoolZero() external {
     vm.expectRevert(abi.encodeWithSelector(PrizePoolZeroAddress.selector));
 
-    new VaultMock(
+    new Vault(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
-      twabController,
       yieldVault,
       PrizePool(address(0)),
       claimer,
@@ -128,11 +109,10 @@ contract VaultTest is UnitBaseSetup {
   function testConstructorOwnerZero() external {
     vm.expectRevert(abi.encodeWithSelector(OwnerZeroAddress.selector));
 
-    new VaultMock(
+    new Vault(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
-      twabController,
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
@@ -153,30 +133,10 @@ contract VaultTest is UnitBaseSetup {
       abi.encodeWithSelector(UnderlyingAssetMismatch.selector, address(underlyingAsset), address(0))
     );
 
-    new VaultMock(
+    new Vault(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
-      twabController,
-      yieldVault,
-      PrizePool(address(prizePool)),
-      claimer,
-      address(this),
-      YIELD_FEE_PERCENTAGE,
-      address(this)
-    );
-  }
-
-  function testConstructorTwabControllerMismatch() external {
-    vm.expectRevert(
-      abi.encodeWithSelector(TwabControllerMismatch.selector, address(1), address(twabController))
-    );
-
-    new VaultMock(
-      IERC20(address(underlyingAsset)),
-      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
-      "PTaEthDAI",
-      TwabController(address(1)),
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
@@ -189,11 +149,10 @@ contract VaultTest is UnitBaseSetup {
   function testConstructorClaimerZero() external {
     vm.expectRevert(abi.encodeWithSelector(ClaimerZeroAddress.selector));
 
-    new VaultMock(
+    new Vault(
       IERC20(address(underlyingAsset)),
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
-      twabController,
       yieldVault,
       PrizePool(address(prizePool)),
       address(0),

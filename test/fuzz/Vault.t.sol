@@ -60,7 +60,6 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
       underlyingAsset,
       "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
       "PTaEthDAI",
-      twabController,
       yieldVault,
       PrizePool(address(prizePool)),
       address(0x2faD9255711A4d22C35a003b3E723D9271aeA51d),

@@ -5,7 +5,6 @@ import { Create2 } from "openzeppelin/utils/Create2.sol";
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
-import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import { Vault } from "./Vault.sol";
 
@@ -48,7 +47,6 @@ contract VaultFactory {
    * @param _asset Address of the underlying asset used by the vault
    * @param _name Name of the ERC20 share minted by the vault
    * @param _symbol Symbol of the ERC20 share minted by the vault
-   * @param _twabController Address of the TwabController used to keep track of balances
    * @param _yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
    * @param _prizePool Address of the PrizePool that computes prizes
    * @param _claimer Address of the claimer
@@ -61,7 +59,6 @@ contract VaultFactory {
     IERC20 _asset,
     string memory _name,
     string memory _symbol,
-    TwabController _twabController,
     IERC4626 _yieldVault,
     PrizePool _prizePool,
     address _claimer,
@@ -75,7 +72,6 @@ contract VaultFactory {
         _asset,
         _name,
         _symbol,
-        _twabController,
         _yieldVault,
         _prizePool,
         _claimer,
