@@ -11,6 +11,7 @@ import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import { VaultFactory } from "../../src/VaultFactory.sol";
 import { Vault } from "../../src/Vault.sol";
+import { PrizePoolMock, IERC20 } from "../contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "../contracts/mock/YieldVault.sol";
 
 contract VaultFactoryTest is Test {
@@ -28,7 +29,10 @@ contract VaultFactoryTest is Test {
     TwabController(address(0xDEBef0AD51fEF36a8ea13eEDA6B60Da2fef675cD));
 
   YieldVault public yieldVault = YieldVault(address(0xc24F43A638E2c32995108415fb3EB402Cd675580));
-  PrizePool public prizePool = PrizePool(address(0x46fdfAdF967526047175693C751c920f786248C9));
+
+  PrizePoolMock public prizePool =
+    new PrizePoolMock(IERC20(address(0x46fdfAdF967526047175693C751c920f786248C9)), twabController);
+
   address public claimer = address(0xB6719828701798673852BceCadB764aaf26e8814);
 
   /* ============ Setup ============ */
@@ -54,9 +58,8 @@ contract VaultFactoryTest is Test {
       asset,
       name,
       symbol,
-      twabController,
       yieldVault,
-      prizePool,
+      PrizePool(address(prizePool)),
       claimer,
       address(this),
       0,
@@ -75,9 +78,8 @@ contract VaultFactoryTest is Test {
         asset,
         name,
         symbol,
-        twabController,
         yieldVault,
-        prizePool,
+        PrizePool(address(prizePool)),
         claimer,
         address(this),
         0,
@@ -90,9 +92,8 @@ contract VaultFactoryTest is Test {
         asset,
         name,
         symbol,
-        twabController,
         yieldVault,
-        prizePool,
+        PrizePool(address(prizePool)),
         claimer,
         address(this),
         0,

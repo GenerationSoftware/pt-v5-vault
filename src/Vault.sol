@@ -15,9 +15,6 @@ import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
-/// @notice Emitted when the TWAB controller is set to the zero address.
-error TwabControllerZeroAddress();
-
 /// @notice Emitted when the Yield Vault is set to the zero address.
 error YieldVaultZeroAddress();
 
@@ -125,6 +122,9 @@ error YVWithdrawableAssetsLTExpected(
  */
 error TargetTokenNotSupported(address token);
 
+/// @notice Emitted when the Claimer is set to the zero address.
+error ClaimerZeroAddress();
+
 /**
  * @notice Emitted when the caller is not the prize claimer.
  * @param caller The caller address
@@ -167,6 +167,9 @@ error BeforeClaimPrizeFailed(bytes reason);
  * @param reason The revert reason that was thrown
  */
 error AfterClaimPrizeFailed(bytes reason);
+
+/// @notice Emitted when a prize is claimed for the zero address.
+error ClaimRecipientZeroAddress();
 
 // The maximum amount of shares that can be minted.
 uint256 constant UINT112_MAX = type(uint112).max;
@@ -216,10 +219,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Emitted when a new claimer has been set.
-   * @param previousClaimer Address of the previous claimer
-   * @param newClaimer Address of the new claimer
+   * @param claimer Address of the new claimer
    */
-  event ClaimerSet(address indexed previousClaimer, address indexed newClaimer);
+  event ClaimerSet(address indexed claimer);
 
   /**
    * @notice Emitted when an account sets new hooks
@@ -244,20 +246,15 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Emitted when a new yield fee recipient has been set.
-   * @param previousYieldFeeRecipient Address of the previous yield fee recipient
-   * @param newYieldFeeRecipient Address of the new yield fee recipient
+   * @param yieldFeeRecipient Address of the new yield fee recipient
    */
-  event YieldFeeRecipientSet(
-    address indexed previousYieldFeeRecipient,
-    address indexed newYieldFeeRecipient
-  );
+  event YieldFeeRecipientSet(address indexed yieldFeeRecipient);
 
   /**
    * @notice Emitted when a new yield fee percentage has been set.
-   * @param previousYieldFeePercentage Previous yield fee percentage
-   * @param newYieldFeePercentage New yield fee percentage
+   * @param yieldFeePercentage New yield fee percentage
    */
-  event YieldFeePercentageSet(uint256 previousYieldFeePercentage, uint256 newYieldFeePercentage);
+  event YieldFeePercentageSet(uint256 yieldFeePercentage);
 
   /**
    * @notice Emitted when a user sponsors the Vault.
@@ -282,6 +279,16 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Underlying asset decimals.
   uint8 private immutable _underlyingDecimals;
 
+  /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
+  uint32 private constant FEE_PRECISION = 1e9;
+
+  /// @notice Yield fee percentage represented in integer format with 9 decimal places (i.e. 10000000 = 0.01 = 1%).
+  uint32 private _yieldFeePercentage;
+
+  /// @notice The gas to give to each of the before and after prize claim hooks.
+  /// This should be enough gas to mint an NFT if needed.
+  uint24 constant HOOK_GAS = 150_000;
+
   /// @notice Address of the TwabController used to keep track of balances.
   TwabController private immutable _twabController;
 
@@ -297,21 +304,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
   /// @notice Address of the ILiquidationPair used to liquidate yield for prize token.
   ILiquidationPair private _liquidationPair;
 
-  /// @notice Yield fee percentage represented in integer format with 9 decimal places (i.e. 10000000 = 0.01 = 1%).
-  uint256 private _yieldFeePercentage;
-
   /// @notice Address of the yield fee recipient. Receives Vault shares when `mintYieldFee` is called.
   address private _yieldFeeRecipient;
 
   /// @notice Total yield fee shares available. Can be minted to `_yieldFeeRecipient` by calling `mintYieldFee`.
   uint256 private _yieldFeeShares;
-
-  /// @notice Fee precision denominated in 9 decimal places and used to calculate yield fee percentage.
-  uint256 private constant FEE_PRECISION = 1e9;
-
-  /// @notice The gas to give to each of the before and after prize claim hooks.
-  /// This should be enough gas to mint an NFT if needed.
-  uint256 constant HOOK_GAS = 150_000;
 
   /// @notice Maps user addresses to hooks that they want to execute when prizes are won.
   mapping(address => VaultHooks) internal _hooks;
@@ -324,7 +321,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param asset_ Address of the underlying asset used by the vault
    * @param name_ Name of the ERC20 share minted by the vault
    * @param symbol_ Symbol of the ERC20 share minted by the vault
-   * @param twabController_ Address of the TwabController used to keep track of balances
    * @param yieldVault_ Address of the ERC4626 vault in which assets are deposited to generate yield
    * @param prizePool_ Address of the PrizePool that computes prizes
    * @param claimer_ Address of the claimer
@@ -336,30 +332,32 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     IERC20 asset_,
     string memory name_,
     string memory symbol_,
-    TwabController twabController_,
     IERC4626 yieldVault_,
     PrizePool prizePool_,
     address claimer_,
     address yieldFeeRecipient_,
-    uint256 yieldFeePercentage_,
+    uint32 yieldFeePercentage_,
     address owner_
   ) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(owner_) {
-    if (address(twabController_) == address(0)) revert TwabControllerZeroAddress();
     if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
     if (owner_ == address(0)) revert OwnerZeroAddress();
+
     if (address(asset_) != yieldVault_.asset())
       revert UnderlyingAssetMismatch(address(asset_), yieldVault_.asset());
+
+    _setClaimer(claimer_);
 
     (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(asset_);
     _underlyingDecimals = success ? assetDecimals : 18;
     _asset = asset_;
 
+    TwabController twabController_ = prizePool_.twabController();
     _twabController = twabController_;
+
     _yieldVault = yieldVault_;
     _prizePool = prizePool_;
 
-    _setClaimer(claimer_);
     _setYieldFeeRecipient(yieldFeeRecipient_);
     _setYieldFeePercentage(yieldFeePercentage_);
 
@@ -777,10 +775,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return address New claimer address
    */
   function setClaimer(address claimer_) external onlyOwner returns (address) {
-    address _previousClaimer = _claimer;
     _setClaimer(claimer_);
 
-    emit ClaimerSet(_previousClaimer, claimer_);
+    emit ClaimerSet(claimer_);
     return claimer_;
   }
 
@@ -788,9 +785,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @notice Sets the hooks for a winner.
    * @param hooks The hooks to set
    */
-  function setHooks(VaultHooks memory hooks) external {
+  function setHooks(VaultHooks calldata hooks) external {
     _hooks[msg.sender] = hooks;
-
     emit SetHooks(msg.sender, hooks);
   }
 
@@ -817,11 +813,10 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @param yieldFeePercentage_ Yield fee percentage
    * @return uint256 New yield fee percentage
    */
-  function setYieldFeePercentage(uint256 yieldFeePercentage_) external onlyOwner returns (uint256) {
-    uint256 _previousYieldFeePercentage = _yieldFeePercentage;
+  function setYieldFeePercentage(uint32 yieldFeePercentage_) external onlyOwner returns (uint256) {
     _setYieldFeePercentage(yieldFeePercentage_);
 
-    emit YieldFeePercentageSet(_previousYieldFeePercentage, yieldFeePercentage_);
+    emit YieldFeePercentageSet(yieldFeePercentage_);
     return yieldFeePercentage_;
   }
 
@@ -831,10 +826,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @return address New fee recipient address
    */
   function setYieldFeeRecipient(address yieldFeeRecipient_) external onlyOwner returns (address) {
-    address _previousYieldFeeRecipient = _yieldFeeRecipient;
     _setYieldFeeRecipient(yieldFeeRecipient_);
 
-    emit YieldFeeRecipientSet(_previousYieldFeeRecipient, yieldFeeRecipient_);
+    emit YieldFeeRecipientSet(yieldFeeRecipient_);
     return yieldFeeRecipient_;
   }
 
@@ -1298,7 +1292,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
       recipient = _winner;
     }
 
-    uint prizeTotal = _prizePool.claimPrize(
+    if (recipient == address(0)) revert ClaimRecipientZeroAddress();
+
+    uint256 prizeTotal = _prizePool.claimPrize(
       _winner,
       _tier,
       _prizeIndex,
@@ -1446,9 +1442,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /**
    * @notice Set claimer address.
+   * @dev Will revert if `claimer_` is address zero.
    * @param claimer_ Address of the claimer
    */
   function _setClaimer(address claimer_) internal {
+    if (claimer_ == address(0)) revert ClaimerZeroAddress();
     _claimer = claimer_;
   }
 
@@ -1457,7 +1455,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
    * @dev Yield fee is represented in 9 decimals and can't exceed or equal `1e9`.
    * @param yieldFeePercentage_ The new yield fee percentage to set
    */
-  function _setYieldFeePercentage(uint256 yieldFeePercentage_) internal {
+  function _setYieldFeePercentage(uint32 yieldFeePercentage_) internal {
     if (yieldFeePercentage_ >= FEE_PRECISION) {
       revert YieldFeePercentageGtePrecision(yieldFeePercentage_, FEE_PRECISION);
     }

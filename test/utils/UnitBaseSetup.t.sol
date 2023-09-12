@@ -12,8 +12,9 @@ import { ERC20PermitMock } from "../contracts/mock/ERC20PermitMock.sol";
 import { LiquidationPairMock } from "../contracts/mock/LiquidationPairMock.sol";
 import { LiquidationRouterMock } from "../contracts/mock/LiquidationRouterMock.sol";
 import { PrizePoolMock } from "../contracts/mock/PrizePoolMock.sol";
-import { VaultMock } from "../contracts/mock/Vault.sol";
 import { YieldVault } from "../contracts/mock/YieldVault.sol";
+
+import { Vault } from "../../src/Vault.sol";
 
 import { Helpers } from "./Helpers.t.sol";
 
@@ -33,7 +34,7 @@ contract UnitBaseSetup is Test, Helpers {
 
   address public constant SPONSORSHIP_ADDRESS = address(1);
 
-  VaultMock public vault;
+  Vault public vault;
   string public vaultName = "PoolTogether aEthDAI Prize Token (PTaEthDAI)";
   string public vaultSymbol = "PTaEthDAI";
 
@@ -67,7 +68,7 @@ contract UnitBaseSetup is Test, Helpers {
 
     twabController = new TwabController(1 days, uint32(block.timestamp));
 
-    prizePool = new PrizePoolMock(prizeToken);
+    prizePool = new PrizePoolMock(prizeToken, twabController);
 
     claimer = address(0xe291d9169F0316272482dD82bF297BB0a11D267f);
 
@@ -77,11 +78,10 @@ contract UnitBaseSetup is Test, Helpers {
       "PTaEthDAIY"
     );
 
-    vault = new VaultMock(
+    vault = new Vault(
       underlyingAsset,
       vaultName,
       vaultSymbol,
-      twabController,
       yieldVault,
       PrizePool(address(prizePool)),
       claimer,
