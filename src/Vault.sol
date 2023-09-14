@@ -535,28 +535,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /// @inheritdoc IERC4626
   function previewRedeem(uint256 _shares) public view virtual override returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-
-    if (_isVaultCollateralized(_depositedAssets, _withdrawableAssets)) {
-      // The Vault is collateralized, shares are backed 1:1 by assets
-      // no need to convert to assets
-      return
-        _yieldVault.previewWithdraw(
-          _convertToAssets(_shares, _depositedAssets, _withdrawableAssets, Math.Rounding.Down)
-        );
-    } else {
-      return
-        _yieldVault.previewRedeem(
-          _convertSharesToYVShares(
-            _shares,
-            _depositedAssets,
-            _withdrawableAssets,
-            _yieldVault.maxRedeem(address(this)),
-            Math.Rounding.Up
-          )
-        );
-    }
+    return _convertToAssets(_shares, _totalSupply(), _totalAssets(), Math.Rounding.Down);
   }
 
   /* ============ Deposit Functions ============ */
