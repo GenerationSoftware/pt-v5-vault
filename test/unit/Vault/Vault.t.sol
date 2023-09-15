@@ -174,11 +174,11 @@ contract VaultTest is UnitBaseSetup {
 
   /* ============ Claimer ============ */
 
-  /* ============ isClaimer ============ */
-  function testIsClaimer() public {
-    assertEq(vault.isClaimer(address(0)), false);
-    assertEq(vault.isClaimer(address(this)), false);
-    assertEq(vault.isClaimer(address(claimer)), true);
+  /* ============ claimer ============ */
+  function testClaimer() public {
+    assertNotEq(vault.claimer(), address(0));
+    assertNotEq(vault.claimer(), address(this));
+    assertEq(vault.claimer(), address(claimer));
   }
 
   /* ============ claimPrize ============ */

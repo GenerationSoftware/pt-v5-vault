@@ -868,14 +868,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /**
-   * @notice Address of the claimer.
-   * @return address Claimer address
-   */
-  function claimer() public view returns (address) {
-    return _claimer;
-  }
-
-  /**
    * @notice Gets the hooks for the given user.
    * @param _account The user to retrieve the hooks for
    * @return VaultHooks The hooks for the given user
@@ -1287,8 +1279,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /// @inheritdoc IClaimable
-  function isClaimer(address claimer_) external returns (bool) {
-    return _claimer == claimer_;
+  function claimer() external returns (address) {
+    return _claimer;
   }
 
   /* ============ Permit Functions ============ */
