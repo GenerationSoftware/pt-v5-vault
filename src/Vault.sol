@@ -358,56 +358,24 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     );
   }
 
-  /**
-   * @notice Fetch underlying asset decimals.
-   * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
-   * @param asset_ Address of the underlying asset
-   */
-  function _tryGetAssetDecimals(IERC20 asset_) private view returns (bool, uint8) {
-    (bool success, bytes memory encodedDecimals) = address(asset_).staticcall(
-      abi.encodeWithSelector(IERC20Metadata.decimals.selector)
-    );
-    if (success && encodedDecimals.length >= 32) {
-      uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
-      if (returnedDecimals <= type(uint8).max) {
-        return (true, uint8(returnedDecimals));
-      }
-    }
-    return (false, 0);
-  }
-
   /* ===================================================== */
   /* ============ Public & External Functions ============ */
   /* ===================================================== */
 
   /**
    * @notice Total available yield amount accrued by this vault.
-   * @dev This amount includes the liquidatable yield + yield fee amount.
-   * @dev The available yield is equal to the total amount of assets managed by this Vault
-   *      minus the total amount of assets supplied to the Vault and current allocated `_yieldFeeShares`.
-   * @dev If `_assetsAllocated` is greater than `_withdrawableAssets`, it means that the Vault is undercollateralized.
-   *      We must not mint more shares than underlying assets available so we return 0.
    * @return uint256 Total yield amount
    */
-  function availableYieldBalance() public view returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-    uint256 _assetsAllocated = _convertToAssets(
-      _depositedAssets + _yieldFeeShares,
-      _depositedAssets,
-      _withdrawableAssets,
-      Math.Rounding.Down
-    );
-
-    return _assetsAllocated > _withdrawableAssets ? 0 : _withdrawableAssets - _assetsAllocated;
+  function availableYieldBalance() external view returns (uint256) {
+    return _availableYieldBalance();
   }
 
   /**
    * @notice Get the available yield fee amount accrued by this vault.
    * @return uint256 Yield fee amount
    */
-  function availableYieldFeeBalance() public view returns (uint256) {
-    uint256 _availableYield = availableYieldBalance();
+  function availableYieldFeeBalance() external view returns (uint256) {
+    uint256 _availableYield = _availableYieldBalance();
 
     if (_availableYield != 0 && _yieldFeePercentage != 0) {
       return _availableYieldFeeBalance(_availableYield);
@@ -417,7 +385,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /// @inheritdoc IERC4626
-  function asset() public view virtual override returns (address) {
+  function asset() external view virtual override returns (address) {
     return address(_asset);
   }
 
@@ -425,7 +393,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   function balanceOf(
     address _account
   ) public view virtual override(ERC20, IERC20) returns (uint256) {
-    return _twabController.balanceOf(address(this), _account);
+    return _balanceOf(_account);
   }
 
   /// @inheritdoc IERC20Metadata
@@ -434,7 +402,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /// @inheritdoc IERC4626
-  function totalAssets() public view virtual override returns (uint256) {
+  function totalAssets() external view virtual override returns (uint256) {
     return _totalAssets();
   }
 
@@ -447,7 +415,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Check if the Vault is collateralized.
    * @return bool True if the vault is collateralized, false otherwise
    */
-  function isVaultCollateralized() public view returns (bool) {
+  function isVaultCollateralized() external view returns (bool) {
     return _isVaultCollateralized(_totalSupply(), _totalAssets());
   }
 
@@ -457,71 +425,54 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @inheritdoc IERC4626
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
-  function maxDeposit(address) public view virtual override returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-
-    if (!_isVaultCollateralized(_depositedAssets, _withdrawableAssets)) return 0;
-
-    uint256 _vaultMaxDeposit = UINT112_MAX -
-      _convertToAssets(_depositedAssets, _depositedAssets, _withdrawableAssets, Math.Rounding.Up);
-
-    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
-
-    return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
+  function maxDeposit(address) external view virtual override returns (uint256) {
+    return _maxDeposit();
   }
 
   /**
    * @inheritdoc IERC4626
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
-  function maxMint(address) public view virtual override returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-
-    if (!_isVaultCollateralized(_depositedAssets, _totalAssets())) return 0;
-
-    uint256 _vaultMaxMint = UINT112_MAX - _depositedAssets;
-    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
-
-    return _yieldVaultMaxDeposit < _vaultMaxMint ? _yieldVaultMaxDeposit : _vaultMaxMint;
+  function maxMint(address) external view virtual override returns (uint256) {
+    return _maxMint();
   }
 
   /// @inheritdoc IERC4626
-  function maxWithdraw(address _owner) public view virtual override returns (uint256) {
-    return _convertToAssets(balanceOf(_owner), _totalSupply(), _totalAssets(), Math.Rounding.Down);
+  function maxWithdraw(address _owner) external view virtual override returns (uint256) {
+    return _maxWithdraw(_owner);
   }
 
   /// @inheritdoc IERC4626
-  function maxRedeem(address owner) public view virtual override returns (uint256) {
-    return balanceOf(owner);
+  function maxRedeem(address owner) external view virtual override returns (uint256) {
+    return _maxRedeem(owner);
   }
 
   /* ============ Preview Functions ============ */
 
   /// @inheritdoc IERC4626
-  function previewDeposit(uint256 _assets) public view virtual override returns (uint256) {
+  function previewDeposit(uint256 _assets) external view virtual override returns (uint256) {
     return _convertToShares(_assets, _totalSupply(), _totalAssets(), Math.Rounding.Down);
   }
 
   /// @inheritdoc IERC4626
-  function previewMint(uint256 _shares) public view virtual override returns (uint256) {
+  function previewMint(uint256 _shares) external view virtual override returns (uint256) {
     return _convertToAssets(_shares, _totalSupply(), _totalAssets(), Math.Rounding.Up);
   }
 
   /// @inheritdoc IERC4626
-  function previewWithdraw(uint256 _assets) public view virtual override returns (uint256) {
+  function previewWithdraw(uint256 _assets) external view virtual override returns (uint256) {
     return _convertToShares(_assets, _totalSupply(), _totalAssets(), Math.Rounding.Up);
   }
 
   /// @inheritdoc IERC4626
-  function previewRedeem(uint256 _shares) public view virtual override returns (uint256) {
+  function previewRedeem(uint256 _shares) external view virtual override returns (uint256) {
     return _convertToAssets(_shares, _totalSupply(), _totalAssets(), Math.Rounding.Down);
   }
 
   /* ============ Deposit Functions ============ */
 
   /// @inheritdoc IERC4626
-  function deposit(uint256 _assets, address _receiver) public virtual override returns (uint256) {
+  function deposit(uint256 _assets, address _receiver) external virtual override returns (uint256) {
     return _depositAssets(_assets, msg.sender, _receiver);
   }
 
@@ -545,12 +496,12 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(asset()), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    _permit(IERC20Permit(address(_asset)), _owner, address(this), _assets, _deadline, _v, _r, _s);
     return _depositAssets(_assets, _owner, _owner);
   }
 
   /// @inheritdoc IERC4626
-  function mint(uint256 _shares, address _receiver) public virtual override returns (uint256) {
+  function mint(uint256 _shares, address _receiver) external virtual override returns (uint256) {
     _deposit(msg.sender, _receiver, _shares);
     return _shares;
   }
@@ -587,9 +538,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint256 _assets,
     address _receiver,
     address _owner
-  ) public virtual override returns (uint256) {
-    if (_assets > maxWithdraw(_owner)) {
-      revert WithdrawMoreThanMax(_owner, _assets, maxWithdraw(_owner));
+  ) external virtual override returns (uint256) {
+    if (_assets > _maxWithdraw(_owner)) {
+      revert WithdrawMoreThanMax(_owner, _assets, _maxWithdraw(_owner));
     }
 
     uint256 _depositedAssets = _totalSupply();
@@ -619,8 +570,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint256 _shares,
     address _receiver,
     address _owner
-  ) public virtual override returns (uint256) {
-    if (_shares > maxRedeem(_owner)) revert RedeemMoreThanMax(_owner, _shares, maxRedeem(_owner));
+  ) external virtual override returns (uint256) {
+    if (_shares > _maxRedeem(_owner)) revert RedeemMoreThanMax(_owner, _shares, _maxRedeem(_owner));
 
     uint256 _depositedAssets = _totalSupply();
     uint256 _withdrawableAssets = _totalAssets();
@@ -664,7 +615,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /* ============ Liquidation Functions ============ */
 
   /// @inheritdoc ILiquidationSource
-  function liquidatableBalanceOf(address _token) public view override returns (uint256) {
+  function liquidatableBalanceOf(address _token) external view override returns (uint256) {
     return _liquidatableBalanceOf(_token);
   }
 
@@ -680,7 +631,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     address _receiver,
     address _tokenOut,
     uint256 _amountOut
-  ) public virtual override onlyLiquidationPair onlyVaultCollateralized returns (bytes memory) {
+  ) external virtual override onlyLiquidationPair onlyVaultCollateralized returns (bytes memory) {
     if (_tokenOut != address(this)) {
       revert LiquidationTokenOutNotVaultShare(_tokenOut, address(this));
     }
@@ -715,7 +666,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     address _tokenIn,
     uint256 _amountIn,
     bytes calldata
-  ) public virtual override onlyLiquidationPair {
+  ) external virtual override onlyLiquidationPair {
     if (_tokenIn != address(_prizePool.prizeToken())) {
       revert LiquidationTokenInNotPrizeToken(_tokenIn, address(_prizePool.prizeToken()));
     }
@@ -802,7 +753,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @return address Yield fee recipient address
    */
 
-  function yieldFeeRecipient() public view returns (address) {
+  function yieldFeeRecipient() external view returns (address) {
     return _yieldFeeRecipient;
   }
 
@@ -811,7 +762,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @return uint256 Yield fee percentage
    */
 
-  function yieldFeePercentage() public view returns (uint256) {
+  function yieldFeePercentage() external view returns (uint256) {
     return _yieldFeePercentage;
   }
 
@@ -820,7 +771,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev If the vault becomes undercollateralized, this total yield fee can be used to collateralize it.
    * @return uint256 Total accrued yield fee
    */
-  function yieldFeeShares() public view returns (uint256) {
+  function yieldFeeShares() external view returns (uint256) {
     return _yieldFeeShares;
   }
 
@@ -828,7 +779,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Address of the TwabController keeping track of balances.
    * @return address TwabController address
    */
-  function twabController() public view returns (address) {
+  function twabController() external view returns (address) {
     return address(_twabController);
   }
 
@@ -836,7 +787,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Address of the ERC4626 vault generating yield.
    * @return address YieldVault address
    */
-  function yieldVault() public view returns (address) {
+  function yieldVault() external view returns (address) {
     return address(_yieldVault);
   }
 
@@ -844,7 +795,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Address of the LiquidationPair used to liquidate yield for prize token.
    * @return address LiquidationPair address
    */
-  function liquidationPair() public view returns (address) {
+  function liquidationPair() external view returns (address) {
     return address(_liquidationPair);
   }
 
@@ -852,8 +803,16 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Address of the PrizePool that computes prizes.
    * @return address PrizePool address
    */
-  function prizePool() public view returns (address) {
+  function prizePool() external view returns (address) {
     return address(_prizePool);
+  }
+
+  /**
+   * @notice Address of the claimer.
+   * @return address Claimer address
+   */
+  function claimer() external view returns (address) {
+    return _claimer;
   }
 
   /**
@@ -868,6 +827,28 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /* ============================================ */
   /* ============ Internal Functions ============ */
   /* ============================================ */
+
+  /**
+   * @notice Fetch underlying asset decimals.
+   * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
+   * @param asset_ Address of the underlying asset
+   */
+  function _tryGetAssetDecimals(IERC20 asset_) private view returns (bool, uint8) {
+    (bool success, bytes memory encodedDecimals) = address(asset_).staticcall(
+      abi.encodeWithSelector(IERC20Metadata.decimals.selector)
+    );
+    if (success && encodedDecimals.length >= 32) {
+      uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
+      if (returnedDecimals <= type(uint8).max) {
+        return (true, uint8(returnedDecimals));
+      }
+    }
+    return (false, 0);
+  }
+
+  function _balanceOf(address _account) internal view returns (uint256) {
+    return _twabController.balanceOf(address(this), _account);
+  }
 
   /**
    * @notice Total amount of assets managed by this Vault.
@@ -895,11 +876,33 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   function _liquidatableBalanceOf(address _token) internal view returns (uint256) {
     if (_token != address(this)) revert LiquidationTokenOutNotVaultShare(_token, address(this));
 
-    uint256 _availableYield = availableYieldBalance();
+    uint256 _availableYield = _availableYieldBalance();
 
     unchecked {
       return _availableYield -= _availableYieldFeeBalance(_availableYield);
     }
+  }
+
+  /**
+   * @notice Total available yield amount accrued by this vault.
+   * @dev This amount includes the liquidatable yield + yield fee amount.
+   * @dev The available yield is equal to the total amount of assets managed by this Vault
+   *      minus the total amount of assets supplied to the Vault and current allocated `_yieldFeeShares`.
+   * @dev If `_assetsAllocated` is greater than `_withdrawableAssets`, it means that the Vault is undercollateralized.
+   *      We must not mint more shares than underlying assets available so we return 0.
+   * @return uint256 Total yield amount
+   */
+  function _availableYieldBalance() internal view returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+    uint256 _assetsAllocated = _convertToAssets(
+      _depositedAssets + _yieldFeeShares,
+      _depositedAssets,
+      _withdrawableAssets,
+      Math.Rounding.Down
+    );
+
+    return _assetsAllocated > _withdrawableAssets ? 0 : _withdrawableAssets - _assetsAllocated;
   }
 
   /**
@@ -922,12 +925,12 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /* ============ Conversion Functions ============ */
 
   /// @inheritdoc IERC4626
-  function convertToShares(uint256 _assets) public view virtual override returns (uint256) {
+  function convertToShares(uint256 _assets) external view virtual override returns (uint256) {
     return _convertToShares(_assets, _totalSupply(), _totalAssets(), Math.Rounding.Down);
   }
 
   /// @inheritdoc IERC4626
-  function convertToAssets(uint256 shares) public view virtual override returns (uint256) {
+  function convertToAssets(uint256 shares) external view virtual override returns (uint256) {
     return _convertToAssets(shares, _totalSupply(), _totalAssets(), Math.Rounding.Down);
   }
 
@@ -1107,8 +1110,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     address _owner,
     address _receiver
   ) internal onlyVaultCollateralized returns (uint256) {
-    if (_assets > maxDeposit(_receiver)) {
-      revert DepositMoreThanMax(_receiver, _assets, maxDeposit(_receiver));
+    if (_assets > _maxDeposit()) {
+      revert DepositMoreThanMax(_receiver, _assets, _maxDeposit());
     }
 
     _deposit(_owner, _receiver, _assets);
@@ -1329,6 +1332,62 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     _twabController.transfer(_from, _to, SafeCast.toUint112(_shares));
 
     emit Transfer(_from, _to, _shares);
+  }
+
+  /**
+   * @notice Returns the maximum amount of underlying assets that can be deposited into the Vault,
+   * through a deposit call.
+   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
+   * @return uint256 Amount of underlying assets that can deposited
+   */
+  function _maxDeposit() internal view returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
+    if (!_isVaultCollateralized(_depositedAssets, _withdrawableAssets)) return 0;
+
+    uint256 _vaultMaxDeposit = UINT112_MAX -
+      _convertToAssets(_depositedAssets, _depositedAssets, _withdrawableAssets, Math.Rounding.Up);
+
+    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
+
+    return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
+  }
+
+  /**
+   * @notice Returns the maximum amount of Vault shares that can be minted, through a mint call.
+   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
+   * @return uint256 Amount of Vault shares that can be minted
+   */
+  function _maxMint() internal view returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+
+    if (!_isVaultCollateralized(_depositedAssets, _totalAssets())) return 0;
+
+    uint256 _vaultMaxMint = UINT112_MAX - _depositedAssets;
+    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
+
+    return _yieldVaultMaxDeposit < _vaultMaxMint ? _yieldVaultMaxDeposit : _vaultMaxMint;
+  }
+
+  /**
+   * @notice Returns the maximum amount of the underlying asset that can be withdrawn
+   * from the owner balance in the Vault, through a withdraw call.
+   * @param _owner Address to check `maxWithdraw` for
+   * @return uint256 Amount of the underlying asset that can be withdrawn
+   */
+  function _maxWithdraw(address _owner) internal view returns (uint256) {
+    return _convertToAssets(_balanceOf(_owner), _totalSupply(), _totalAssets(), Math.Rounding.Down);
+  }
+
+  /**
+   * @notice Returns the maximum amount of Vault shares that can be redeemed
+   * from the owner balance in the Vault, through a redeem call.
+   * @param _owner Address to check `maxRedeem` for
+   * @return uint256 Amount of Vault shares that can be redeemed
+   */
+  function _maxRedeem(address _owner) internal view returns (uint256) {
+    return _balanceOf(_owner);
   }
 
   /**
