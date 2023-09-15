@@ -13,6 +13,7 @@ import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.s
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
+import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
 /// @notice Emitted when the Yield Vault is set to the zero address.
@@ -184,7 +185,7 @@ uint256 constant UINT112_MAX = type(uint112).max;
  *         This yield is sold for prize tokens (i.e. POOL) via the Liquidator and captured by the PrizePool to be awarded to depositors.
  * @dev    Balances are stored in the TwabController contract.
  */
-contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
+contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable {
   using Math for uint256;
   using SafeCast for uint256;
   using SafeERC20 for IERC20;
@@ -216,12 +217,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     uint256 yieldFeePercentage,
     address owner
   );
-
-  /**
-   * @notice Emitted when a new claimer has been set.
-   * @param claimer Address of the new claimer
-   */
-  event ClaimerSet(address indexed claimer);
 
   /**
    * @notice Emitted when an account sets new hooks
@@ -1234,15 +1229,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
 
   /* ============ Claim Functions ============ */
 
-  /**
-   * @notice Claim prize for a winner
-   * @param _winner The winner of the prize
-   * @param _tier The prize tier
-   * @param _prizeIndex The prize index
-   * @param _fee The fee to charge
-   * @param _feeRecipient The recipient of the fee
-   * @return The total prize amount claimed. Zero if already claimed.
-   */
+  /// @inheritdoc IClaimable
   function claimPrize(
     address _winner,
     uint8 _tier,
@@ -1297,6 +1284,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, Ownable {
     }
 
     return prizeTotal;
+  }
+
+  /// @inheritdoc IClaimable
+  function isClaimer(address claimer_) external returns (bool) {
+    return _claimer == claimer_;
   }
 
   /* ============ Permit Functions ============ */
