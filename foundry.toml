@@ -4,8 +4,8 @@ out = 'out'
 test = 'test'
 libs = ['lib']
 solc = "0.8.19"
-fs_permissions = [{ access = "read", path = "./broadcast"}]
-gas_reports = ["*"]
+fs_permissions = [{ access = "read", path = "./broadcast" }]
+gas_reports = ["Vault", "VaultFactory"]
 
 [fuzz]
 runs = 1000

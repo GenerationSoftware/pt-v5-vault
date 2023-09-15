@@ -29,6 +29,10 @@ jobs:
           forge build --sizes --via-ir
         id: build
 
+      - name: Run Forge gas report
+        run: forge test --gas-report
+        id: snapshot
+
       - name: Install lcov
         uses: hrishikesh-kadam/setup-lcov@v1.0.0
 
