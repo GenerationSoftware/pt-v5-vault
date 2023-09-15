@@ -107,16 +107,6 @@ error LiquidationAmountOutGTYield(uint256 amountOut, uint256 availableYield);
 /// @notice Emitted when the Vault is under-collateralized.
 error VaultUnderCollateralized();
 
-/**
- * @notice Emitted when after a deposit the amount of withdrawable assets from the YieldVault is lower than the expected amount.
- * @param withdrawableAssets The actual amount of assets withdrawable from the YieldVault
- * @param expectedWithdrawableAssets The expected amount of assets withdrawable from the YieldVault
- */
-error YVWithdrawableAssetsLTExpected(
-  uint256 withdrawableAssets,
-  uint256 expectedWithdrawableAssets
-);
-
 /// @notice Emitted when the Claimer is set to the zero address.
 error ClaimerZeroAddress();
 
@@ -332,8 +322,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
     if (owner_ == address(0)) revert OwnerZeroAddress();
 
-    if (address(asset_) != yieldVault_.asset())
+    if (address(asset_) != yieldVault_.asset()) {
       revert UnderlyingAssetMismatch(address(asset_), yieldVault_.asset());
+    }
 
     _setClaimer(claimer_);
 
@@ -597,8 +588,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     address _receiver,
     address _owner
   ) public virtual override returns (uint256) {
-    if (_assets > maxWithdraw(_owner))
+    if (_assets > maxWithdraw(_owner)) {
       revert WithdrawMoreThanMax(_owner, _assets, maxWithdraw(_owner));
+    }
 
     uint256 _depositedAssets = _totalSupply();
     uint256 _withdrawableAssets = _totalAssets();
@@ -689,15 +681,17 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     address _tokenOut,
     uint256 _amountOut
   ) public virtual override onlyLiquidationPair onlyVaultCollateralized returns (bytes memory) {
-    if (_tokenOut != address(this))
+    if (_tokenOut != address(this)) {
       revert LiquidationTokenOutNotVaultShare(_tokenOut, address(this));
+    }
 
     if (_amountOut == 0) revert LiquidationAmountOutZero();
 
     uint256 _liquidatableYield = _liquidatableBalanceOf(_tokenOut);
 
-    if (_amountOut > _liquidatableYield)
+    if (_amountOut > _liquidatableYield) {
       revert LiquidationAmountOutGTYield(_amountOut, _liquidatableYield);
+    }
 
     // Distributes the specified yield fee percentage.
     // For instance, with a yield fee percentage of 20% and 8e18 Vault shares being liquidated,
@@ -722,8 +716,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint256 _amountIn,
     bytes calldata
   ) public virtual override onlyLiquidationPair {
-    if (_tokenIn != address(_prizePool.prizeToken()))
+    if (_tokenIn != address(_prizePool.prizeToken())) {
       revert LiquidationTokenInNotPrizeToken(_tokenIn, address(_prizePool.prizeToken()));
+    }
 
     _prizePool.contributePrizeTokens(address(this), _amountIn);
   }
@@ -1084,23 +1079,14 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
         }
       }
 
-      SafeERC20.safeTransferFrom(
-        _asset,
+      _asset.safeTransferFrom(
         _caller,
         address(this),
         _assetsDeposit != 0 ? _assetsDeposit : _assets
       );
     }
 
-    uint256 _withdrawableAssets = _totalAssets();
-
     _yieldVault.deposit(_assets, address(this));
-
-    uint256 _expectedWithdrawableAssets = _withdrawableAssets + _assets;
-    uint256 _withdrawableAssetsAfter = _totalAssets();
-
-    if (_withdrawableAssetsAfter < _expectedWithdrawableAssets)
-      revert YVWithdrawableAssetsLTExpected(_withdrawableAssetsAfter, _expectedWithdrawableAssets);
 
     _mint(_receiver, _assets);
 
@@ -1121,8 +1107,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     address _owner,
     address _receiver
   ) internal onlyVaultCollateralized returns (uint256) {
-    if (_assets > maxDeposit(_receiver))
+    if (_assets > maxDeposit(_receiver)) {
       revert DepositMoreThanMax(_receiver, _assets, maxDeposit(_receiver));
+    }
 
     _deposit(_owner, _receiver, _assets);
 
@@ -1198,15 +1185,13 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
     // If the Vault is collateralized, users can withdraw their deposit 1:1
     if (_vaultCollateralized) {
-      _yieldVault.withdraw(_assets, address(this), address(this));
+      _yieldVault.withdraw(_assets, _receiver, address(this));
     } else {
       // Otherwise, redeem is used to avoid burning too many YieldVault shares
-      _assets = _yieldVault.redeem(_yieldVaultShares, address(this), address(this));
+      _assets = _yieldVault.redeem(_yieldVaultShares, _receiver, address(this));
     }
 
     if (_assets == 0) revert WithdrawZeroAssets();
-
-    SafeERC20.safeTransfer(_asset, _receiver, _assets);
 
     emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
 
@@ -1439,8 +1424,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Requires the caller to be the liquidation pair
    */
   modifier onlyLiquidationPair() {
-    if (msg.sender != address(_liquidationPair))
+    if (msg.sender != address(_liquidationPair)) {
       revert CallerNotLP(msg.sender, address(_liquidationPair));
+    }
     _;
   }
 }

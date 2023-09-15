@@ -222,40 +222,6 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
-  function testYieldVaultExchangeRateManipulated() external {
-    vm.startPrank(alice);
-
-    // Alice deposits in a new YieldVault
-    uint256 _yieldVaultAmount = 333e18;
-
-    underlyingAsset.mint(alice, _yieldVaultAmount);
-    underlyingAsset.approve(address(yieldVault), type(uint256).max);
-
-    yieldVault.deposit(_yieldVaultAmount, alice);
-
-    // 0.1e18 underlying assets are sent to the YieldVault
-    // to manipulate the exchange rate
-    underlyingAsset.mint(address(yieldVault), 0.1e18);
-
-    // When Alice deposits in the Vault, her deposit reverts
-    // because the amount of assets withdrawable from the YieldVault
-    // is lower than the amount deposited by Alice
-    uint256 _vaultAmount = 1000e18;
-
-    underlyingAsset.mint(alice, _vaultAmount);
-    underlyingAsset.approve(address(vault), type(uint256).max);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        YVWithdrawableAssetsLTExpected.selector,
-        _vaultAmount - 1,
-        _vaultAmount
-      )
-    );
-
-    vault.deposit(_vaultAmount, alice);
-  }
-
   function testDepositVaultUndercollateralized() external {
     vm.startPrank(alice);
 

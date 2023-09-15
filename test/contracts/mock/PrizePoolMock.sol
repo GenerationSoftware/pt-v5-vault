@@ -15,8 +15,8 @@ contract PrizePoolMock {
   }
 
   function contributePrizeTokens(
-    address /* _prizeVault */,
-    uint256 /* _amount */
+    address,
+    /* _prizeVault */ uint256 /* _amount */
   ) external view returns (uint256) {
     return prizeToken.balanceOf(address(this));
   }

@@ -66,11 +66,6 @@ Feature: Deposit
     Then the transaction reverts with the custom error `DepositMoreThanMax`
 
   Scenario: Alice deposits into the Vault
-    Given Alice owns 0 Vault shares and the YieldVault's exchange rate has been manipulated
-    When Alice deposits 1,000 underlying assets
-    Then the transaction reverts with the custom error `YVWithdrawableAssetsLTExpected`
-
-  Scenario: Alice deposits into the Vault
     Given Alice owns 0 Vault shares and the Vault is undercollateralized
     When Alice deposits 1,000 underlying assets
     Then the transaction reverts with the custom error `VaultUnderCollateralized`
