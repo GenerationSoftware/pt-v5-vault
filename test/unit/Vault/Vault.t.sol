@@ -75,7 +75,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testConstructorYieldVaultZero() external {
-    vm.expectRevert(abi.encodeWithSelector(YieldVaultZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.YieldVaultZeroAddress.selector));
 
     new Vault(
       IERC20(address(underlyingAsset)),
@@ -91,7 +91,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testConstructorPrizePoolZero() external {
-    vm.expectRevert(abi.encodeWithSelector(PrizePoolZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.PrizePoolZeroAddress.selector));
 
     new Vault(
       IERC20(address(underlyingAsset)),
@@ -107,7 +107,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testConstructorOwnerZero() external {
-    vm.expectRevert(abi.encodeWithSelector(OwnerZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.OwnerZeroAddress.selector));
 
     new Vault(
       IERC20(address(underlyingAsset)),
@@ -130,7 +130,11 @@ contract VaultTest is UnitBaseSetup {
     );
 
     vm.expectRevert(
-      abi.encodeWithSelector(UnderlyingAssetMismatch.selector, address(underlyingAsset), address(0))
+      abi.encodeWithSelector(
+        Vault.UnderlyingAssetMismatch.selector,
+        address(underlyingAsset),
+        address(0)
+      )
     );
 
     new Vault(
@@ -147,7 +151,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testConstructorClaimerZero() external {
-    vm.expectRevert(abi.encodeWithSelector(ClaimerZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.ClaimerZeroAddress.selector));
 
     new Vault(
       IERC20(address(underlyingAsset)),
@@ -251,7 +255,7 @@ contract VaultTest is UnitBaseSetup {
 
     mockPrizePoolClaimPrize(uint8(1), alice, 0, 0, address(0));
     vm.expectRevert(
-      abi.encodeWithSelector(CallerNotClaimer.selector, _randomUser, address(claimer))
+      abi.encodeWithSelector(Vault.CallerNotClaimer.selector, _randomUser, address(claimer))
     );
 
     claimPrize(uint8(1), alice, 0, 0, address(0));
@@ -262,7 +266,7 @@ contract VaultTest is UnitBaseSetup {
   function testClaimPrizeCallerNotClaimer() public {
     vm.startPrank(alice);
 
-    vm.expectRevert(abi.encodeWithSelector(CallerNotClaimer.selector, alice, claimer));
+    vm.expectRevert(abi.encodeWithSelector(Vault.CallerNotClaimer.selector, alice, claimer));
     vault.claimPrize(alice, uint8(1), uint32(0), uint96(0), address(0));
 
     vm.stopPrank();
@@ -291,7 +295,7 @@ contract VaultTest is UnitBaseSetup {
 
     mockPrizePoolClaimPrize(uint8(1), alice, 0, bob, 1e18, address(claimer));
 
-    vm.expectRevert(abi.encodeWithSelector(ClaimRecipientZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.ClaimRecipientZeroAddress.selector));
     claimPrize(uint8(1), alice, 0, 1e18, address(claimer));
 
     vm.stopPrank();
@@ -356,7 +360,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetClaimerZeroAddress() public {
-    vm.expectRevert(abi.encodeWithSelector(ClaimerZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.ClaimerZeroAddress.selector));
     vault.setClaimer(address(0));
   }
 
@@ -372,7 +376,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetLiquidationPairNotZeroAddress() public {
-    vm.expectRevert(abi.encodeWithSelector(LPZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.LPZeroAddress.selector));
     vault.setLiquidationPair(ILiquidationPair(address(0)));
   }
 
@@ -399,7 +403,9 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetYieldFeePercentageGT1e9() public {
-    vm.expectRevert(abi.encodeWithSelector(YieldFeePercentageGtePrecision.selector, 2e9, 1e9));
+    vm.expectRevert(
+      abi.encodeWithSelector(Vault.YieldFeePercentageGtePrecision.selector, 2e9, 1e9)
+    );
     vault.setYieldFeePercentage(2e9);
   }
 

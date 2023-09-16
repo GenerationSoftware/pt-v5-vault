@@ -191,7 +191,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectRevert(
-      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
+      abi.encodeWithSelector(Vault.DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
     );
 
     vault.deposit(_amount, alice);
@@ -214,7 +214,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     );
 
     vm.expectRevert(
-      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint88).max)
+      abi.encodeWithSelector(Vault.DepositMoreThanMax.selector, alice, _amount, type(uint88).max)
     );
 
     vault.deposit(_amount, alice);
@@ -234,7 +234,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     underlyingAsset.burn(address(yieldVault), _amount);
 
-    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
 
     vault.deposit(_amount, alice);
 
@@ -422,7 +422,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   function testMintZeroShares() external {
     vm.startPrank(alice);
 
-    vm.expectRevert(abi.encodeWithSelector(MintZeroShares.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.MintZeroShares.selector));
 
     vault.mint(0, alice);
 
@@ -441,7 +441,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     underlyingAsset.burn(address(yieldVault), _amount);
 
-    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
 
     vault.mint(_amount, alice);
 
@@ -552,7 +552,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   function testSweepZeroAssets() external {
     vm.startPrank(bob);
 
-    vm.expectRevert(abi.encodeWithSelector(SweepZeroAssets.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.SweepZeroAssets.selector));
 
     vault.sweep();
 

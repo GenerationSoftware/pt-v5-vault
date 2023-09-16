@@ -271,7 +271,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     // Bob can't withdraw any assets
     assertEq(_bobMaxWithdraw, 0);
 
-    vm.expectRevert(abi.encodeWithSelector(WithdrawZeroAssets.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.WithdrawZeroAssets.selector));
 
     vault.withdraw(_bobMaxWithdraw, bob, bob);
 
@@ -284,14 +284,14 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     // Alice can't withdraw any assets
     assertEq(_aliceMaxWithdraw, 0);
 
-    vm.expectRevert(abi.encodeWithSelector(WithdrawZeroAssets.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.WithdrawZeroAssets.selector));
 
     vault.withdraw(_aliceMaxWithdraw, alice, alice);
 
     underlyingAsset.mint(alice, _aliceAmount);
 
     // Alice can't deposit into an undercollateralized vault
-    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
 
     vault.deposit(_aliceAmount, alice);
 
@@ -407,7 +407,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     uint256 _yieldFeeShares = vault.yieldFeeShares();
 
     // The Vault is now undercollateralized so we can't mint the yield fee
-    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
     vault.mintYieldFee(_yieldFeeShares);
 
     vm.startPrank(bob);
@@ -494,7 +494,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     // The Vault is now partially undercollateralized so we can't mint the yield fee
     vm.expectRevert(
       abi.encodeWithSelector(
-        YieldFeeGTAvailableYield.selector,
+        Vault.YieldFeeGTAvailableYield.selector,
         vault.convertToAssets(_yieldFeeShares),
         yieldVault.maxWithdraw(address(vault)) - vault.convertToAssets(vault.totalSupply())
       )

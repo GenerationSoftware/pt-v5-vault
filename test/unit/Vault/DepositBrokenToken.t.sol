@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { UnitBrokenTokenBaseSetup } from "../../utils/UnitBrokenTokenBaseSetup.t.sol";
-import { DepositMoreThanMax } from "../../../src/Vault.sol";
+import "../../../src/Vault.sol";
 
 contract VaultDepositBrokenTokenTest is UnitBrokenTokenBaseSetup {
   /* ============ Events ============ */
@@ -43,7 +43,7 @@ contract VaultDepositBrokenTokenTest is UnitBrokenTokenBaseSetup {
     // Token with 50 decimals, amount is greater than type(uint112).max
     if (brokenERC20Name == keccak256(bytes("HighDecimalToken"))) {
       vm.expectRevert(
-        abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
+        abi.encodeWithSelector(Vault.DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
       );
 
       vault.deposit(_amount, alice);
