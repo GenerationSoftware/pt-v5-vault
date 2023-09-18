@@ -16,9 +16,6 @@ import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabC
 import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol";
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
-// The maximum amount of shares that can be minted.
-uint256 constant UINT112_MAX = type(uint112).max;
-
 /**
  * @title  PoolTogether V5 Vault
  * @author PoolTogether Inc Team, Generation Software Team
@@ -35,6 +32,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   using SafeERC20 for IERC20;
 
   /* ============ Variables ============ */
+
+  /// The maximum amount of shares that can be minted.
+  uint256 constant UINT112_MAX = type(uint112).max;
 
   /// @notice Address of the underlying asset used by the Vault.
   IERC20 private immutable _asset;
