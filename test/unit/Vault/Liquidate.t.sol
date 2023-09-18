@@ -400,7 +400,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUndercollateralized.selector));
 
     vault.transferTokensOut(address(this), address(this), address(vault), 1e18);
 

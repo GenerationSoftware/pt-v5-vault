@@ -179,6 +179,14 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   error DepositMoreThanMax(address receiver, uint256 amount, uint256 max);
 
   /**
+   * @notice Emitted when the amount being minted for the receiver is greater than the max amount allowed.
+   * @param receiver The receiver of the mint
+   * @param amount The amount to mint
+   * @param max The max mint amount allowed
+   */
+  error MintMoreThanMax(address receiver, uint256 amount, uint256 max);
+
+  /**
    * @notice Emitted when the amount being withdrawn for the owner is greater than the max amount allowed.
    * @param owner The owner of the assets
    * @param amount The amount to withdraw
@@ -243,7 +251,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   error LiquidationAmountOutGTYield(uint256 amountOut, uint256 availableYield);
 
   /// @notice Emitted when the Vault is under-collateralized.
-  error VaultUnderCollateralized();
+  error VaultUndercollateralized();
 
   /**
    * @notice Emitted when the target token is not supported for a given token address.
@@ -304,7 +312,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /// @notice Require reverting if the vault is under-collateralized.
   modifier onlyVaultCollateralized() {
-    if (!_isVaultCollateralized(_totalSupply(), _totalAssets())) revert VaultUnderCollateralized();
+    if (!_isVaultCollateralized(_totalSupply(), _totalAssets())) revert VaultUndercollateralized();
     _;
   }
 
@@ -488,7 +496,10 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /* ============ Deposit Functions ============ */
 
   /// @inheritdoc IERC4626
-  function deposit(uint256 _assets, address _receiver) external virtual override returns (uint256) {
+  function deposit(
+    uint256 _assets,
+    address _receiver
+  ) external virtual override onlyVaultCollateralized returns (uint256) {
     return _depositAssets(_assets, msg.sender, _receiver);
   }
 
@@ -511,13 +522,20 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint8 _v,
     bytes32 _r,
     bytes32 _s
-  ) external returns (uint256) {
+  ) external onlyVaultCollateralized returns (uint256) {
     _permit(IERC20Permit(address(_asset)), _owner, address(this), _assets, _deadline, _v, _r, _s);
     return _depositAssets(_assets, _owner, _owner);
   }
 
   /// @inheritdoc IERC4626
-  function mint(uint256 _shares, address _receiver) external virtual override returns (uint256) {
+  function mint(
+    uint256 _shares,
+    address _receiver
+  ) external virtual override onlyVaultCollateralized returns (uint256) {
+    if (_shares > _maxMint()) {
+      revert MintMoreThanMax(_receiver, _shares, _maxMint());
+    }
+
     _deposit(msg.sender, _receiver, _shares);
     return _shares;
   }
@@ -527,7 +545,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param _assets Amount of assets to deposit
    * @return uint256 Amount of shares minted to caller.
    */
-  function sponsor(uint256 _assets) external returns (uint256) {
+  function sponsor(uint256 _assets) external onlyVaultCollateralized returns (uint256) {
     return _sponsor(_assets, msg.sender);
   }
 
@@ -1199,11 +1217,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev Will revert if the Vault is undercollateralized.
    * @dev Will revert if 0 shares are minted back to the receiver.
    */
-  function _deposit(
-    address _caller,
-    address _receiver,
-    uint256 _assets
-  ) internal onlyVaultCollateralized {
+  function _deposit(address _caller, address _receiver, uint256 _assets) internal {
     // It is only possible to deposit when the vault is collateralized
     // Shares are backed 1:1 by assets
     if (_assets == 0) revert MintZeroShares();
@@ -1254,7 +1268,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint256 _assets,
     address _owner,
     address _receiver
-  ) internal onlyVaultCollateralized returns (uint256) {
+  ) internal returns (uint256) {
     if (_assets > _maxDeposit()) {
       revert DepositMoreThanMax(_receiver, _assets, _maxDeposit());
     }

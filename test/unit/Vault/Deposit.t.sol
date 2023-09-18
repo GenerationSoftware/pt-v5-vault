@@ -234,7 +234,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     underlyingAsset.burn(address(yieldVault), _amount);
 
-    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUndercollateralized.selector));
 
     vault.deposit(_amount, alice);
 
@@ -389,7 +389,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    vm.expectRevert(bytes("SafeCast: value doesn't fit in 112 bits"));
+    vm.expectRevert(
+      abi.encodeWithSelector(Vault.MintMoreThanMax.selector, alice, _amount, type(uint112).max)
+    );
 
     vault.mint(_amount, alice);
 
@@ -441,7 +443,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     underlyingAsset.burn(address(yieldVault), _amount);
 
-    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUndercollateralized.selector));
 
     vault.mint(_amount, alice);
 

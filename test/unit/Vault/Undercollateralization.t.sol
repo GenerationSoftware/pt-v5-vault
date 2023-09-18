@@ -291,7 +291,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     underlyingAsset.mint(alice, _aliceAmount);
 
     // Alice can't deposit into an undercollateralized vault
-    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUndercollateralized.selector));
 
     vault.deposit(_aliceAmount, alice);
 
@@ -407,7 +407,7 @@ contract VaultUndercollateralizationTest is UnitBaseSetup {
     uint256 _yieldFeeShares = vault.yieldFeeShares();
 
     // The Vault is now undercollateralized so we can't mint the yield fee
-    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUndercollateralized.selector));
     vault.mintYieldFee(_yieldFeeShares);
 
     vm.startPrank(bob);
