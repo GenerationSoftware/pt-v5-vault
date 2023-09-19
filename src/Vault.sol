@@ -116,12 +116,6 @@ error YVWithdrawableAssetsLTExpected(
   uint256 expectedWithdrawableAssets
 );
 
-/**
- * @notice Emitted when the target token is not supported for a given token address.
- * @param token The unsupported token address
- */
-error TargetTokenNotSupported(address token);
-
 /// @notice Emitted when the Claimer is set to the zero address.
 error ClaimerZeroAddress();
 
