@@ -174,6 +174,13 @@ contract VaultTest is UnitBaseSetup {
 
   /* ============ Claimer ============ */
 
+  /* ============ claimer ============ */
+  function testClaimer() public {
+    assertNotEq(vault.claimer(), address(0));
+    assertNotEq(vault.claimer(), address(this));
+    assertEq(vault.claimer(), address(claimer));
+  }
+
   /* ============ claimPrize ============ */
   function testClaimPrize() public {
     vm.startPrank(address(claimer));
