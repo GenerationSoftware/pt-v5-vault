@@ -310,14 +310,27 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /* ============ Modifiers ============ */
 
-  /// @notice Require reverting if the vault is under-collateralized.
+  /// @notice Modifier reverting if the Vault is under-collateralized.
   modifier onlyVaultCollateralized() {
-    if (!_isVaultCollateralized(_totalSupply(), _totalAssets())) revert VaultUndercollateralized();
+    _onlyVaultCollateralized(_totalSupply(), _totalAssets());
     _;
   }
 
   /**
-   * @notice Requires the caller to be the claimer
+   * @notice Reverts if the Vault is under-collateralized.
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
+   */
+  function _onlyVaultCollateralized(
+    uint256 _depositedAssets,
+    uint256 _withdrawableAssets
+  ) internal view {
+    if (!_isVaultCollateralized(_depositedAssets, _withdrawableAssets))
+      revert VaultUndercollateralized();
+  }
+
+  /**
+   * @notice Requires the caller to be the claimer.
    */
   modifier onlyClaimer() {
     if (msg.sender != _claimer) revert CallerNotClaimer(msg.sender, _claimer);
@@ -325,7 +338,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /**
-   * @notice Requires the caller to be the liquidation pair
+   * @notice Requires the caller to be the liquidation pair.
    */
   modifier onlyLiquidationPair() {
     if (msg.sender != address(_liquidationPair)) {
@@ -452,7 +465,13 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
   function maxDeposit(address) external view virtual override returns (uint256) {
-    return _maxDeposit();
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
+    return
+      _isVaultCollateralized(_depositedAssets, _withdrawableAssets)
+        ? _maxDeposit(_depositedAssets)
+        : 0;
   }
 
   /// @inheritdoc IERC4626
@@ -465,7 +484,13 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
   function maxMint(address) external view virtual override returns (uint256) {
-    return _maxDeposit();
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
+    return
+      _isVaultCollateralized(_depositedAssets, _withdrawableAssets)
+        ? _maxDeposit(_depositedAssets)
+        : 0;
   }
 
   /// @inheritdoc IERC4626
@@ -495,18 +520,22 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /* ============ Deposit Functions ============ */
 
-  /// @inheritdoc IERC4626
-  function deposit(
-    uint256 _assets,
-    address _receiver
-  ) external virtual override onlyVaultCollateralized returns (uint256) {
-    return _depositAssets(_assets, msg.sender, _receiver);
+  /**
+   * @inheritdoc IERC4626
+   * @dev Will revert if the Vault is under-collateralized.
+   */
+  function deposit(uint256 _assets, address _receiver) external virtual override returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
+    return _depositAssets(_assets, msg.sender, _receiver, _depositedAssets, _withdrawableAssets);
   }
 
   /**
    * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
    * @dev Can't be used to deposit on behalf of another user since `permit` does not accept a receiver parameter.
    *      Meaning that anyone could reuse the signature and pass an arbitrary `_receiver` to this function.
+   * @dev Will revert if the Vault is under-collateralized.
    * @param _assets Amount of assets to approve and deposit
    * @param _owner Address of the owner depositing `_assets` and signing the permit
    * @param _deadline Timestamp after which the approval is no longer valid
@@ -522,18 +551,27 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint8 _v,
     bytes32 _r,
     bytes32 _s
-  ) external onlyVaultCollateralized returns (uint256) {
+  ) external returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
     _permit(IERC20Permit(address(_asset)), _owner, address(this), _assets, _deadline, _v, _r, _s);
-    return _depositAssets(_assets, _owner, _owner);
+
+    return _depositAssets(_assets, _owner, _owner, _depositedAssets, _withdrawableAssets);
   }
 
-  /// @inheritdoc IERC4626
-  function mint(
-    uint256 _shares,
-    address _receiver
-  ) external virtual override onlyVaultCollateralized returns (uint256) {
-    if (_shares > _maxDeposit()) {
-      revert MintMoreThanMax(_receiver, _shares, _maxDeposit());
+  /**
+   * @inheritdoc IERC4626
+   * @dev Will revert if the Vault is under-collateralized.
+   */
+  function mint(uint256 _shares, address _receiver) external virtual override returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
+    _onlyVaultCollateralized(_totalSupply(), _totalAssets());
+
+    if (_shares > _maxDeposit(_depositedAssets)) {
+      revert MintMoreThanMax(_receiver, _shares, _maxDeposit(_depositedAssets));
     }
 
     _deposit(msg.sender, _receiver, _shares);
@@ -542,11 +580,24 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /**
    * @notice Deposit assets into the Vault and delegate to the sponsorship address.
+   * @dev Will revert if the Vault is under-collateralized.
    * @param _assets Amount of assets to deposit
    * @return uint256 Amount of shares minted to caller.
    */
-  function sponsor(uint256 _assets) external onlyVaultCollateralized returns (uint256) {
-    return _sponsor(_assets, msg.sender);
+  function sponsor(uint256 _assets) external returns (uint256) {
+    address _owner = msg.sender;
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
+    _depositAssets(_assets, _owner, _owner, _depositedAssets, _withdrawableAssets);
+
+    if (_twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS) {
+      _twabController.sponsor(_owner);
+    }
+
+    emit Sponsor(_owner, _assets, _assets);
+
+    return _assets;
   }
 
   /**
@@ -653,9 +704,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev Will revert if there is not enough yield available in the YieldVault to back `_shares`.
    * @param _shares Amount of shares to mint
    */
-  function mintYieldFee(uint256 _shares) external onlyVaultCollateralized {
+  function mintYieldFee(uint256 _shares) external {
     uint256 _depositedAssets = _totalSupply();
     uint256 _withdrawableAssets = _totalAssets();
+
+    _onlyVaultCollateralized(_depositedAssets, _withdrawableAssets);
 
     uint256 _availableYield = _withdrawableAssets -
       _convertToAssets(_depositedAssets, _depositedAssets, _withdrawableAssets, Math.Rounding.Down);
@@ -1093,14 +1146,10 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Returns the maximum amount of underlying assets that can be deposited into the Vault,
    * through a deposit call.
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
+   * @param _depositedAssets Assets deposited into the YieldVault
    * @return uint256 Amount of underlying assets that can deposited
    */
-  function _maxDeposit() internal view returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-
-    if (!_isVaultCollateralized(_depositedAssets, _withdrawableAssets)) return 0;
-
+  function _maxDeposit(uint256 _depositedAssets) internal view returns (uint256) {
     uint256 _vaultMaxDeposit = UINT112_MAX - _depositedAssets;
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
@@ -1243,44 +1292,29 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /**
    * @notice Deposit assets and mint shares.
-   * @dev Will revert if the Vault is uncollateralized.
+   * @dev Will revert if the Vault is under-collateralized.
    *      So assets does not need to be converted to shares.
    * @param _assets The assets to deposit
    * @param _owner The owner of the assets
    * @param _receiver The receiver of the deposit shares
+   * @param _depositedAssets Assets deposited into the YieldVault
+   * @param _withdrawableAssets Assets withdrawable from the YieldVault
    * @return uint256 Amount of shares minted to `_receiver`
    */
   function _depositAssets(
     uint256 _assets,
     address _owner,
-    address _receiver
+    address _receiver,
+    uint256 _depositedAssets,
+    uint256 _withdrawableAssets
   ) internal returns (uint256) {
-    if (_assets > _maxDeposit()) {
-      revert DepositMoreThanMax(_receiver, _assets, _maxDeposit());
+    _onlyVaultCollateralized(_depositedAssets, _withdrawableAssets);
+
+    if (_assets > _maxDeposit(_depositedAssets)) {
+      revert DepositMoreThanMax(_receiver, _assets, _maxDeposit(_depositedAssets));
     }
 
     _deposit(_owner, _receiver, _assets);
-
-    return _assets;
-  }
-
-  /**
-   * @notice Deposit assets into the Vault and delegate to the sponsorship address.
-   * @dev There is no receiver parameter.
-   *      The calling address is the one depositing assets and receiving shares.
-   * @dev If the caller has not delegated to the sponsorship address yet, this function will.
-   * @param _assets Amount of assets to deposit
-   * @param _owner Address of the owner depositing `_assets`
-   * @return uint256 Amount of shares minted to `_receiver`.
-   */
-  function _sponsor(uint256 _assets, address _owner) internal returns (uint256) {
-    _depositAssets(_assets, _owner, _owner);
-
-    if (_twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS) {
-      _twabController.sponsor(_owner);
-    }
-
-    emit Sponsor(_owner, _assets, _assets);
 
     return _assets;
   }
