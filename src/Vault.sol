@@ -1194,7 +1194,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
       _depositedAssets + _yieldFeeShares,
       _depositedAssets,
       _withdrawableAssets,
-      Math.Rounding.Down
+      Math.Rounding.Up
     );
 
     return _assetsAllocated > _withdrawableAssets ? 0 : _withdrawableAssets - _assetsAllocated;
