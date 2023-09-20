@@ -36,7 +36,7 @@ contract VaultFactory {
   /**
    * @notice Mapping to store deployer nonces for CREATE2
    */
-  mapping(address => uint) public deployerNonces;
+  mapping(address => uint256) public deployerNonces;
 
   /* ============ External Functions ============ */
 
