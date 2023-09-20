@@ -465,7 +465,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    */
   function maxMint(address) external view virtual override returns (uint256) {
-    return _maxMint();
+    return _maxDeposit();
   }
 
   /// @inheritdoc IERC4626
@@ -532,8 +532,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint256 _shares,
     address _receiver
   ) external virtual override onlyVaultCollateralized returns (uint256) {
-    if (_shares > _maxMint()) {
-      revert MintMoreThanMax(_receiver, _shares, _maxMint());
+    if (_shares > _maxDeposit()) {
+      revert MintMoreThanMax(_receiver, _shares, _maxDeposit());
     }
 
     _deposit(msg.sender, _receiver, _shares);
@@ -940,10 +940,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     return address(_prizePool);
   }
 
-  /**
-   * @notice Address of the claimer.
-   * @return address Claimer address
-   */
+  /// @inheritdoc IClaimable
   function claimer() external view returns (address) {
     return _claimer;
   }
@@ -967,6 +964,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Fetch underlying asset decimals.
    * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
    * @param asset_ Address of the underlying asset
+   * @return bool True if the attempt was successful, false otherwise
+   * @return uint8 Token decimals number
    */
   function _tryGetAssetDecimals(IERC20 asset_) private view returns (bool, uint8) {
     (bool success, bytes memory encodedDecimals) = address(asset_).staticcall(
@@ -981,6 +980,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     return (false, 0);
   }
 
+  /**
+   * @notice Get the Vault shares balance of a given account.
+   * @param _account Account to get the balance for
+   * @return uint256 Balance of the account
+   */
   function _balanceOf(address _account) internal view returns (uint256) {
     return _twabController.balanceOf(address(this), _account);
   }
@@ -1097,28 +1101,10 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
     if (!_isVaultCollateralized(_depositedAssets, _withdrawableAssets)) return 0;
 
-    uint256 _vaultMaxDeposit = UINT112_MAX -
-      _convertToAssets(_depositedAssets, _depositedAssets, _withdrawableAssets, Math.Rounding.Up);
-
+    uint256 _vaultMaxDeposit = UINT112_MAX - _depositedAssets;
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
     return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
-  }
-
-  /**
-   * @notice Returns the maximum amount of Vault shares that can be minted, through a mint call.
-   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
-   * @return uint256 Amount of Vault shares that can be minted
-   */
-  function _maxMint() internal view returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-
-    if (!_isVaultCollateralized(_depositedAssets, _totalAssets())) return 0;
-
-    uint256 _vaultMaxMint = UINT112_MAX - _depositedAssets;
-    uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
-
-    return _yieldVaultMaxDeposit < _vaultMaxMint ? _yieldVaultMaxDeposit : _vaultMaxMint;
   }
 
   /**
