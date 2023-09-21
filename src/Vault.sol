@@ -1239,7 +1239,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    *      - if `_vaultAssets` balance is greater than or equal to `_assets`,
    *        we know the vault has enough underlying assets to fulfill the deposit
    *        so we don't transfer any assets from the user wallet into the vault
-   * @dev Will revert if the Vault is undercollateralized.
    * @dev Will revert if 0 shares are minted back to the receiver.
    */
   function _deposit(address _caller, address _receiver, uint256 _assets) internal {
