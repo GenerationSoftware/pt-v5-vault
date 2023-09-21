@@ -34,7 +34,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /* ============ Variables ============ */
 
   /// The maximum amount of shares that can be minted.
-  uint256 constant UINT112_MAX = type(uint112).max;
+  uint256 private constant UINT112_MAX = type(uint112).max;
 
   /// @notice Address of the underlying asset used by the Vault.
   IERC20 private immutable _asset;
@@ -50,7 +50,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /// @notice The gas to give to each of the before and after prize claim hooks.
   /// This should be enough gas to mint an NFT if needed.
-  uint24 constant HOOK_GAS = 150_000;
+  uint24 private constant HOOK_GAS = 150_000;
 
   /// @notice Address of the TwabController used to keep track of balances.
   TwabController private immutable _twabController;
@@ -324,7 +324,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   function _onlyVaultCollateralized(
     uint256 _depositedAssets,
     uint256 _withdrawableAssets
-  ) internal view {
+  ) internal pure {
     if (!_isVaultCollateralized(_depositedAssets, _withdrawableAssets))
       revert VaultUndercollateralized();
   }
@@ -525,10 +525,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev Will revert if the Vault is under-collateralized.
    */
   function deposit(uint256 _assets, address _receiver) external virtual override returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-
-    return _depositAssets(_assets, msg.sender, _receiver, _depositedAssets, _withdrawableAssets);
+    return _depositAssets(_assets, msg.sender, _receiver);
   }
 
   /**
@@ -552,12 +549,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-
     _permit(IERC20Permit(address(_asset)), _owner, address(this), _assets, _deadline, _v, _r, _s);
-
-    return _depositAssets(_assets, _owner, _owner, _depositedAssets, _withdrawableAssets);
+    return _depositAssets(_assets, _owner, _owner);
   }
 
   /**
@@ -566,9 +559,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    */
   function mint(uint256 _shares, address _receiver) external virtual override returns (uint256) {
     uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
 
-    _onlyVaultCollateralized(_totalSupply(), _totalAssets());
+    _onlyVaultCollateralized(_depositedAssets, _totalAssets());
 
     if (_shares > _maxDeposit(_depositedAssets)) {
       revert MintMoreThanMax(_receiver, _shares, _maxDeposit(_depositedAssets));
@@ -586,10 +578,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    */
   function sponsor(uint256 _assets) external returns (uint256) {
     address _owner = msg.sender;
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
 
-    _depositAssets(_assets, _owner, _owner, _depositedAssets, _withdrawableAssets);
+    _depositAssets(_assets, _owner, _owner);
 
     if (_twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS) {
       _twabController.sponsor(_owner);
@@ -1297,17 +1287,16 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param _assets The assets to deposit
    * @param _owner The owner of the assets
    * @param _receiver The receiver of the deposit shares
-   * @param _depositedAssets Assets deposited into the YieldVault
-   * @param _withdrawableAssets Assets withdrawable from the YieldVault
    * @return uint256 Amount of shares minted to `_receiver`
    */
   function _depositAssets(
     uint256 _assets,
     address _owner,
-    address _receiver,
-    uint256 _depositedAssets,
-    uint256 _withdrawableAssets
+    address _receiver
   ) internal returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
+
     _onlyVaultCollateralized(_depositedAssets, _withdrawableAssets);
 
     if (_assets > _maxDeposit(_depositedAssets)) {
