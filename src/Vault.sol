@@ -462,7 +462,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /// @inheritdoc IERC4626
   function maxDeposit(address) external view virtual override returns (uint256) {
-    return _maxDeposit(_totalSupply());
+    uint256 _depositedAssets = _totalSupply();
+    return
+      _isVaultCollateralized(_depositedAssets, _totalAssets()) ? _maxDeposit(_depositedAssets) : 0;
   }
 
   /// @inheritdoc IERC4626
@@ -472,7 +474,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /// @inheritdoc IERC4626
   function maxMint(address) external view virtual override returns (uint256) {
-    return _maxDeposit(_totalSupply());
+    uint256 _depositedAssets = _totalSupply();
+    return
+      _isVaultCollateralized(_depositedAssets, _totalAssets()) ? _maxDeposit(_depositedAssets) : 0;
   }
 
   /// @inheritdoc IERC4626
@@ -1106,25 +1110,18 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /* ============ Max / Preview Functions ============ */
 
   /**
-   * @notice Returns the maximum amount of underlying assets that can be deposited into the Vault,
-   * through a deposit call.
+   * @notice Returns the maximum amount of underlying assets that can be deposited into the Vault.
    * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
    * @param _depositedAssets Assets deposited into the YieldVault
-   * @return uint256 Amount of underlying assets that can deposited
+   * @return uint256 Amount of underlying assets that can be deposited
    */
   function _maxDeposit(uint256 _depositedAssets) internal view returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
     uint256 _vaultMaxDeposit = UINT112_MAX - _depositedAssets;
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
-    // Vault shares a minted 1:1 when the vault is collateralized,
+    // Vault shares are minted 1:1 when the vault is collateralized,
     // so maxDeposit and maxMint return the same value
-    if (_isVaultCollateralized(_depositedAssets, _withdrawableAssets)) {
-      return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
-    }
-
-    return 0;
+    return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
   }
 
   /**
