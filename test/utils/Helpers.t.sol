@@ -8,13 +8,10 @@ import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 
-import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
-
 import { IERC4626, Vault } from "../../src/Vault.sol";
 
 import { LiquidationPairMock } from "../contracts/mock/LiquidationPairMock.sol";
 import { LiquidationRouterMock } from "../contracts/mock/LiquidationRouterMock.sol";
-import { PrizePoolMock } from "../contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "../contracts/mock/YieldVault.sol";
 
 contract Helpers is Test {

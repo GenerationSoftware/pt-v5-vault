@@ -68,7 +68,7 @@ Feature: Deposit
   Scenario: Alice deposits into the Vault
     Given Alice owns 0 Vault shares and the Vault is undercollateralized
     When Alice deposits 1,000 underlying assets
-    Then the transaction reverts with the custom error `VaultUnderCollateralized`
+    Then the transaction reverts with the custom error `VaultUndercollateralized`
 
   # Deposit - Attacks
   # Inflation attack
@@ -111,7 +111,7 @@ Feature: Deposit
   Scenario: Alice mints shares from the Vault
     Given Alice owns 0 Vault shares
     When Alice mints type(uint112).max + 1 shares
-    Then the transaction reverts with the error SafeCast: value doesn't fit in 112 bits
+    Then the transaction reverts with the custom error `MintMoreThanMax`
 
   Scenario: Alice mints shares from the Vault
     Given Alice owns 0 Vault shares and YieldVault's maxMint function returns type(uint88).max
@@ -126,7 +126,7 @@ Feature: Deposit
   Scenario: Alice mints 1,000 shares from the Vault
     Given Alice owns 0 Vault shares and the Vault is undercollateralized
     When Alice mints 1,000 shares
-    Then the transaction reverts with the custom error VaultUnderCollateralized
+    Then the transaction reverts with the custom error VaultUndercollateralized
 
   # Sponsor
   Scenario: Alice sponsors the Vault

@@ -400,7 +400,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUndercollateralized.selector));
 
     vault.transferTokensOut(address(this), address(this), address(vault), 1e18);
 
@@ -412,7 +412,9 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(bob);
 
-    vm.expectRevert(abi.encodeWithSelector(CallerNotLP.selector, bob, address(liquidationPair)));
+    vm.expectRevert(
+      abi.encodeWithSelector(Vault.CallerNotLP.selector, bob, address(liquidationPair))
+    );
 
     vault.transferTokensOut(address(this), address(this), address(vault), 1e18);
 
@@ -437,7 +439,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     _setLiquidationPair();
 
     vm.expectRevert(
-      abi.encodeWithSelector(CallerNotLP.selector, address(bob), address(liquidationPair))
+      abi.encodeWithSelector(Vault.CallerNotLP.selector, address(bob), address(liquidationPair))
     );
 
     vm.startPrank(address(bob));
@@ -452,7 +454,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        LiquidationTokenInNotPrizeToken.selector,
+        Vault.LiquidationTokenInNotPrizeToken.selector,
         address(0),
         address(prizeToken)
       )
@@ -469,7 +471,11 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.startPrank(address(liquidationPair));
 
     vm.expectRevert(
-      abi.encodeWithSelector(LiquidationTokenOutNotVaultShare.selector, address(0), address(vault))
+      abi.encodeWithSelector(
+        Vault.LiquidationTokenOutNotVaultShare.selector,
+        address(0),
+        address(vault)
+      )
     );
 
     vault.transferTokensOut(address(this), address(this), address(0), 0);
@@ -482,7 +488,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(abi.encodeWithSelector(LiquidationAmountOutZero.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.LiquidationAmountOutZero.selector));
 
     vault.transferTokensOut(address(this), address(this), address(vault), 0);
 
@@ -495,7 +501,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.startPrank(address(liquidationPair));
 
     vm.expectRevert(
-      abi.encodeWithSelector(LiquidationAmountOutGTYield.selector, type(uint256).max, 0)
+      abi.encodeWithSelector(Vault.LiquidationAmountOutGTYield.selector, type(uint256).max, 0)
     );
 
     vault.transferTokensOut(address(this), address(this), address(vault), type(uint256).max);
@@ -543,7 +549,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     _accrueYield(underlyingAsset, yieldVault, 10e18);
 
-    vm.expectRevert(abi.encodeWithSelector(YieldFeeGTAvailableShares.selector, 10e18, 0));
+    vm.expectRevert(abi.encodeWithSelector(Vault.YieldFeeGTAvailableShares.selector, 10e18, 0));
     vault.mintYieldFee(10e18);
   }
 

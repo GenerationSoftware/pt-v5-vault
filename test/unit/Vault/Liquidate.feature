@@ -58,7 +58,7 @@ Feature: Liquidate
   Scenario: Bob swaps prize tokens in exchange of Vault shares
     Given the YieldVault is now undercollateralized
     When `liquidate` is called
-    Then the transaction reverts with the custom error `VaultUnderCollateralized`
+    Then the transaction reverts with the custom error `VaultUndercollateralized`
 
   Scenario: Bob swaps prize tokens in exchange of Vault shares by calling `liquidate` directly
     Given no underlying assets have accrued in the YieldVault

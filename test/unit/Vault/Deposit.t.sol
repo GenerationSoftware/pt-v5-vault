@@ -191,7 +191,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.approve(address(vault), type(uint256).max);
 
     vm.expectRevert(
-      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
+      abi.encodeWithSelector(Vault.DepositMoreThanMax.selector, alice, _amount, type(uint112).max)
     );
 
     vault.deposit(_amount, alice);
@@ -214,7 +214,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     );
 
     vm.expectRevert(
-      abi.encodeWithSelector(DepositMoreThanMax.selector, alice, _amount, type(uint88).max)
+      abi.encodeWithSelector(Vault.DepositMoreThanMax.selector, alice, _amount, type(uint88).max)
     );
 
     vault.deposit(_amount, alice);
@@ -234,7 +234,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     underlyingAsset.burn(address(yieldVault), _amount);
 
-    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUndercollateralized.selector));
 
     vault.deposit(_amount, alice);
 
@@ -389,7 +389,9 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     underlyingAsset.mint(alice, _amount);
     underlyingAsset.approve(address(vault), type(uint256).max);
 
-    vm.expectRevert(bytes("SafeCast: value doesn't fit in 112 bits"));
+    vm.expectRevert(
+      abi.encodeWithSelector(Vault.MintMoreThanMax.selector, alice, _amount, type(uint112).max)
+    );
 
     vault.mint(_amount, alice);
 
@@ -422,7 +424,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   function testMintZeroShares() external {
     vm.startPrank(alice);
 
-    vm.expectRevert(abi.encodeWithSelector(MintZeroShares.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.MintZeroShares.selector));
 
     vault.mint(0, alice);
 
@@ -441,7 +443,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     underlyingAsset.burn(address(yieldVault), _amount);
 
-    vm.expectRevert(abi.encodeWithSelector(VaultUnderCollateralized.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.VaultUndercollateralized.selector));
 
     vault.mint(_amount, alice);
 
@@ -552,7 +554,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   function testSweepZeroAssets() external {
     vm.startPrank(bob);
 
-    vm.expectRevert(abi.encodeWithSelector(SweepZeroAssets.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.SweepZeroAssets.selector));
 
     vault.sweep();
 

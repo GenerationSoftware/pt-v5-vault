@@ -13,7 +13,6 @@ import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import { Vault } from "../../src/Vault.sol";
 
-import { ERC20PermitMock } from "../contracts/mock/ERC20PermitMock.sol";
 import { LiquidationPairMock } from "../contracts/mock/LiquidationPairMock.sol";
 import { LiquidationRouterMock } from "../contracts/mock/LiquidationRouterMock.sol";
 import { PrizePoolMock } from "../contracts/mock/PrizePoolMock.sol";

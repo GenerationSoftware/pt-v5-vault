@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { UnitBaseSetup, IERC20 } from "../../utils/UnitBaseSetup.t.sol";
-import "../../../src/Vault.sol";
+import { Vault } from "../../../src/Vault.sol";
 
 contract VaultWithdrawTest is UnitBaseSetup {
   /* ============ Events ============ */
@@ -240,7 +240,7 @@ contract VaultWithdrawTest is UnitBaseSetup {
     _deposit(underlyingAsset, vault, _amount, alice);
 
     vm.expectRevert(
-      abi.encodeWithSelector(WithdrawMoreThanMax.selector, alice, _amount + 1, _amount)
+      abi.encodeWithSelector(Vault.WithdrawMoreThanMax.selector, alice, _amount + 1, _amount)
     );
 
     vault.withdraw(_amount + 1, alice, alice);
@@ -251,7 +251,7 @@ contract VaultWithdrawTest is UnitBaseSetup {
   function testWithdrawZeroAssets() external {
     vm.startPrank(alice);
 
-    vm.expectRevert(abi.encodeWithSelector(WithdrawZeroAssets.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.WithdrawZeroAssets.selector));
 
     vault.withdraw(0, alice, alice);
 
@@ -403,7 +403,7 @@ contract VaultWithdrawTest is UnitBaseSetup {
     uint256 _shares = _deposit(underlyingAsset, vault, _amount, alice);
 
     vm.expectRevert(
-      abi.encodeWithSelector(RedeemMoreThanMax.selector, alice, _shares + 1, _shares)
+      abi.encodeWithSelector(Vault.RedeemMoreThanMax.selector, alice, _shares + 1, _shares)
     );
     vault.redeem(_shares + 1, alice, alice);
 
@@ -413,7 +413,7 @@ contract VaultWithdrawTest is UnitBaseSetup {
   function testRedeemZeroShares() external {
     vm.startPrank(alice);
 
-    vm.expectRevert(abi.encodeWithSelector(WithdrawZeroAssets.selector));
+    vm.expectRevert(abi.encodeWithSelector(Vault.WithdrawZeroAssets.selector));
 
     vault.redeem(0, alice, alice);
 
