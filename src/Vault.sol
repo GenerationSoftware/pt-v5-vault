@@ -460,18 +460,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /* ============ Max / Preview Functions ============ */
 
-  /**
-   * @inheritdoc IERC4626
-   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
-   */
+  /// @inheritdoc IERC4626
   function maxDeposit(address) external view virtual override returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-
-    return
-      _isVaultCollateralized(_depositedAssets, _withdrawableAssets)
-        ? _maxDeposit(_depositedAssets)
-        : 0;
+    return _maxDeposit(_totalSupply());
   }
 
   /// @inheritdoc IERC4626
@@ -479,18 +470,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     return _convertToShares(_assets, _totalSupply(), _totalAssets(), Math.Rounding.Down);
   }
 
-  /**
-   * @inheritdoc IERC4626
-   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
-   */
+  /// @inheritdoc IERC4626
   function maxMint(address) external view virtual override returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-    uint256 _withdrawableAssets = _totalAssets();
-
-    return
-      _isVaultCollateralized(_depositedAssets, _withdrawableAssets)
-        ? _maxDeposit(_depositedAssets)
-        : 0;
+    return _maxDeposit(_totalSupply());
   }
 
   /// @inheritdoc IERC4626
@@ -525,7 +507,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev Will revert if the Vault is under-collateralized.
    */
   function deposit(uint256 _assets, address _receiver) external virtual override returns (uint256) {
-    return _depositAssets(_assets, msg.sender, _receiver);
+    return _depositAssets(_assets, msg.sender, _receiver, false);
   }
 
   /**
@@ -550,7 +532,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     bytes32 _s
   ) external returns (uint256) {
     _permit(IERC20Permit(address(_asset)), _owner, address(this), _assets, _deadline, _v, _r, _s);
-    return _depositAssets(_assets, _owner, _owner);
+    return _depositAssets(_assets, _owner, _owner, false);
   }
 
   /**
@@ -558,16 +540,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @dev Will revert if the Vault is under-collateralized.
    */
   function mint(uint256 _shares, address _receiver) external virtual override returns (uint256) {
-    uint256 _depositedAssets = _totalSupply();
-
-    _onlyVaultCollateralized(_depositedAssets, _totalAssets());
-
-    if (_shares > _maxDeposit(_depositedAssets)) {
-      revert MintMoreThanMax(_receiver, _shares, _maxDeposit(_depositedAssets));
-    }
-
-    _deposit(msg.sender, _receiver, _shares);
-    return _shares;
+    return _depositAssets(_shares, msg.sender, _receiver, true);
   }
 
   /**
@@ -579,7 +552,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   function sponsor(uint256 _assets) external returns (uint256) {
     address _owner = msg.sender;
 
-    _depositAssets(_assets, _owner, _owner);
+    _depositAssets(_assets, _owner, _owner, false);
 
     if (_twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS) {
       _twabController.sponsor(_owner);
@@ -1140,10 +1113,18 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @return uint256 Amount of underlying assets that can deposited
    */
   function _maxDeposit(uint256 _depositedAssets) internal view returns (uint256) {
+    uint256 _depositedAssets = _totalSupply();
+    uint256 _withdrawableAssets = _totalAssets();
     uint256 _vaultMaxDeposit = UINT112_MAX - _depositedAssets;
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
-    return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
+    // Vault shares a minted 1:1 when the vault is collateralized,
+    // so maxDeposit and maxMint return the same value
+    if (_isVaultCollateralized(_depositedAssets, _withdrawableAssets)) {
+      return _yieldVaultMaxDeposit < _vaultMaxDeposit ? _yieldVaultMaxDeposit : _vaultMaxDeposit;
+    }
+
+    return 0;
   }
 
   /**
@@ -1286,12 +1267,14 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param _assets The assets to deposit
    * @param _owner The owner of the assets
    * @param _receiver The receiver of the deposit shares
+   * @param _isMint Whether the function is called to mint or deposit
    * @return uint256 Amount of shares minted to `_receiver`
    */
   function _depositAssets(
     uint256 _assets,
     address _owner,
-    address _receiver
+    address _receiver,
+    bool _isMint
   ) internal returns (uint256) {
     uint256 _depositedAssets = _totalSupply();
     uint256 _withdrawableAssets = _totalAssets();
@@ -1299,11 +1282,14 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     _onlyVaultCollateralized(_depositedAssets, _withdrawableAssets);
 
     if (_assets > _maxDeposit(_depositedAssets)) {
+      if (_isMint) {
+        revert MintMoreThanMax(_receiver, _assets, _maxDeposit(_depositedAssets));
+      }
+
       revert DepositMoreThanMax(_receiver, _assets, _maxDeposit(_depositedAssets));
     }
 
     _deposit(_owner, _receiver, _assets);
-
     return _assets;
   }
 
