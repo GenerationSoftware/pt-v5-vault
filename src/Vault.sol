@@ -9,7 +9,6 @@ import { SafeCast } from "openzeppelin/utils/math/SafeCast.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
-import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
@@ -64,8 +63,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /// @notice Address of the claimer.
   address private _claimer;
 
-  /// @notice Address of the ILiquidationPair used to liquidate yield for prize token.
-  ILiquidationPair private _liquidationPair;
+  /// @notice Address of the liquidation pair used to liquidate yield for prize token.
+  address private _liquidationPair;
 
   /// @notice Address of the yield fee recipient. Receives Vault shares when `mintYieldFee` is called.
   address private _yieldFeeRecipient;
@@ -335,8 +334,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Requires the caller to be the liquidation pair.
    */
   modifier onlyLiquidationPair() {
-    if (msg.sender != address(_liquidationPair)) {
-      revert CallerNotLP(msg.sender, address(_liquidationPair));
+    if (msg.sender != _liquidationPair) {
+      revert CallerNotLP(msg.sender, _liquidationPair);
     }
     _;
   }
@@ -753,7 +752,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /// @inheritdoc ILiquidationSource
   function isLiquidationPair(address _tokenOut, address liquidationPair_) external view returns (bool) {
-    return _tokenOut == address(this) && liquidationPair_ == address(_liquidationPair);
+    return _tokenOut == address(this) && liquidationPair_ == _liquidationPair;
   }
 
   /* ============ Claim Functions ============ */
@@ -863,7 +862,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @return address New liquidationPair address
    */
   function setLiquidationPair(
-    ILiquidationPair liquidationPair_
+    address liquidationPair_
   ) external onlyOwner returns (address) {
     if (address(liquidationPair_) == address(0)) revert LPZeroAddress();
 
@@ -948,7 +947,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @return address LiquidationPair address
    */
   function liquidationPair() external view returns (address) {
-    return address(_liquidationPair);
+    return _liquidationPair;
   }
 
   /**

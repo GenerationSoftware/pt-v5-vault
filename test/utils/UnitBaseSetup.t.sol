@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 import { Test } from "forge-std/Test.sol";
 import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
-import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
@@ -102,6 +101,6 @@ contract UnitBaseSetup is Test, Helpers {
 
   /* ============ Helpers ============ */
   function _setLiquidationPair() internal returns (address) {
-    return vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
+    return vault.setLiquidationPair(address(liquidationPair));
   }
 }

@@ -7,7 +7,6 @@ import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { Strings } from "openzeppelin/utils/Strings.sol";
 
-import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
@@ -341,7 +340,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     init.yield = int256(bound(shares, 10e18, type(uint104).max));
 
     setUpVault(init);
-    vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
+    vault.setLiquidationPair(address(liquidationPair));
 
     address caller = init.user[0];
     prizeToken.mint(caller, type(uint256).max);
