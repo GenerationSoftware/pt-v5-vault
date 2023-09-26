@@ -857,7 +857,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /**
    * @notice Set liquidationPair.
-   * @dev We reset approval of the previous liquidationPair and approve max for new one.
    * @param liquidationPair_ New liquidationPair address
    * @return address New liquidationPair address
    */
