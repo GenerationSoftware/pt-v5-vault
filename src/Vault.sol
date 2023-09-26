@@ -112,12 +112,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   event SetHooks(address indexed account, VaultHooks indexed hooks);
 
   /**
-   * @notice Emitted when a new LiquidationPair has been set.
-   * @param newLiquidationPair Address of the new liquidationPair
-   */
-  event LiquidationPairSet(ILiquidationPair indexed newLiquidationPair);
-
-  /**
    * @notice Emitted when yield fee is minted to the yield recipient.
    * @param caller Address that called the function
    * @param recipient Address receiving the Vault shares
@@ -757,6 +751,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     return address(_prizePool);
   }
 
+  /// @inheritdoc ILiquidationSource
+  function isLiquidationPair(address _tokenOut, address liquidationPair_) external view returns (bool) {
+    return _tokenOut == address(this) && liquidationPair_ == address(_liquidationPair);
+  }
+
   /* ============ Claim Functions ============ */
 
   /**
@@ -870,7 +869,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
     _liquidationPair = liquidationPair_;
 
-    emit LiquidationPairSet(liquidationPair_);
+    emit LiquidationPairSet(address(this), address(liquidationPair_));
     return address(liquidationPair_);
   }
 

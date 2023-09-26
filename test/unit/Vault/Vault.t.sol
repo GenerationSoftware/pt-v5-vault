@@ -24,7 +24,7 @@ contract VaultTest is UnitBaseSetup {
 
   event ClaimerSet(address indexed claimer);
 
-  event LiquidationPairSet(ILiquidationPair indexed newLiquidationPair);
+  event LiquidationPairSet(address indexed tokenOut, address indexed liquidationPair);
 
   event YieldFeeRecipientSet(address indexed yieldFeeRecipient);
 
@@ -367,7 +367,7 @@ contract VaultTest is UnitBaseSetup {
   /* ============ setLiquidationPair ============ */
   function testSetLiquidationPair() public {
     vm.expectEmit();
-    emit LiquidationPairSet(ILiquidationPair(address(liquidationPair)));
+    emit LiquidationPairSet(address(vault), address(liquidationPair));
 
     address _newLiquidationPairAddress = _setLiquidationPair();
 
@@ -391,6 +391,23 @@ contract VaultTest is UnitBaseSetup {
     vault.setLiquidationPair(_newLiquidationPair);
 
     vm.stopPrank();
+  }
+
+  /* ============ isLiquidationPair ============ */
+  function testIsLiquidationPair() public {
+    ILiquidationPair _newLiquidationPair = ILiquidationPair(
+      0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820
+    );
+
+    vault.setLiquidationPair(ILiquidationPair(address(liquidationPair)));
+    assertEq(vault.isLiquidationPair(address(vault), address(_newLiquidationPair)), false);
+    assertEq(vault.isLiquidationPair(address(vault), address(liquidationPair)), true);
+    assertEq(vault.isLiquidationPair(address(1), address(liquidationPair)), false);
+
+    vault.setLiquidationPair(_newLiquidationPair);
+    assertEq(vault.isLiquidationPair(address(vault), address(_newLiquidationPair)), true);
+    assertEq(vault.isLiquidationPair(address(vault), address(liquidationPair)), false);
+    assertEq(vault.isLiquidationPair(address(1), address(_newLiquidationPair)), false);
   }
 
   /* ============ testSetYieldFeePercentage ============ */
