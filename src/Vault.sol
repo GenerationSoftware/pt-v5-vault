@@ -9,7 +9,6 @@ import { SafeCast } from "openzeppelin/utils/math/SafeCast.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
-import { ILiquidationPair } from "pt-v5-liquidator-interfaces/ILiquidationPair.sol";
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
@@ -64,8 +63,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /// @notice Address of the claimer.
   address private _claimer;
 
-  /// @notice Address of the ILiquidationPair used to liquidate yield for prize token.
-  ILiquidationPair private _liquidationPair;
+  /// @notice Address of the liquidation pair used to liquidate yield for prize token.
+  address private _liquidationPair;
 
   /// @notice Address of the yield fee recipient. Receives Vault shares when `mintYieldFee` is called.
   address private _yieldFeeRecipient;
@@ -110,12 +109,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param hooks The hooks being set
    */
   event SetHooks(address indexed account, VaultHooks indexed hooks);
-
-  /**
-   * @notice Emitted when a new LiquidationPair has been set.
-   * @param newLiquidationPair Address of the new liquidationPair
-   */
-  event LiquidationPairSet(ILiquidationPair indexed newLiquidationPair);
 
   /**
    * @notice Emitted when yield fee is minted to the yield recipient.
@@ -341,8 +334,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @notice Requires the caller to be the liquidation pair.
    */
   modifier onlyLiquidationPair() {
-    if (msg.sender != address(_liquidationPair)) {
-      revert CallerNotLP(msg.sender, address(_liquidationPair));
+    if (msg.sender != _liquidationPair) {
+      revert CallerNotLP(msg.sender, _liquidationPair);
     }
     _;
   }
@@ -757,6 +750,11 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     return address(_prizePool);
   }
 
+  /// @inheritdoc ILiquidationSource
+  function isLiquidationPair(address _tokenOut, address liquidationPair_) external view returns (bool) {
+    return _tokenOut == address(this) && liquidationPair_ == _liquidationPair;
+  }
+
   /* ============ Claim Functions ============ */
 
   /**
@@ -859,18 +857,17 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /**
    * @notice Set liquidationPair.
-   * @dev We reset approval of the previous liquidationPair and approve max for new one.
    * @param liquidationPair_ New liquidationPair address
    * @return address New liquidationPair address
    */
   function setLiquidationPair(
-    ILiquidationPair liquidationPair_
+    address liquidationPair_
   ) external onlyOwner returns (address) {
     if (address(liquidationPair_) == address(0)) revert LPZeroAddress();
 
     _liquidationPair = liquidationPair_;
 
-    emit LiquidationPairSet(liquidationPair_);
+    emit LiquidationPairSet(address(this), address(liquidationPair_));
     return address(liquidationPair_);
   }
 
@@ -949,7 +946,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @return address LiquidationPair address
    */
   function liquidationPair() external view returns (address) {
-    return address(_liquidationPair);
+    return _liquidationPair;
   }
 
   /**
