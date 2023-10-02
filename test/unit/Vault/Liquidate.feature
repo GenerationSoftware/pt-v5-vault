@@ -98,6 +98,6 @@ Feature: Liquidate
     Then the transaction reverts with the custom error `YieldFeeGTAvailable`
 
   Scenario: Bob mints 1e18 yield fee shares
-    Given Bob owns type(uint112).max Vault shares and 10e18 of yield fee shares have accrued
+    Given Bob owns type(uint96).max Vault shares and 10e18 of yield fee shares have accrued
     When Bob mints 1e18 yield fee shares
     Then the transaction reverts with the error SafeCast: value doesn't fit in 112 bits

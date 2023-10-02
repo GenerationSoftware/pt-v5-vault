@@ -324,7 +324,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vault.setYieldFeeRecipient(bob);
 
     uint256 _yield = 10e18;
-    uint256 _amount = type(uint112).max - _yield;
+    uint256 _amount = type(uint96).max - _yield;
 
     underlyingAsset.mint(address(this), _amount);
     _sponsor(underlyingAsset, vault, _amount);
@@ -361,7 +361,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     assertEq(vault.balanceOf(bob), 0);
 
-    // _yieldFeeShares has not been minted yet, so totatSupply is type(uint112).max - _yield
+    // _yieldFeeShares has not been minted yet, so totatSupply is type(uint96).max - _yield
     assertEq(vault.totalSupply(), _amount);
     assertEq(vault.yieldFeeShares(), _yieldFeeShares);
 
@@ -509,7 +509,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     vm.stopPrank();
   }
 
-  function testTransferTokensOut_AmountOutGTUint112() public {
+  function testTransferTokensOut_AmountOutGTuint96() public {
     _setLiquidationPair();
 
     uint256 _amount = 1000e18;
@@ -517,7 +517,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
     underlyingAsset.mint(address(this), _amount);
     _sponsor(underlyingAsset, vault, _amount);
 
-    uint256 _amountOut = type(uint120).max;
+    uint256 _amountOut = type(uint104).max;
     _accrueYield(underlyingAsset, yieldVault, _amountOut);
 
     vm.startPrank(address(alice));
@@ -533,7 +533,7 @@ contract VaultLiquidateTest is UnitBaseSetup {
 
     vm.startPrank(address(liquidationPair));
 
-    vm.expectRevert(bytes("SafeCast: value doesn't fit in 112 bits"));
+    vm.expectRevert(bytes("SafeCast: value doesn't fit in 96 bits"));
 
     vault.transferTokensOut(address(this), alice, address(vault), _amountOut);
 

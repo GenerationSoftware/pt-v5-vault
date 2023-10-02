@@ -33,7 +33,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /* ============ Variables ============ */
 
   /// The maximum amount of shares that can be minted.
-  uint256 private constant UINT112_MAX = type(uint112).max;
+  uint256 private constant UINT96_MAX = type(uint96).max;
 
   /// @notice Address of the underlying asset used by the Vault.
   IERC20 private immutable _asset;
@@ -751,7 +751,10 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /// @inheritdoc ILiquidationSource
-  function isLiquidationPair(address _tokenOut, address liquidationPair_) external view returns (bool) {
+  function isLiquidationPair(
+    address _tokenOut,
+    address liquidationPair_
+  ) external view returns (bool) {
     return _tokenOut == address(this) && liquidationPair_ == _liquidationPair;
   }
 
@@ -860,9 +863,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param liquidationPair_ New liquidationPair address
    * @return address New liquidationPair address
    */
-  function setLiquidationPair(
-    address liquidationPair_
-  ) external onlyOwner returns (address) {
+  function setLiquidationPair(address liquidationPair_) external onlyOwner returns (address) {
     if (address(liquidationPair_) == address(0)) revert LPZeroAddress();
 
     _liquidationPair = liquidationPair_;
@@ -1108,12 +1109,12 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
   /**
    * @notice Returns the maximum amount of underlying assets that can be deposited into the Vault.
-   * @dev We use type(uint112).max cause this is the type used to store balances in TwabController.
+   * @dev We use type(uint96).max cause this is the type used to store balances in TwabController.
    * @param _depositedAssets Assets deposited into the YieldVault
    * @return uint256 Amount of underlying assets that can be deposited
    */
   function _maxDeposit(uint256 _depositedAssets) internal view returns (uint256) {
-    uint256 _vaultMaxDeposit = UINT112_MAX - _depositedAssets;
+    uint256 _vaultMaxDeposit = UINT96_MAX - _depositedAssets;
     uint256 _yieldVaultMaxDeposit = _yieldVault.maxDeposit(address(this));
 
     // Vault shares are minted 1:1 when the vault is collateralized,
@@ -1384,7 +1385,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param _shares Shares to mint
    */
   function _mint(address _receiver, uint256 _shares) internal virtual override {
-    _twabController.mint(_receiver, SafeCast.toUint112(_shares));
+    _twabController.mint(_receiver, SafeCast.toUint96(_shares));
     emit Transfer(address(0), _receiver, _shares);
   }
 
@@ -1397,7 +1398,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param _shares The shares to burn
    */
   function _burn(address _owner, uint256 _shares) internal virtual override {
-    _twabController.burn(_owner, SafeCast.toUint112(_shares));
+    _twabController.burn(_owner, SafeCast.toUint96(_shares));
     emit Transfer(_owner, address(0), _shares);
   }
 
@@ -1411,7 +1412,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param _shares Shares to transfer
    */
   function _transfer(address _from, address _to, uint256 _shares) internal virtual override {
-    _twabController.transfer(_from, _to, SafeCast.toUint112(_shares));
+    _twabController.transfer(_from, _to, SafeCast.toUint96(_shares));
     emit Transfer(_from, _to, _shares);
   }
 

@@ -381,9 +381,7 @@ contract VaultTest is UnitBaseSetup {
   }
 
   function testSetLiquidationPairOnlyOwner() public {
-    address _newLiquidationPair = address(
-      0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820
-    );
+    address _newLiquidationPair = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
 
     vm.startPrank(alice);
 
@@ -395,9 +393,7 @@ contract VaultTest is UnitBaseSetup {
 
   /* ============ isLiquidationPair ============ */
   function testIsLiquidationPair() public {
-    address _newLiquidationPair = address(
-      0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820
-    );
+    address _newLiquidationPair = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
 
     vault.setLiquidationPair(address(liquidationPair));
     assertEq(vault.isLiquidationPair(address(vault), address(_newLiquidationPair)), false);
