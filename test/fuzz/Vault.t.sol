@@ -336,8 +336,8 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
   }
 
   function test_liquidate(Init memory init, uint256 shares) public virtual {
-    // We set the higher bound to uint104 to avoid overflowing above uint112
-    init.yield = int256(bound(shares, 10e18, type(uint104).max));
+    // We set the higher bound to uint88 to avoid overflowing above uint96
+    init.yield = int256(bound(shares, 10e18, type(uint88).max));
 
     setUpVault(init);
     vault.setLiquidationPair(address(liquidationPair));
@@ -368,7 +368,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     }
   }
 
-  // We set the higher bound to uint104 to avoid overflowing above uint112
+  // We set the higher bound to uint88 to avoid overflowing above uint96
   function setUpVault(Init memory init) public virtual override {
     for (uint256 i = 0; i < N; i++) {
       init.user[i] = makeAddr(Strings.toString(i));
@@ -376,7 +376,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
       vm.assume(_isEOA(user));
 
-      uint256 shares = bound(init.share[i], 0, type(uint104).max);
+      uint256 shares = bound(init.share[i], 0, type(uint88).max);
       try IMockERC20(_underlying_).mint(user, shares) {} catch {
         vm.assume(false);
       }
@@ -388,7 +388,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
         vm.assume(false);
       }
 
-      uint256 assets = bound(init.asset[i], 0, type(uint104).max);
+      uint256 assets = bound(init.asset[i], 0, type(uint88).max);
       try IMockERC20(_underlying_).mint(user, assets) {} catch {
         vm.assume(false);
       }
@@ -398,22 +398,22 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
   }
 
   function _max_deposit(address from) internal virtual override returns (uint256) {
-    if (_unlimitedAmount) return type(uint104).max;
-    return uint104(IERC20(_underlying_).balanceOf(from));
+    if (_unlimitedAmount) return type(uint88).max;
+    return uint88(IERC20(_underlying_).balanceOf(from));
   }
 
   function _max_mint(address from) internal virtual override returns (uint256) {
-    if (_unlimitedAmount) return type(uint112).max;
-    return uint104(vault_convertToShares(IERC20(_underlying_).balanceOf(from)));
+    if (_unlimitedAmount) return type(uint96).max;
+    return uint88(vault_convertToShares(IERC20(_underlying_).balanceOf(from)));
   }
 
   function _max_withdraw(address from) internal virtual override returns (uint256) {
-    if (_unlimitedAmount) return type(uint104).max;
-    return uint104(vault_convertToAssets(IERC20(_vault_).balanceOf(from)));
+    if (_unlimitedAmount) return type(uint88).max;
+    return uint88(vault_convertToAssets(IERC20(_vault_).balanceOf(from)));
   }
 
   function _max_redeem(address from) internal virtual override returns (uint256) {
-    if (_unlimitedAmount) return type(uint104).max;
-    return uint104(IERC20(_vault_).balanceOf(from));
+    if (_unlimitedAmount) return type(uint88).max;
+    return uint88(IERC20(_vault_).balanceOf(from));
   }
 }

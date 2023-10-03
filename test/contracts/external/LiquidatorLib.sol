@@ -157,10 +157,10 @@ library LiquidatorLib {
     uint256 reserve1_1 = FixedMathLib.div(_amountIn1, _liquidityFraction);
 
     // Ensure we can fit K into a uint256
-    // Ensure new virtual reserves fit into uint112
+    // Ensure new virtual reserves fit into uint96
     if (
-      reserve0_1 <= type(uint112).max &&
-      reserve1_1 <= type(uint112).max &&
+      reserve0_1 <= type(uint96).max &&
+      reserve1_1 <= type(uint96).max &&
       uint256(reserve1_1) * reserve0_1 > _minK
     ) {
       reserve0 = uint128(reserve0_1);

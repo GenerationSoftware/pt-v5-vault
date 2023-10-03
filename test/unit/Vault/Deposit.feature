@@ -57,7 +57,7 @@ Feature: Deposit
   # Deposit - Errors
   Scenario: Alice deposits into the Vault
     Given Alice owns 0 Vault shares
-    When Alice deposits type(uint112).max + 1 underlying assets
+    When Alice deposits type(uint96).max + 1 underlying assets
     Then the transaction reverts with the custom error `DepositMoreThanMax`
 
   Scenario: Alice deposits into the Vault
@@ -110,7 +110,7 @@ Feature: Deposit
   # Mint - Errors
   Scenario: Alice mints shares from the Vault
     Given Alice owns 0 Vault shares
-    When Alice mints type(uint112).max + 1 shares
+    When Alice mints type(uint96).max + 1 shares
     Then the transaction reverts with the custom error `MintMoreThanMax`
 
   Scenario: Alice mints shares from the Vault
