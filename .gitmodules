@@ -22,12 +22,12 @@
 [submodule "lib/pt-v5-twab-controller"]
 	path = lib/pt-v5-twab-controller
 	url = https://github.com/generationsoftware/pt-v5-twab-controller
-	branch = main
+	branch = prod-testnet-2
 [submodule "lib/pt-v5-liquidator-interfaces"]
 	path = lib/pt-v5-liquidator-interfaces
 	url = https://github.com/generationsoftware/pt-v5-liquidator-interfaces
-	branch = main
+	branch = prod-testnet-2
 [submodule "lib/pt-v5-claimable-interface"]
 	path = lib/pt-v5-claimable-interface
 	url = https://github.com/GenerationSoftware/pt-v5-claimable-interface
-	branch = main
+	branch = prod-testnet-2
