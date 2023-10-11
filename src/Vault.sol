@@ -508,9 +508,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /**
-   * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_receiver`.
+   * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_owner`.
    * @dev Can't be used to deposit on behalf of another user since `permit` does not accept a receiver parameter.
-   *      Meaning that anyone could reuse the signature and pass an arbitrary `_receiver` to this function.
+   *      Meaning that anyone could reuse the signature and pass an arbitrary receiver to this function.
    * @dev Will revert if the Vault is under-collateralized.
    * @param _assets Amount of assets to approve and deposit
    * @param _owner Address of the owner depositing `_assets` and signing the permit
@@ -518,7 +518,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
    * @param _v V part of the secp256k1 signature
    * @param _r R part of the secp256k1 signature
    * @param _s S part of the secp256k1 signature
-   * @return uint256 Amount of Vault shares minted to `_receiver`.
+   * @return uint256 Amount of Vault shares minted to `_owner`.
    */
   function depositWithPermit(
     uint256 _assets,
@@ -1352,7 +1352,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /* ============ Permit Functions ============ */
 
   /**
-   * @notice Approve `_spender` to spend `_assets` of `_owner`'s `_asset` via signature.
+   * @notice Approve `_spender` to spend `_assets` of `_owner`'s `_permitAsset` via signature.
    * @param _permitAsset Address of the asset to approve
    * @param _owner Address of the owner of the asset
    * @param _spender Address of the spender of the asset
