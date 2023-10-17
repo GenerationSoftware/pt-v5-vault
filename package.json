@@ -1,14 +1,14 @@
 {
-  "name": "@pooltogether/foundry-template",
+  "name": "@generationsoftware/pt-v5-vault",
   "version": "1.0.0",
-  "description": "Template to kickstart a Foundry project",
+  "description": "PoolTogether V5 Vault contracts",
   "author": {
-    "name": "PoolTogether Inc.",
-    "url": "https://github.com/pooltogether"
+    "name": "G9 Software Inc.",
+    "url": "https://github.com/generationsoftware"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pooltogether/foundry-template.git"
+    "url": "git+https://github.com/generationsoftware/pt-v5-vault.git"
   },
   "scripts": {
     "clean": "forge clean",

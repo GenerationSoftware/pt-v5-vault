@@ -17,7 +17,7 @@ import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
 /**
  * @title  PoolTogether V5 Vault
- * @author PoolTogether Inc Team, Generation Software Team
+ * @author PoolTogether Inc. & G9 Software Inc.
  * @notice Vault extends the ERC4626 standard and is the entry point for users interacting with a V5 pool.
  *         Users deposit an underlying asset (i.e. USDC) in this contract and receive in exchange an ERC20 token
  *         representing their share of deposit in the vault.
@@ -447,8 +447,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /// @inheritdoc IERC4626
-  function convertToAssets(uint256 shares) external view virtual override returns (uint256) {
-    return _convertToAssets(shares, _totalSupply(), _totalAssets(), Math.Rounding.Down);
+  function convertToAssets(uint256 _shares) external view virtual override returns (uint256) {
+    return _convertToAssets(_shares, _totalSupply(), _totalAssets(), Math.Rounding.Down);
   }
 
   /* ============ Max / Preview Functions ============ */
@@ -488,8 +488,8 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   }
 
   /// @inheritdoc IERC4626
-  function maxRedeem(address owner) external view virtual override returns (uint256) {
-    return _maxRedeem(owner);
+  function maxRedeem(address _owner) external view virtual override returns (uint256) {
+    return _maxRedeem(_owner);
   }
 
   /// @inheritdoc IERC4626
