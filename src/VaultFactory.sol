@@ -9,7 +9,7 @@ import { Vault } from "./Vault.sol";
 
 /**
  * @title  PoolTogether V5 Vault Factory
- * @author PoolTogether Inc Team, Generation Software Team
+ * @author PoolTogether Inc. & G9 Software Inc.
  * @notice Factory contract for deploying new vaults using a standard underlying ERC4626 yield vault.
  */
 contract VaultFactory {
