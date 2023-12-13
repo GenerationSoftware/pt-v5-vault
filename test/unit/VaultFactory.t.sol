@@ -69,7 +69,7 @@ contract VaultFactoryTest is Test {
     assertEq(address(Vault(_vault).asset()), address(asset));
 
     assertEq(vaultFactory.totalVaults(), 1);
-    assertTrue(vaultFactory.deployedVaults(Vault(_vault)));
+    assertTrue(vaultFactory.deployedVaults(address(_vault)));
   }
 
   function testDeployVault_secondDeployShouldHaveDiffAddress() public {
