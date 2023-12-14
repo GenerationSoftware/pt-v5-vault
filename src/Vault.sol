@@ -670,8 +670,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
     _onlyVaultCollateralized(_depositedAssets, _withdrawableAssets);
 
-    uint256 _availableYield = _withdrawableAssets -
-      _convertToAssets(_depositedAssets, _depositedAssets, _withdrawableAssets, Math.Rounding.Down);
+    uint256 _availableYield = _withdrawableAssets - _depositedAssets;
 
     if (_shares > _availableYield) revert YieldFeeGTAvailableYield(_shares, _availableYield);
     if (_shares > _yieldFeeShares) revert YieldFeeGTAvailableShares(_shares, _yieldFeeShares);
