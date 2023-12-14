@@ -301,6 +301,23 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /// @notice Emitted when a prize is claimed for the zero address.
   error ClaimRecipientZeroAddress();
 
+  /**
+   * @notice Emitted when the caller of a permit function is not the owner of the assets being permitted.
+   * @param caller The address of the caller
+   * @param owner The address of the owner
+   */
+  error PermitCallerNotOwner(address caller, address owner);
+
+  /**
+   * @notice Emitted when a permit call on the underlying asset failed to set the spending allowance.
+   * @dev This is likely thrown when the underlying asset does not support permit, but has a fallback function.
+   * @param owner The owner of the assets
+   * @param spender The spender of the assets
+   * @param amount The amount of assets permitted
+   * @param allowance The allowance after the permit was called
+   */
+  error PermitAllowanceNotSet(address owner, address spender, uint256 amount, uint256 allowance);
+
   /* ============ Modifiers ============ */
 
   /// @notice Modifier reverting if the Vault is under-collateralized.
@@ -528,7 +545,17 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(address(_asset)), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    if (_owner != msg.sender) {
+      revert PermitCallerNotOwner(msg.sender, _owner);
+    }
+
+    IERC20Permit(address(_asset)).permit(_owner, address(this), _assets, _deadline, _v, _r, _s);
+
+    uint256 _allowance = _asset.allowance(_owner, address(this));
+    if (_allowance != _assets) {
+      revert PermitAllowanceNotSet(_owner, address(this), _assets, _allowance);
+    }
+
     return _depositAssets(_assets, _owner, _owner, false);
   }
 
@@ -1347,32 +1374,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
 
     return _assets;
-  }
-
-  /* ============ Permit Functions ============ */
-
-  /**
-   * @notice Approve `_spender` to spend `_assets` of `_owner`'s `_permitAsset` via signature.
-   * @param _permitAsset Address of the asset to approve
-   * @param _owner Address of the owner of the asset
-   * @param _spender Address of the spender of the asset
-   * @param _assets Amount of assets to approve
-   * @param _deadline Timestamp after which the approval is no longer valid
-   * @param _v V part of the secp256k1 signature
-   * @param _r R part of the secp256k1 signature
-   * @param _s S part of the secp256k1 signature
-   */
-  function _permit(
-    IERC20Permit _permitAsset,
-    address _owner,
-    address _spender,
-    uint256 _assets,
-    uint256 _deadline,
-    uint8 _v,
-    bytes32 _r,
-    bytes32 _s
-  ) internal {
-    _permitAsset.permit(_owner, _spender, _assets, _deadline, _v, _r, _s);
   }
 
   /* ============ State Functions ============ */
