@@ -78,7 +78,7 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
     liquidationRouter = new LiquidationRouterMock();
 
     _delta_ = 0;
-    _vaultMayBeEmpty = false;
+    _vaultMayBeEmpty = true;
     _unlimitedAmount = true;
   }
 
@@ -376,7 +376,8 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
 
       vm.assume(_isEOA(user));
 
-      uint256 shares = bound(init.share[i], 0, type(uint88).max);
+      init.share[i] = bound(init.share[i], 0, type(uint88).max);
+      uint256 shares = init.share[i];
       try IMockERC20(_underlying_).mint(user, shares) {} catch {
         vm.assume(false);
       }
@@ -388,7 +389,8 @@ contract VaultFuzzTest is ERC4626Test, Helpers {
         vm.assume(false);
       }
 
-      uint256 assets = bound(init.asset[i], 0, type(uint88).max);
+      init.asset[i] = bound(init.asset[i], 0, type(uint88).max);
+      uint256 assets = init.asset[i];
       try IMockERC20(_underlying_).mint(user, assets) {} catch {
         vm.assume(false);
       }

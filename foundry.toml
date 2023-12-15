@@ -4,7 +4,12 @@ out = 'out'
 test = 'test'
 libs = ['lib']
 solc = "0.8.19"
-fs_permissions = [{ access = "read", path = "./broadcast" }]
+fs_permissions = [
+  { access = "read", path = "./broadcast" },
+  { access = "read", path = "./out/Vault.sol/Vault.json" },
+  { access = "read", path = "./cache/txList.txt" },
+  { access = "read-write", path = "./cache/testedTxList.txt" }
+]
 gas_reports = ["Vault", "VaultFactory"]
 
 [fuzz]
