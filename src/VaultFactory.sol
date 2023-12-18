@@ -31,7 +31,7 @@ contract VaultFactory {
    * @notice Mapping to verify if a Vault has been deployed via this factory.
    * @dev Vault address => boolean
    */
-  mapping(Vault => bool) public deployedVaults;
+  mapping(address => bool) public deployedVaults;
 
   /**
    * @notice Mapping to store deployer nonces for CREATE2
@@ -80,7 +80,7 @@ contract VaultFactory {
     );
 
     allVaults.push(_vault);
-    deployedVaults[_vault] = true;
+    deployedVaults[address(_vault)] = true;
 
     emit NewFactoryVault(_vault, VaultFactory(address(this)));
 
