@@ -1073,38 +1073,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
       _collateralAssets == 0 ? 0 : _shares.mulDiv(_collateralAssets, _depositedAssets, _rounding);
   }
 
-  /**
-   * @notice Convert Vault shares to YieldVault shares.
-   * @param _shares Vault shares to convert
-   * @param _depositedAssets Assets deposited into the YieldVault
-   * @param _withdrawableAssets Assets withdrawable from the YieldVault
-   * @param _maxRedeemableYVShares Maximum amount of shares that can be redeemed from the YieldVault
-   * @param _rounding Rounding mode (i.e. down or up)
-   * @return uint256 YieldVault shares
-   */
-  function _convertSharesToYVShares(
-    uint256 _shares,
-    uint256 _depositedAssets,
-    uint256 _withdrawableAssets,
-    uint256 _maxRedeemableYVShares,
-    Math.Rounding _rounding
-  ) internal view returns (uint256) {
-    if (_shares == 0) {
-      return _shares;
-    }
-
-    if (_depositedAssets == 0) {
-      return _yieldVault.convertToShares(_shares);
-    }
-
-    uint256 _redeemableShares = _isVaultCollateralized(_depositedAssets, _withdrawableAssets)
-      ? _depositedAssets // shares are backed 1:1 by assets, no need to convert to YieldVault shares
-      : _maxRedeemableYVShares;
-
-    return
-      _redeemableShares == 0 ? 0 : _shares.mulDiv(_redeemableShares, _depositedAssets, _rounding);
-  }
-
   /* ============ Max / Preview Functions ============ */
 
   /**
@@ -1317,11 +1285,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint256 _yieldVaultShares;
 
     if (!_vaultCollateralized) {
-      _yieldVaultShares = _convertSharesToYVShares(
-        _shares,
-        _totalSupply(),
-        _totalAssets(),
+      _yieldVaultShares = _shares.mulDiv(
         _yieldVault.maxRedeem(address(this)),
+        _totalSupply(),
         Math.Rounding.Down
       );
     }
