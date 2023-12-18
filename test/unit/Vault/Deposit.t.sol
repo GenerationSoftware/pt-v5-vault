@@ -147,7 +147,7 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
     vm.stopPrank();
   }
 
-  function testDepositWithPermitByThirdParty() external {
+  function testDepositWithPermitByThirdParty_CallerNotOwner() external {
     vm.startPrank(alice);
 
     uint256 _amount = 1000e18;
@@ -163,22 +163,11 @@ contract VaultDepositTest is UnitBaseSetup, BrokenToken {
 
     vm.stopPrank();
 
-    vm.expectEmit();
-    emit Transfer(address(0), alice, _amount);
-
-    vm.expectEmit();
-    emit Deposit(alice, alice, _amount, _amount);
+    vm.expectRevert(
+      abi.encodeWithSelector(Vault.PermitCallerNotOwner.selector, address(this), alice)
+    );
 
     _depositWithPermit(vault, _amount, alice, _v, _r, _s);
-
-    assertEq(vault.balanceOf(alice), _amount);
-
-    assertEq(twabController.balanceOf(address(vault), alice), _amount);
-    assertEq(twabController.delegateBalanceOf(address(vault), alice), _amount);
-
-    assertEq(underlyingAsset.balanceOf(address(yieldVault)), _amount);
-    assertEq(yieldVault.balanceOf(address(vault)), _amount);
-    assertEq(yieldVault.totalSupply(), _amount);
   }
 
   /* ============ Deposit - Errors ============ */
