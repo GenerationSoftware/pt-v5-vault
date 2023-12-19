@@ -16,7 +16,7 @@ import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol"
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
 /**
- * @title  PoolTogether V5 Vault
+ * @title  PoolTogether V5 Vault (Version 2)
  * @author PoolTogether Inc. & G9 Software Inc.
  * @notice Vault extends the ERC4626 standard and is the entry point for users interacting with a V5 pool.
  *         Users deposit an underlying asset (i.e. USDC) in this contract and receive in exchange an ERC20 token
@@ -25,7 +25,7 @@ import { VaultHooks } from "./interfaces/IVaultHooks.sol";
  *         This yield is sold for prize tokens (i.e. POOL) via the Liquidator and captured by the PrizePool to be awarded to depositors.
  * @dev    Balances are stored in the TwabController contract.
  */
-contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable {
+contract VaultV2 is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable {
   using Math for uint256;
   using SafeCast for uint256;
   using SafeERC20 for IERC20;

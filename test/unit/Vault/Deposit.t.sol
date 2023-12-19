@@ -5,7 +5,7 @@ import { BrokenToken } from "brokentoken/BrokenToken.sol";
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { IERC20, UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
-import "../../../src/Vault.sol";
+import { VaultV2 as Vault } from "../../../src/Vault.sol";
 
 contract VaultDepositTest is UnitBaseSetup, BrokenToken {
   /* ============ Events ============ */
