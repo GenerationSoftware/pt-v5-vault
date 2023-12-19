@@ -18,16 +18,16 @@
 [submodule "lib/pt-v5-prize-pool"]
 	path = lib/pt-v5-prize-pool
 	url = https://github.com/GenerationSoftware/pt-v5-prize-pool
-	branch = prod-testnet-3
+	branch = prod-deploy-2
 [submodule "lib/pt-v5-twab-controller"]
 	path = lib/pt-v5-twab-controller
 	url = https://github.com/generationsoftware/pt-v5-twab-controller
-	branch = prod-testnet-3
+	branch = prod-deploy-2
 [submodule "lib/pt-v5-liquidator-interfaces"]
 	path = lib/pt-v5-liquidator-interfaces
 	url = https://github.com/generationsoftware/pt-v5-liquidator-interfaces
-	branch = prod-testnet-3
+	branch = prod-deploy-2
 [submodule "lib/pt-v5-claimable-interface"]
 	path = lib/pt-v5-claimable-interface
 	url = https://github.com/GenerationSoftware/pt-v5-claimable-interface
-	branch = prod-testnet-3
+	branch = prod-deploy-2

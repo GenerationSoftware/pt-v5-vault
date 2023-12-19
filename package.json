@@ -1,6 +1,6 @@
 {
   "name": "@generationsoftware/pt-v5-vault",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "PoolTogether V5 Vault contracts",
   "author": {
     "name": "G9 Software Inc.",
@@ -24,8 +24,8 @@
   },
   "devDependencies": {
     "husky": "8.0.3",
-    "lint-staged": "14.0.1",
-    "prettier": "3.0.3",
+    "lint-staged": "15.0.0",
+    "prettier": "2.8.8",
     "prettier-plugin-solidity": "1.1.3",
     "solhint": "3.6.2",
     "solhint-plugin-prettier": "0.0.5"

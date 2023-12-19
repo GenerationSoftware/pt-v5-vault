@@ -10,7 +10,7 @@ import { Strings } from "openzeppelin/utils/Strings.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
-import { Vault } from "../../src/Vault.sol";
+import { VaultV2 as Vault } from "../../src/Vault.sol";
 
 import { LiquidationPairMock } from "../contracts/mock/LiquidationPairMock.sol";
 import { LiquidationRouterMock } from "../contracts/mock/LiquidationRouterMock.sol";

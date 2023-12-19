@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { UnitBaseSetup, IERC20 } from "../../utils/UnitBaseSetup.t.sol";
-import { Vault } from "../../../src/Vault.sol";
+import { VaultV2 as Vault } from "../../../src/Vault.sol";
 
 contract VaultWithdrawTest is UnitBaseSetup {
   /* ============ Events ============ */

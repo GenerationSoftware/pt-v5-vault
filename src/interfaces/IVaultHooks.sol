@@ -21,6 +21,8 @@ interface IVaultHooks {
    * @param winner The user who won the prize and for whom this hook is attached
    * @param tier The tier of the prize
    * @param prizeIndex The index of the prize in the tier
+   * @param fee The fee portion of the prize that will be allocated to the claimer
+   * @param feeRecipient The recipient of the claim fee
    * @return address The address of the recipient of the prize
    */
   function beforeClaimPrize(

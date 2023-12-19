@@ -2,7 +2,10 @@
 pragma solidity ^0.8.19;
 
 import { UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
-import "../../../src/Vault.sol";
+import { VaultV2 as Vault } from "../../../src/Vault.sol";
+import { IERC4626 } from "openzeppelin/interfaces/IERC4626.sol";
+import { IERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
+import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 
 contract VaultUndercollateralizationTest is UnitBaseSetup {
   /* ============ Tests ============ */

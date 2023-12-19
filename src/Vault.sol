@@ -16,7 +16,7 @@ import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol"
 import { VaultHooks } from "./interfaces/IVaultHooks.sol";
 
 /**
- * @title  PoolTogether V5 Vault
+ * @title  PoolTogether V5 Vault (Version 2)
  * @author PoolTogether Inc. & G9 Software Inc.
  * @notice Vault extends the ERC4626 standard and is the entry point for users interacting with a V5 pool.
  *         Users deposit an underlying asset (i.e. USDC) in this contract and receive in exchange an ERC20 token
@@ -25,7 +25,7 @@ import { VaultHooks } from "./interfaces/IVaultHooks.sol";
  *         This yield is sold for prize tokens (i.e. POOL) via the Liquidator and captured by the PrizePool to be awarded to depositors.
  * @dev    Balances are stored in the TwabController contract.
  */
-contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable {
+contract VaultV2 is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable {
   using Math for uint256;
   using SafeCast for uint256;
   using SafeERC20 for IERC20;
@@ -301,6 +301,23 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
   /// @notice Emitted when a prize is claimed for the zero address.
   error ClaimRecipientZeroAddress();
 
+  /**
+   * @notice Emitted when the caller of a permit function is not the owner of the assets being permitted.
+   * @param caller The address of the caller
+   * @param owner The address of the owner
+   */
+  error PermitCallerNotOwner(address caller, address owner);
+
+  /**
+   * @notice Emitted when a permit call on the underlying asset failed to set the spending allowance.
+   * @dev This is likely thrown when the underlying asset does not support permit, but has a fallback function.
+   * @param owner The owner of the assets
+   * @param spender The spender of the assets
+   * @param amount The amount of assets permitted
+   * @param allowance The allowance after the permit was called
+   */
+  error PermitAllowanceNotSet(address owner, address spender, uint256 amount, uint256 allowance);
+
   /* ============ Modifiers ============ */
 
   /// @notice Modifier reverting if the Vault is under-collateralized.
@@ -528,7 +545,17 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     bytes32 _r,
     bytes32 _s
   ) external returns (uint256) {
-    _permit(IERC20Permit(address(_asset)), _owner, address(this), _assets, _deadline, _v, _r, _s);
+    if (_owner != msg.sender) {
+      revert PermitCallerNotOwner(msg.sender, _owner);
+    }
+
+    IERC20Permit(address(_asset)).permit(_owner, address(this), _assets, _deadline, _v, _r, _s);
+
+    uint256 _allowance = _asset.allowance(_owner, address(this));
+    if (_allowance != _assets) {
+      revert PermitAllowanceNotSet(_owner, address(this), _assets, _allowance);
+    }
+
     return _depositAssets(_assets, _owner, _owner, false);
   }
 
@@ -670,8 +697,7 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
 
     _onlyVaultCollateralized(_depositedAssets, _withdrawableAssets);
 
-    uint256 _availableYield = _withdrawableAssets -
-      _convertToAssets(_depositedAssets, _depositedAssets, _withdrawableAssets, Math.Rounding.Down);
+    uint256 _availableYield = _withdrawableAssets - _depositedAssets;
 
     if (_shares > _availableYield) revert YieldFeeGTAvailableYield(_shares, _availableYield);
     if (_shares > _yieldFeeShares) revert YieldFeeGTAvailableShares(_shares, _yieldFeeShares);
@@ -1073,38 +1099,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
       _collateralAssets == 0 ? 0 : _shares.mulDiv(_collateralAssets, _depositedAssets, _rounding);
   }
 
-  /**
-   * @notice Convert Vault shares to YieldVault shares.
-   * @param _shares Vault shares to convert
-   * @param _depositedAssets Assets deposited into the YieldVault
-   * @param _withdrawableAssets Assets withdrawable from the YieldVault
-   * @param _maxRedeemableYVShares Maximum amount of shares that can be redeemed from the YieldVault
-   * @param _rounding Rounding mode (i.e. down or up)
-   * @return uint256 YieldVault shares
-   */
-  function _convertSharesToYVShares(
-    uint256 _shares,
-    uint256 _depositedAssets,
-    uint256 _withdrawableAssets,
-    uint256 _maxRedeemableYVShares,
-    Math.Rounding _rounding
-  ) internal view returns (uint256) {
-    if (_shares == 0) {
-      return _shares;
-    }
-
-    if (_depositedAssets == 0) {
-      return _yieldVault.convertToShares(_shares);
-    }
-
-    uint256 _redeemableShares = _isVaultCollateralized(_depositedAssets, _withdrawableAssets)
-      ? _depositedAssets // shares are backed 1:1 by assets, no need to convert to YieldVault shares
-      : _maxRedeemableYVShares;
-
-    return
-      _redeemableShares == 0 ? 0 : _shares.mulDiv(_redeemableShares, _depositedAssets, _rounding);
-  }
-
   /* ============ Max / Preview Functions ============ */
 
   /**
@@ -1317,11 +1311,9 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     uint256 _yieldVaultShares;
 
     if (!_vaultCollateralized) {
-      _yieldVaultShares = _convertSharesToYVShares(
-        _shares,
-        _totalSupply(),
-        _totalAssets(),
+      _yieldVaultShares = _shares.mulDiv(
         _yieldVault.maxRedeem(address(this)),
+        _totalSupply(),
         Math.Rounding.Down
       );
     }
@@ -1347,32 +1339,6 @@ contract Vault is IERC4626, ERC20Permit, ILiquidationSource, IClaimable, Ownable
     emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
 
     return _assets;
-  }
-
-  /* ============ Permit Functions ============ */
-
-  /**
-   * @notice Approve `_spender` to spend `_assets` of `_owner`'s `_permitAsset` via signature.
-   * @param _permitAsset Address of the asset to approve
-   * @param _owner Address of the owner of the asset
-   * @param _spender Address of the spender of the asset
-   * @param _assets Amount of assets to approve
-   * @param _deadline Timestamp after which the approval is no longer valid
-   * @param _v V part of the secp256k1 signature
-   * @param _r R part of the secp256k1 signature
-   * @param _s S part of the secp256k1 signature
-   */
-  function _permit(
-    IERC20Permit _permitAsset,
-    address _owner,
-    address _spender,
-    uint256 _assets,
-    uint256 _deadline,
-    uint8 _v,
-    bytes32 _r,
-    bytes32 _s
-  ) internal {
-    _permitAsset.permit(_owner, _spender, _assets, _deadline, _v, _r, _s);
   }
 
   /* ============ State Functions ============ */

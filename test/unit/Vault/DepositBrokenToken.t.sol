@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { UnitBrokenTokenBaseSetup } from "../../utils/UnitBrokenTokenBaseSetup.t.sol";
-import "../../../src/Vault.sol";
+import { VaultV2 as Vault } from "../../../src/Vault.sol";
 
 contract VaultDepositBrokenTokenTest is UnitBrokenTokenBaseSetup {
   /* ============ Events ============ */
