@@ -13,7 +13,7 @@ import { LiquidationRouterMock } from "../contracts/mock/LiquidationRouterMock.s
 import { PrizePoolMock } from "../contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "../contracts/mock/YieldVault.sol";
 
-import { Vault } from "../../src/Vault.sol";
+import { VaultV2 as Vault } from "../../src/Vault.sol";
 
 import { Helpers } from "./Helpers.t.sol";
 

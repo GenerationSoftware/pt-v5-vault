@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { IERC20, UnitBaseSetup } from "../../utils/UnitBaseSetup.t.sol";
-import "../../../src/Vault.sol";
+import { VaultV2 as Vault } from "../../../src/Vault.sol";
 
 import { ERC20PermitFallbackMock } from "../../contracts/mock/ERC20PermitFallbackMock.sol";
 import { ERC20PermitMock } from "../../contracts/mock/ERC20PermitMock.sol";

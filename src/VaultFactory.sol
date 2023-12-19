@@ -5,14 +5,14 @@ import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.so
 
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 
-import { Vault } from "./Vault.sol";
+import { VaultV2 as Vault } from "./Vault.sol";
 
 /**
- * @title  PoolTogether V5 Vault Factory
+ * @title  PoolTogether V5 Vault Factory (Version 2)
  * @author PoolTogether Inc. & G9 Software Inc.
  * @notice Factory contract for deploying new vaults using a standard underlying ERC4626 yield vault.
  */
-contract VaultFactory {
+contract VaultFactoryV2 {
   /* ============ Events ============ */
 
   /**
@@ -20,7 +20,7 @@ contract VaultFactory {
    * @param vault Address of the vault that was deployed
    * @param vaultFactory Address of the VaultFactory that deployed `vault`
    */
-  event NewFactoryVault(Vault indexed vault, VaultFactory indexed vaultFactory);
+  event NewFactoryVault(Vault indexed vault, VaultFactoryV2 indexed vaultFactory);
 
   /* ============ Variables ============ */
 
@@ -82,7 +82,7 @@ contract VaultFactory {
     allVaults.push(_vault);
     deployedVaults[address(_vault)] = true;
 
-    emit NewFactoryVault(_vault, VaultFactory(address(this)));
+    emit NewFactoryVault(_vault, VaultFactoryV2(address(this)));
 
     return address(_vault);
   }
