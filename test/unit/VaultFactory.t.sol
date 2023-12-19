@@ -9,8 +9,8 @@ import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
-import { VaultFactory } from "../../src/VaultFactory.sol";
-import { Vault } from "../../src/Vault.sol";
+import { VaultFactoryV2 as VaultFactory } from "../../src/VaultFactory.sol";
+import { VaultV2 as Vault } from "../../src/Vault.sol";
 import { PrizePoolMock, IERC20 } from "../contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "../contracts/mock/YieldVault.sol";
 
@@ -69,7 +69,7 @@ contract VaultFactoryTest is Test {
     assertEq(address(Vault(_vault).asset()), address(asset));
 
     assertEq(vaultFactory.totalVaults(), 1);
-    assertTrue(vaultFactory.deployedVaults(Vault(_vault)));
+    assertTrue(vaultFactory.deployedVaults(address(_vault)));
   }
 
   function testDeployVault_secondDeployShouldHaveDiffAddress() public {

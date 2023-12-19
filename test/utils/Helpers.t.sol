@@ -8,7 +8,7 @@ import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 
-import { IERC4626, Vault } from "../../src/Vault.sol";
+import { IERC4626, VaultV2 as Vault } from "../../src/Vault.sol";
 
 import { LiquidationPairMock } from "../contracts/mock/LiquidationPairMock.sol";
 import { LiquidationRouterMock } from "../contracts/mock/LiquidationRouterMock.sol";
