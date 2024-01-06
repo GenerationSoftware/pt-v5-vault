@@ -5,27 +5,27 @@ import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.so
 
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 
-import { VaultV2 as Vault } from "./Vault.sol";
+import { LendingVault } from "./LendingVault.sol";
 
 /**
- * @title  PoolTogether V5 Vault Factory (Version 2)
+ * @title  PoolTogether V5 Lending Vault Factory
  * @author PoolTogether Inc. & G9 Software Inc.
- * @notice Factory contract for deploying new vaults using a standard underlying ERC4626 yield vault.
+ * @notice Factory contract for deploying new lending vaults using a standard underlying ERC4626 yield vault.
  */
-contract VaultFactoryV2 {
+contract LendingVaultFactory {
   /* ============ Events ============ */
 
   /**
    * @notice Emitted when a new Vault has been deployed by this factory.
    * @param vault Address of the vault that was deployed
-   * @param vaultFactory Address of the VaultFactory that deployed `vault`
+   * @param vaultFactory Address of the factory that deployed `vault`
    */
-  event NewFactoryVault(Vault indexed vault, VaultFactoryV2 indexed vaultFactory);
+  event NewFactoryVault(LendingVault indexed vault, LendingVaultFactory indexed vaultFactory);
 
   /* ============ Variables ============ */
 
   /// @notice List of all vaults deployed by this factory.
-  Vault[] public allVaults;
+  LendingVault[] public allVaults;
 
   /**
    * @notice Mapping to verify if a Vault has been deployed via this factory.
@@ -43,7 +43,6 @@ contract VaultFactoryV2 {
   /**
    * @notice Deploy a new vault
    * @dev `claimer` can be set to address zero if none is available yet.
-   * @param _asset Address of the underlying asset used by the vault
    * @param _name Name of the ERC20 share minted by the vault
    * @param _symbol Symbol of the ERC20 share minted by the vault
    * @param _yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
@@ -55,7 +54,6 @@ contract VaultFactoryV2 {
    * @return address Address of the newly deployed Vault
    */
   function deployVault(
-    IERC20 _asset,
     string memory _name,
     string memory _symbol,
     IERC4626 _yieldVault,
@@ -65,10 +63,9 @@ contract VaultFactoryV2 {
     uint32 _yieldFeePercentage,
     address _owner
   ) external returns (address) {
-    Vault _vault = new Vault{
+    LendingVault _vault = new LendingVault{
       salt: keccak256(abi.encode(msg.sender, deployerNonces[msg.sender]++))
     }(
-      _asset,
       _name,
       _symbol,
       _yieldVault,
@@ -82,7 +79,7 @@ contract VaultFactoryV2 {
     allVaults.push(_vault);
     deployedVaults[address(_vault)] = true;
 
-    emit NewFactoryVault(_vault, VaultFactoryV2(address(this)));
+    emit NewFactoryVault(_vault, LendingVaultFactory(address(this)));
 
     return address(_vault);
   }
