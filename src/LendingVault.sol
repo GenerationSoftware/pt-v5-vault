@@ -634,6 +634,8 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
      * @dev Returns the full excess asset balance if the fee percentage has been set to
      * 100%. This enables LPs to be bypassed on 100% fee vaults.
      * @dev Limits the accrued fee to the amount of excess assets available in the vault.
+     * This ensures that the yield fee is used to make depositors whole in the case of an
+     * asset shortage.
      * @return The accrued yield fee balance.
      */
     function yieldFeeBalance() public view returns (uint256) {
