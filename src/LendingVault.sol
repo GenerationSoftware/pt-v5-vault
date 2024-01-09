@@ -6,13 +6,12 @@ import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
-import { HookManager } from "./abstract/HookManager.sol";
+import { Claimable } from "./abstract/Claimable.sol";
 import { TwabERC20, ERC20, IERC20, IERC20Metadata, IERC20Permit } from "./TwabERC20.sol";
 
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
-import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol";
 
 /**
  * @title  PoolTogether V5 Lending Vault
@@ -24,7 +23,7 @@ import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol"
  *         a depositor's ability to withdraw assets or redeem shares is dependent on underlying market conditions.
  * @dev    Balances are stored in the TwabController contract.
  */
-contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, IClaimable, Ownable {
+contract LendingVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -33,15 +32,8 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
     /// @notice The yield fee decimal precision.
     uint32 public constant FEE_PRECISION = 1e9;
 
-    /// @notice The gas to give to each of the before and after prize claim hooks.
-    /// @dev This should be enough gas to mint an NFT if needed.
-    uint24 public constant HOOK_GAS = 150_000;
-
     /// @notice Address of the underlying ERC4626 vault generating yield.
     IERC4626 public immutable yieldVault;
-
-    /// @notice Address of the PrizePool that computes prizes.
-    PrizePool public immutable prizePool;
 
     /// @notice Yield fee percentage represented in integer format with decimal precision defined by `FEE_PRECISION`.
     /// @dev For example, if `FEE_PRECISION` were 1e9 a value of 1e7 = 0.01 = 1%.
@@ -49,9 +41,6 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
 
     /// @notice Address of the yield fee recipient.
     address public yieldFeeRecipient;
-
-    /// @notice Address of the claimer.
-    address public claimer;
 
     /// @notice Address of the liquidation pair used to liquidate yield for prize token.
     address public liquidationPair;
@@ -124,9 +113,6 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
     /// @notice Thrown when the Yield Vault is set to the zero address.
     error YieldVaultZeroAddress();
 
-    /// @notice Thrown when the Prize Pool is set to the zero address.
-    error PrizePoolZeroAddress();
-
     /// @notice Thrown when the Owner is set to the zero address.
     error OwnerZeroAddress();
 
@@ -145,27 +131,14 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
     /// @notice Thrown if `totalAssets` is zero during a withdraw
     error ZeroTotalAssets();
 
-    /// @notice Thrown when the Claimer is set to the zero address.
-    error ClaimerZeroAddress();
-
     /// @notice Thrown when the Liquidation Pair being set is the zero address.
     error LPZeroAddress();
 
     /// @notice Thrown when `sweep` is called but no underlying assets are currently held by the Vault.
     error SweepZeroAssets();
 
-    /// @notice Thrown when a prize is claimed for the zero address.
-    error ClaimRecipientZeroAddress();
-
     /// @notice Thrown during the liquidation process when the liquidation amount out is zero.
     error LiquidationAmountOutZero();
-
-    /**
-     * @notice Thrown when the caller is not the prize claimer.
-     * @param caller The caller address
-     * @param claimer The claimer address
-     */
-    error CallerNotClaimer(address caller, address claimer);
 
     /**
      * @notice Thrown during the liquidation process when the caller is not the liquidation pair contract.
@@ -213,18 +186,6 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
     error LiquidationTokenInNotPrizeToken(address tokenIn, address prizeToken);
 
     /**
-     * @notice Thrown when the BeforeClaim prize hook fails
-     * @param reason The revert reason that was thrown
-     */
-    error BeforeClaimPrizeFailed(bytes reason);
-
-    /**
-     * @notice Thrown when the AfterClaim prize hook fails
-     * @param reason The revert reason that was thrown
-     */
-    error AfterClaimPrizeFailed(bytes reason);
-
-    /**
      * @notice Thrown when the fee being withdrawn exceeds the available yield fee balance.
      * @param amount The fee being withdrawn
      * @param yieldFeeBalance The available yield fee balance
@@ -246,12 +207,6 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
     error LiquidationAmountOutGtYield(uint256 amountOut, uint256 availableYield);
 
     /* ============ Modifiers ============ */
-
-    /// @notice Requires the caller to be the claimer.
-    modifier onlyClaimer() {
-        if (msg.sender != claimer) revert CallerNotClaimer(msg.sender, claimer);
-        _;
-    }
 
     /// @notice Requires the caller to be the liquidation pair.
     modifier onlyLiquidationPair() {
@@ -291,12 +246,9 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
         address yieldFeeRecipient_,
         uint32 yieldFeePercentage_,
         address owner_
-    ) TwabERC20(name_, symbol_, prizePool_.twabController()) Ownable(owner_) {
+    ) TwabERC20(name_, symbol_, prizePool_.twabController()) Claimable(prizePool_, claimer_) Ownable(owner_) {
         if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
-        if (address(prizePool_) == address(0)) revert PrizePoolZeroAddress();
         if (owner_ == address(0)) revert OwnerZeroAddress();
-
-        _setClaimer(claimer_);
 
         IERC20 asset_ = IERC20(yieldVault_.asset());
         (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(asset_);
@@ -304,7 +256,6 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
         _asset = asset_;
 
         yieldVault = yieldVault_;
-        prizePool = prizePool_;
 
         _setYieldFeeRecipient(yieldFeeRecipient_);
         _setYieldFeePercentage(yieldFeePercentage_);
@@ -543,72 +494,6 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
         emit Sweep(msg.sender, _assets);
 
         return _assets;
-    }
-
-    /* ============ Claim Functions ============ */
-
-    /**
-     * @notice Claim prize for a winner
-     * @param _winner The winner of the prize
-     * @param _tier The prize tier
-     * @param _prizeIndex The prize index
-     * @param _fee The fee to charge
-     * @param _feeRecipient The recipient of the fee
-     * @return The total prize amount claimed. Zero if already claimed.
-     */
-    function claimPrize(
-        address _winner,
-        uint8 _tier,
-        uint32 _prizeIndex,
-        uint96 _fee,
-        address _feeRecipient
-    ) external onlyClaimer returns (uint256) {
-        address recipient;
-
-        if (_hooks[_winner].useBeforeClaimPrize) {
-            try
-                _hooks[_winner].implementation.beforeClaimPrize{ gas: HOOK_GAS }(
-                    _winner,
-                    _tier,
-                    _prizeIndex,
-                    _fee,
-                    _feeRecipient
-                )
-            returns (address result) {
-                recipient = result;
-            } catch (bytes memory reason) {
-                revert BeforeClaimPrizeFailed(reason);
-            }
-        } else {
-            recipient = _winner;
-        }
-
-        if (recipient == address(0)) revert ClaimRecipientZeroAddress();
-
-        uint256 prizeTotal = prizePool.claimPrize(
-            _winner,
-            _tier,
-            _prizeIndex,
-            recipient,
-            _fee,
-            _feeRecipient
-        );
-
-        if (_hooks[_winner].useAfterClaimPrize) {
-            try
-                _hooks[_winner].implementation.afterClaimPrize{ gas: HOOK_GAS }(
-                    _winner,
-                    _tier,
-                    _prizeIndex,
-                    prizeTotal,
-                    recipient
-                )
-            {} catch (bytes memory reason) {
-                revert AfterClaimPrizeFailed(reason);
-            }
-        }
-
-        return prizeTotal;
     }
 
     /* ============ Yield Functions ============ */
@@ -881,17 +766,6 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
         yieldVault.withdraw(_assets, _receiver, address(this));
 
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
-    }
-
-    /**
-     * @notice Set claimer address.
-     * @dev Will revert if `_claimer` is address zero.
-     * @param _claimer Address of the claimer
-     */
-    function _setClaimer(address _claimer) internal {
-        if (_claimer == address(0)) revert ClaimerZeroAddress();
-        claimer = _claimer;
-        emit ClaimerSet(_claimer);
     }
 
     /**
