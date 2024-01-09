@@ -425,7 +425,7 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
             return _assets;
         } else {
             // Follows the same conversion as `convertToAssets`
-            return _assets.mulDiv(_totalSupply, _totalAssets, Math.Rounding.Down);
+            return _assets.mulDiv(_totalSupply, _totalAssets, Math.Rounding.Up);
         }
     }
 
