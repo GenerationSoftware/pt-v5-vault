@@ -690,7 +690,6 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
     }
 
     /// @inheritdoc ILiquidationSource
-    /// @dev Will revert if the yield fee is set to 100%
     function transferTokensOut(
         address,
         address _receiver,
@@ -705,7 +704,7 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
         uint256 _liquidatableYield = liquidatableBalanceOf(_tokenOut);
         uint32 _yieldFeePercentage = yieldFeePercentage;
 
-        if (_amountOut > _liquidatableYield || _yieldFeePercentage == FEE_PRECISION) {
+        if (_amountOut > _liquidatableYield) {
             revert LiquidationAmountOutGtYield(_amountOut, _liquidatableYield);
         }
 
