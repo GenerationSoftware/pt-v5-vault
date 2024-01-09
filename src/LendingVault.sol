@@ -709,9 +709,9 @@ contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, I
         }
 
         // Distributes the specified yield fee percentage.
-        // For instance, with a yield fee percentage of 20% and 8e18 Vault shares being liquidated,
-        // this calculation assigns 2e18 Vault shares to the yield fee recipient.
-        // `_amountOut` is the amount of Vault shares being liquidated after accounting for the yield fee.
+        // For instance, with a yield fee percentage of 20% and 8e18 assets being liquidated,
+        // this calculation assigns 2e18 assets to the yield fee recipient.
+        // `_amountOut` is the amount of assets being liquidated after accounting for the yield fee.
         if (_yieldFeePercentage != 0) {
             _accruedYieldFee += (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut;
         }
