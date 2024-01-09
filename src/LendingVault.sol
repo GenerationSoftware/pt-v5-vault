@@ -20,8 +20,8 @@ import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol"
  * @notice This vault extends the ERC4626 standard that accepts deposits of an underlying token (ex: USDC) and
  *         lends it on a lending market while converting any accrued yield to prize tokens (ex: POOL) and 
  *         contributing them to the prize pool, giving the depositors a chance to win prizes. This vault always
- *         assumes a one-to-one ratio of underlying assets to receipt tokens, however, a depositor's ability
- *         to withdraw their assets is dependent on underlying market conditions.
+ *         assumes a one-to-one ratio of underlying assets to receipt tokens when depositing or minting, however,
+ *         a depositor's ability to withdraw assets or redeem shares is dependent on underlying market conditions.
  * @dev    Balances are stored in the TwabController contract.
  */
 contract LendingVault is TwabERC20, HookManager, IERC4626, ILiquidationSource, IClaimable, Ownable {
