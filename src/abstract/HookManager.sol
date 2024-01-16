@@ -10,7 +10,7 @@ abstract contract HookManager {
      * @param account The account whose hooks are being configured
      * @param hooks The hooks being set
      */
-    event SetHooks(address indexed account, VaultHooks indexed hooks);
+    event SetHooks(address indexed account, VaultHooks hooks);
 
     /**
      * @notice Maps user addresses to hooks that they want to execute when prizes are won.
