@@ -44,18 +44,6 @@ abstract contract Claimable is HookManager, IClaimable {
      */
     error CallerNotClaimer(address caller, address claimer);
 
-    /**
-     * @notice Thrown when the BeforeClaim prize hook fails
-     * @param reason The revert reason that was thrown
-     */
-    error BeforeClaimPrizeFailed(bytes reason);
-
-    /**
-     * @notice Thrown when the AfterClaim prize hook fails
-     * @param reason The revert reason that was thrown
-     */
-    error AfterClaimPrizeFailed(bytes reason);
-
     /* ============ Modifiers ============ */
 
     /// @notice Requires the caller to be the claimer.
@@ -93,19 +81,13 @@ abstract contract Claimable is HookManager, IClaimable {
         address recipient;
 
         if (_hooks[_winner].useBeforeClaimPrize) {
-            try
-                _hooks[_winner].implementation.beforeClaimPrize{ gas: HOOK_GAS }(
-                    _winner,
-                    _tier,
-                    _prizeIndex,
-                    _fee,
-                    _feeRecipient
-                )
-            returns (address result) {
-                recipient = result;
-            } catch (bytes memory reason) {
-                revert BeforeClaimPrizeFailed(reason);
-            }
+            recipient = _hooks[_winner].implementation.beforeClaimPrize{ gas: HOOK_GAS }(
+                _winner,
+                _tier,
+                _prizeIndex,
+                _fee,
+                _feeRecipient
+            );
         } else {
             recipient = _winner;
         }
@@ -122,17 +104,13 @@ abstract contract Claimable is HookManager, IClaimable {
         );
 
         if (_hooks[_winner].useAfterClaimPrize) {
-            try
-                _hooks[_winner].implementation.afterClaimPrize{ gas: HOOK_GAS }(
-                    _winner,
-                    _tier,
-                    _prizeIndex,
-                    prizeTotal,
-                    recipient
-                )
-            {} catch (bytes memory reason) {
-                revert AfterClaimPrizeFailed(reason);
-            }
+            _hooks[_winner].implementation.afterClaimPrize{ gas: HOOK_GAS }(
+                _winner,
+                _tier,
+                _prizeIndex,
+                prizeTotal,
+                recipient
+            );
         }
 
         return prizeTotal;
