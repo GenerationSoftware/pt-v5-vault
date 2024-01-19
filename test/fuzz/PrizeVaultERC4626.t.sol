@@ -6,7 +6,7 @@ import { ERC4626Test, IMockERC20 } from "erc4626-tests/ERC4626.test.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
-import { LendingVault } from "../../src/LendingVault.sol";
+import { PrizeVault } from "../../src/PrizeVault.sol";
 
 import { IERC4626, IERC20 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
@@ -15,7 +15,7 @@ import { Strings } from "openzeppelin/utils/Strings.sol";
 import { YieldVault } from "../contracts/mock/YieldVault.sol";
 import { PrizePoolMock } from "../contracts/mock/PrizePoolMock.sol";
 
-contract LendingVaultERC4626FuzzTest is ERC4626Test {
+contract PrizeVaultERC4626FuzzTest is ERC4626Test {
 
     TwabController public twabController;
     PrizePoolMock public prizePool;
@@ -36,7 +36,7 @@ contract LendingVaultERC4626FuzzTest is ERC4626Test {
         );
 
         _vault_ = address(
-            new LendingVault(
+            new PrizeVault(
                 "PoolTogether Test Vault",
                 "pTest",
                 yieldVault,

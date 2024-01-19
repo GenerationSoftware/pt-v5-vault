@@ -14,16 +14,17 @@ import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
 
 /**
- * @title  PoolTogether V5 Lending Vault
+ * @title  PoolTogether V5 Prize Vault
  * @author G9 Software Inc.
  * @notice This vault extends the ERC4626 standard that accepts deposits of an underlying token (ex: USDC) and
- *         lends it on a lending market while converting any accrued yield to prize tokens (ex: POOL) and 
- *         contributing them to the prize pool, giving the depositors a chance to win prizes. This vault always
- *         assumes a one-to-one ratio of underlying assets to receipt tokens when depositing or minting, however,
- *         a depositor's ability to withdraw assets or redeem shares is dependent on underlying market conditions.
+ *         deposits it to an underlying yield source while converting any accrued yield to prize tokens (ex: POOL) 
+ *         and contributing them to the prize pool, giving the depositors a chance to win prizes. This vault always
+ *         assumes a one-to-one ratio of underlying assets to receipt tokens when depositing or minting, but a
+ *         depositor's ability to withdraw assets or redeem shares is dependent on underlying market conditions;
+ *         as is the the available rate of exchange.
  * @dev    Balances are stored in the TwabController contract.
  */
-contract LendingVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownable {
+contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -57,22 +58,6 @@ contract LendingVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Own
     uint256 private _accruedYieldFee;
 
     /* ============ Events ============ */
-
-    /**
-     * @notice Emitted when a new Vault has been deployed.
-     * @param name Name of the ERC20 share minted by the vault
-     * @param symbol Symbol of the ERC20 share minted by the vault
-     * @param asset Address of the underlying asset used by the vault
-     * @param yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
-     * @param prizePool Address of the PrizePool that computes prizes
-     */
-    event NewVault(
-        string name,
-        string symbol,
-        IERC20 indexed asset,
-        IERC4626 indexed yieldVault,
-        PrizePool indexed prizePool
-    );
 
     /**
      * @notice Emitted when a new yield fee recipient has been set.
@@ -230,7 +215,7 @@ contract LendingVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Own
      * @notice Vault constructor
      * @param name_ Name of the ERC20 share minted by the vault
      * @param symbol_ Symbol of the ERC20 share minted by the vault
-     * @param yieldVault_ Address of the ERC4626 lending vault in which assets are deposited to generate yield
+     * @param yieldVault_ Address of the underlying ERC4626 vault in which assets are deposited to generate yield
      * @param prizePool_ Address of the PrizePool that computes prizes
      * @param claimer_ Address of the claimer
      * @param yieldFeeRecipient_ Address of the yield fee recipient
@@ -259,14 +244,6 @@ contract LendingVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Own
 
         _setYieldFeeRecipient(yieldFeeRecipient_);
         _setYieldFeePercentage(yieldFeePercentage_);
-
-        emit NewVault(
-            name_,
-            symbol_,
-            asset_,
-            yieldVault_,
-            prizePool_
-        );
     }
 
     /* ============ ERC20 Overrides ============ */
