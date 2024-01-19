@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
@@ -9,10 +9,10 @@ import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
-import { PrizeVaultFactory } from "../../src/PrizeVaultFactory.sol";
-import { PrizeVault } from "../../src/PrizeVault.sol";
-import { PrizePoolMock, IERC20 } from "../contracts/mock/PrizePoolMock.sol";
-import { YieldVault } from "../contracts/mock/YieldVault.sol";
+import { PrizeVaultFactory } from "../../../src/PrizeVaultFactory.sol";
+import { PrizeVault } from "../../../src/PrizeVault.sol";
+import { PrizePoolMock, IERC20 } from "../../contracts/mock/PrizePoolMock.sol";
+import { YieldVault } from "../../contracts/mock/YieldVault.sol";
 
 contract PrizeVaultFactoryTest is Test {
 

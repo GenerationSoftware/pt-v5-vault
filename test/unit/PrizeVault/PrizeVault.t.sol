@@ -1,306 +1,304 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { UnitBaseSetup, PrizePool, TwabController, ERC20, IERC20, IERC4626 } from "../../utils/UnitBaseSetup.t.sol";
+import { UnitBaseSetup, PrizePool, TwabController, ERC20, IERC20, IERC4626 } from "./UnitBaseSetup.t.sol";
 import { IVaultHooks, VaultHooks } from "../../../src/interfaces/IVaultHooks.sol";
 
 import "../../../src/PrizeVault.sol";
 
 contract PrizeVaultTest is UnitBaseSetup {
 
-  /* ============ Events ============ */
+    /* ============ variables ============ */
 
-  event ClaimerSet(address indexed claimer);
+    uint32 public constant YIELD_FEE_PERCENTAGE = 100000000; // 0.1 = 10%
 
-  event LiquidationPairSet(address indexed tokenOut, address indexed liquidationPair);
+    /* ============ constructor ============ */
 
-  event YieldFeeRecipientSet(address indexed yieldFeeRecipient);
+    function testConstructor() public {
+        PrizeVault testVault = new PrizeVault(
+            vaultName,
+            vaultSymbol,
+            yieldVault,
+            PrizePool(address(prizePool)),
+            claimer,
+            address(this),
+            YIELD_FEE_PERCENTAGE,
+            address(this)
+        );
 
-  event YieldFeePercentageSet(uint256 yieldFeePercentage);
+        uint256 assetDecimals = ERC20(address(underlyingAsset)).decimals();
 
-  /* ============ Constructor ============ */
+        assertEq(testVault.asset(), address(underlyingAsset));
+        assertEq(testVault.name(), vaultName);
+        assertEq(testVault.symbol(), vaultSymbol);
+        assertEq(testVault.decimals(), assetDecimals);
+        assertEq(address(testVault.twabController()), address(twabController));
+        assertEq(address(testVault.yieldVault()), address(yieldVault));
+        assertEq(address(testVault.prizePool()), address(prizePool));
+        assertEq(testVault.claimer(), address(claimer));
+        assertEq(testVault.owner(), address(this));
+    }
 
-  function testConstructor() public {
-    PrizeVault testVault = new PrizeVault(
-      vaultName,
-      vaultSymbol,
-      yieldVault,
-      PrizePool(address(prizePool)),
-      claimer,
-      address(this),
-      YIELD_FEE_PERCENTAGE,
-      address(this)
-    );
+    function testConstructorYieldVaultZero() external {
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.YieldVaultZeroAddress.selector));
 
-    uint256 assetDecimals = ERC20(address(underlyingAsset)).decimals();
+        new PrizeVault(
+            "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+            "PTaEthDAI",
+            IERC4626(address(0)),
+            PrizePool(address(prizePool)),
+            claimer,
+            address(this),
+            YIELD_FEE_PERCENTAGE,
+            address(this)
+        );
+    }
 
-    assertEq(testVault.asset(), address(underlyingAsset));
-    assertEq(testVault.name(), vaultName);
-    assertEq(testVault.symbol(), vaultSymbol);
-    assertEq(testVault.decimals(), assetDecimals);
-    assertEq(address(testVault.twabController()), address(twabController));
-    assertEq(address(testVault.yieldVault()), address(yieldVault));
-    assertEq(address(testVault.prizePool()), address(prizePool));
-    assertEq(testVault.claimer(), address(claimer));
-    assertEq(testVault.owner(), address(this));
-  }
+    function testFailConstructorPrizePoolZero() external {
+        // Fails because `prizePool.twabController()` is not callable on the zero address
+        new PrizeVault(
+            "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+            "PTaEthDAI",
+            yieldVault,
+            PrizePool(address(0)),
+            claimer,
+            address(this),
+            YIELD_FEE_PERCENTAGE,
+            address(this)
+        );
+    }
 
-  function testConstructorYieldVaultZero() external {
-    vm.expectRevert(abi.encodeWithSelector(PrizeVault.YieldVaultZeroAddress.selector));
+    function testConstructorOwnerZero() external {
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.OwnerZeroAddress.selector));
 
-    new PrizeVault(
-      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
-      "PTaEthDAI",
-      IERC4626(address(0)),
-      PrizePool(address(prizePool)),
-      claimer,
-      address(this),
-      YIELD_FEE_PERCENTAGE,
-      address(this)
-    );
-  }
+        new PrizeVault(
+            "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+            "PTaEthDAI",
+            yieldVault,
+            PrizePool(address(prizePool)),
+            claimer,
+            address(this),
+            YIELD_FEE_PERCENTAGE,
+            address(0)
+        );
+    }
 
-  function testFailConstructorPrizePoolZero() external {
-    // Fails because `prizePool.twabController()` is not callable on the zero address
-    new PrizeVault(
-      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
-      "PTaEthDAI",
-      yieldVault,
-      PrizePool(address(0)),
-      claimer,
-      address(this),
-      YIELD_FEE_PERCENTAGE,
-      address(this)
-    );
-  }
+    function testConstructorClaimerZero() external {
+        vm.expectRevert(abi.encodeWithSelector(Claimable.ClaimerZeroAddress.selector));
 
-  function testConstructorOwnerZero() external {
-    vm.expectRevert(abi.encodeWithSelector(PrizeVault.OwnerZeroAddress.selector));
+        new PrizeVault(
+            "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
+            "PTaEthDAI",
+            yieldVault,
+            PrizePool(address(prizePool)),
+            address(0),
+            address(this),
+            YIELD_FEE_PERCENTAGE,
+            address(this)
+        );
+    }
 
-    new PrizeVault(
-      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
-      "PTaEthDAI",
-      yieldVault,
-      PrizePool(address(prizePool)),
-      claimer,
-      address(this),
-      YIELD_FEE_PERCENTAGE,
-      address(0)
-    );
-  }
+    /* ============ targetOf ============ */
 
-  function testConstructorClaimerZero() external {
-    vm.expectRevert(abi.encodeWithSelector(Claimable.ClaimerZeroAddress.selector));
+    function testTargetOf() public {
+        _setLiquidationPair();
 
-    new PrizeVault(
-      "PoolTogether aEthDAI Prize Token (PTaEthDAI)",
-      "PTaEthDAI",
-      yieldVault,
-      PrizePool(address(prizePool)),
-      address(0),
-      address(this),
-      YIELD_FEE_PERCENTAGE,
-      address(this)
-    );
-  }
+        address target = vault.targetOf(address(prizeToken));
+        assertEq(target, address(prizePool));
+    }
 
-  /* ============ External functions ============ */
+    /* ============ getters ============ */
 
-  /* ============ targetOf ============ */
-  function testTargetOf() public {
-    _setLiquidationPair();
+    function testGetYieldVault() external {
+        assertEq(address(vault.yieldVault()), address(yieldVault));
+    }
 
-    address target = vault.targetOf(address(prizeToken));
-    assertEq(target, address(prizePool));
-  }
+    function testGetLiquidationPair() external {
+        vault.setLiquidationPair(address(liquidationPair));
+        assertEq(address(vault.liquidationPair()), address(liquidationPair));
+    }
 
-  /* ============ Getters ============ */
-  function testGetYieldVault() external {
-    assertEq(address(vault.yieldVault()), address(yieldVault));
-  }
+    function testGetYieldFeeRecipient() external {
+        assertEq(vault.yieldFeeRecipient(), address(this));
+    }
 
-  function testGetLiquidationPair() external {
-    vault.setLiquidationPair(address(liquidationPair));
-    assertEq(address(vault.liquidationPair()), address(liquidationPair));
-  }
+    function testGetYieldFeePercentage() external {
+        vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+        assertEq(vault.yieldFeePercentage(), YIELD_FEE_PERCENTAGE);
+    }
 
-  function testGetYieldFeeRecipient() external {
-    assertEq(vault.yieldFeeRecipient(), address(this));
-  }
+    /* ============ setClaimer ============ */
 
-  function testGetYieldFeePercentage() external {
-    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
-    assertEq(vault.yieldFeePercentage(), YIELD_FEE_PERCENTAGE);
-  }
+    function testSetClaimer() public {
+        address _newClaimer = makeAddr("claimer");
 
-  /* ============ Setters ============ */
+        vm.expectEmit(true, true, true, true);
+        emit ClaimerSet(_newClaimer);
 
-  /* ============ setClaimer ============ */
-  function testSetClaimer() public {
-    address _newClaimer = makeAddr("claimer");
+        vault.setClaimer(_newClaimer);
 
-    vm.expectEmit(true, true, true, true);
-    emit ClaimerSet(_newClaimer);
+        assertEq(vault.claimer(), address(_newClaimer));
+    }
 
-    vault.setClaimer(_newClaimer);
+    function testSetClaimerOnlyOwner() public {
+        address _caller = address(0xc6781d43c1499311291c8E5d3ab79613dc9e6d98);
+        address _newClaimer = makeAddr("newClaimer");
 
-    assertEq(vault.claimer(), address(_newClaimer));
-  }
+        vm.startPrank(_caller);
 
-  function testSetClaimerOnlyOwner() public {
-    address _caller = address(0xc6781d43c1499311291c8E5d3ab79613dc9e6d98);
-    address _newClaimer = makeAddr("newClaimer");
+        vm.expectRevert(bytes("Ownable/caller-not-owner"));
+        vault.setClaimer(_newClaimer);
 
-    vm.startPrank(_caller);
+        vm.stopPrank();
+    }
 
-    vm.expectRevert(bytes("Ownable/caller-not-owner"));
-    vault.setClaimer(_newClaimer);
+    function testSetClaimerZeroAddress() public {
+        vm.expectRevert(abi.encodeWithSelector(Claimable.ClaimerZeroAddress.selector));
+        vault.setClaimer(address(0));
+    }
 
-    vm.stopPrank();
-  }
+    /* ============ setLiquidationPair ============ */
 
-  function testSetClaimerZeroAddress() public {
-    vm.expectRevert(abi.encodeWithSelector(Claimable.ClaimerZeroAddress.selector));
-    vault.setClaimer(address(0));
-  }
+    function testSetLiquidationPair() public {
+        vm.expectEmit();
+        emit LiquidationPairSet(address(vault), address(liquidationPair));
 
-  /* ============ setLiquidationPair ============ */
-  function testSetLiquidationPair() public {
-    vm.expectEmit();
-    emit LiquidationPairSet(address(vault), address(liquidationPair));
+        vault.setLiquidationPair(address(liquidationPair));
 
-    vault.setLiquidationPair(address(liquidationPair));
+        assertEq(vault.liquidationPair(), address(liquidationPair));
+    }
 
-    assertEq(vault.liquidationPair(), address(liquidationPair));
-  }
+    function testSetLiquidationPairNotZeroAddress() public {
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.LPZeroAddress.selector));
+        vault.setLiquidationPair(address(0));
+    }
 
-  function testSetLiquidationPairNotZeroAddress() public {
-    vm.expectRevert(abi.encodeWithSelector(PrizeVault.LPZeroAddress.selector));
-    vault.setLiquidationPair(address(0));
-  }
+    function testSetLiquidationPairOnlyOwner() public {
+        address _newLiquidationPair = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
 
-  function testSetLiquidationPairOnlyOwner() public {
-    address _newLiquidationPair = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+        vm.startPrank(alice);
 
-    vm.startPrank(alice);
+        vm.expectRevert(bytes("Ownable/caller-not-owner"));
+        vault.setLiquidationPair(_newLiquidationPair);
 
-    vm.expectRevert(bytes("Ownable/caller-not-owner"));
-    vault.setLiquidationPair(_newLiquidationPair);
+        vm.stopPrank();
+    }
 
-    vm.stopPrank();
-  }
+    /* ============ isLiquidationPair ============ */
 
-  /* ============ isLiquidationPair ============ */
-  function testIsLiquidationPair() public {
-    address _newLiquidationPair = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
+    function testIsLiquidationPair() public {
+        address _newLiquidationPair = address(0xff3c527f9F5873bd735878F23Ff7eC5AB2E3b820);
 
-    vault.setLiquidationPair(address(liquidationPair));
-    assertEq(vault.isLiquidationPair(address(underlyingAsset), address(_newLiquidationPair)), false);
-    assertEq(vault.isLiquidationPair(address(underlyingAsset), address(liquidationPair)), true);
-    assertEq(vault.isLiquidationPair(address(1), address(liquidationPair)), false);
+        vault.setLiquidationPair(address(liquidationPair));
+        assertEq(vault.isLiquidationPair(address(underlyingAsset), address(_newLiquidationPair)), false);
+        assertEq(vault.isLiquidationPair(address(underlyingAsset), address(liquidationPair)), true);
+        assertEq(vault.isLiquidationPair(address(1), address(liquidationPair)), false);
 
-    vault.setLiquidationPair(_newLiquidationPair);
-    assertEq(vault.isLiquidationPair(address(underlyingAsset), address(_newLiquidationPair)), true);
-    assertEq(vault.isLiquidationPair(address(underlyingAsset), address(liquidationPair)), false);
-    assertEq(vault.isLiquidationPair(address(1), address(_newLiquidationPair)), false);
-  }
+        vault.setLiquidationPair(_newLiquidationPair);
+        assertEq(vault.isLiquidationPair(address(underlyingAsset), address(_newLiquidationPair)), true);
+        assertEq(vault.isLiquidationPair(address(underlyingAsset), address(liquidationPair)), false);
+        assertEq(vault.isLiquidationPair(address(1), address(_newLiquidationPair)), false);
+    }
 
-  /* ============ testSetYieldFeePercentage ============ */
-  function testSetYieldFeePercentage() public {
-    vm.expectEmit();
-    emit YieldFeePercentageSet(YIELD_FEE_PERCENTAGE);
+    /* ============ testSetYieldFeePercentage ============ */
 
-    vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
-    assertEq(vault.yieldFeePercentage(), YIELD_FEE_PERCENTAGE);
-  }
+    function testSetYieldFeePercentage() public {
+        vm.expectEmit();
+        emit YieldFeePercentageSet(YIELD_FEE_PERCENTAGE);
 
-  function testSetYieldFeePercentageGT1e9() public {
-    vm.expectRevert(
-      abi.encodeWithSelector(PrizeVault.YieldFeePercentageGtPrecision.selector, 2e9, 1e9)
-    );
-    vault.setYieldFeePercentage(2e9);
-  }
+        vault.setYieldFeePercentage(YIELD_FEE_PERCENTAGE);
+        assertEq(vault.yieldFeePercentage(), YIELD_FEE_PERCENTAGE);
+    }
 
-  function testSetYieldFeePercentageOnlyOwner() public {
-    vm.startPrank(alice);
+    function testSetYieldFeePercentageGT1e9() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(PrizeVault.YieldFeePercentageGtPrecision.selector, 2e9, 1e9)
+        );
+        vault.setYieldFeePercentage(2e9);
+    }
 
-    vm.expectRevert(bytes("Ownable/caller-not-owner"));
-    vault.setYieldFeePercentage(1e9);
+    function testSetYieldFeePercentageOnlyOwner() public {
+        vm.startPrank(alice);
 
-    vm.stopPrank();
-  }
+        vm.expectRevert(bytes("Ownable/caller-not-owner"));
+        vault.setYieldFeePercentage(1e9);
 
-  /* ============ setYieldFeeRecipient ============ */
-  function testSetYieldFeeRecipient() public {
-    vm.expectEmit(true, true, true, true);
-    emit YieldFeeRecipientSet(alice);
+        vm.stopPrank();
+    }
 
-    vault.setYieldFeeRecipient(alice);
-    assertEq(vault.yieldFeeRecipient(), alice);
-  }
+    /* ============ setYieldFeeRecipient ============ */
 
-  function testSetYieldFeeRecipientOnlyOwner() public {
-    vm.startPrank(alice);
+    function testSetYieldFeeRecipient() public {
+        vm.expectEmit(true, true, true, true);
+        emit YieldFeeRecipientSet(alice);
 
-    vm.expectRevert(bytes("Ownable/caller-not-owner"));
-    vault.setYieldFeeRecipient(bob);
+        vault.setYieldFeeRecipient(alice);
+        assertEq(vault.yieldFeeRecipient(), alice);
+    }
 
-    vm.stopPrank();
-  }
+    function testSetYieldFeeRecipientOnlyOwner() public {
+        vm.startPrank(alice);
 
-  function claimPrize(
-    uint8 tier,
-    address winner,
-    uint32 prizeIndex,
-    uint96 fee,
-    address feeRecipient
-  ) public returns (uint256) {
-    return vault.claimPrize(winner, tier, prizeIndex, fee, feeRecipient);
-  }
+        vm.expectRevert(bytes("Ownable/caller-not-owner"));
+        vault.setYieldFeeRecipient(bob);
 
-  /* ============ mocks ============ */
-  function mockPrizePoolClaimPrize(
-    uint8 _tier,
-    address _winner,
-    uint32 _prizeIndex,
-    uint96 _fee,
-    address _feeRecipient
-  ) public {
-    vm.mockCall(
-      address(prizePool),
-      abi.encodeWithSelector(
-        PrizePool.claimPrize.selector,
-        _winner,
-        _tier,
-        _prizeIndex,
-        _winner,
-        _fee,
-        _feeRecipient
-      ),
-      abi.encode(100)
-    );
-  }
+        vm.stopPrank();
+    }
 
-  function mockPrizePoolClaimPrize(
-    uint8 _tier,
-    address _winner,
-    uint32 _prizeIndex,
-    address _recipient,
-    uint96 _fee,
-    address _feeRecipient
-  ) public {
-    vm.mockCall(
-      address(prizePool),
-      abi.encodeWithSelector(
-        PrizePool.claimPrize.selector,
-        _winner,
-        _tier,
-        _prizeIndex,
-        _recipient,
-        _fee,
-        _feeRecipient
-      ),
-      abi.encode(100)
-    );
-  }
+    function claimPrize(
+        uint8 tier,
+        address winner,
+        uint32 prizeIndex,
+        uint96 fee,
+        address feeRecipient
+    ) public returns (uint256) {
+        return vault.claimPrize(winner, tier, prizeIndex, fee, feeRecipient);
+    }
+
+    /* ============ mocks ============ */
+
+    function mockPrizePoolClaimPrize(
+        uint8 _tier,
+        address _winner,
+        uint32 _prizeIndex,
+        uint96 _fee,
+        address _feeRecipient
+    ) public {
+        vm.mockCall(
+            address(prizePool),
+            abi.encodeWithSelector(
+                PrizePool.claimPrize.selector,
+                _winner,
+                _tier,
+                _prizeIndex,
+                _winner,
+                _fee,
+                _feeRecipient
+            ),
+            abi.encode(100)
+        );
+    }
+
+    function mockPrizePoolClaimPrize(
+        uint8 _tier,
+        address _winner,
+        uint32 _prizeIndex,
+        address _recipient,
+        uint96 _fee,
+        address _feeRecipient
+    ) public {
+        vm.mockCall(
+            address(prizePool),
+            abi.encodeWithSelector(
+                PrizePool.claimPrize.selector,
+                _winner,
+                _tier,
+                _prizeIndex,
+                _recipient,
+                _fee,
+                _feeRecipient
+            ),
+            abi.encode(100)
+        );
+    }
 }
