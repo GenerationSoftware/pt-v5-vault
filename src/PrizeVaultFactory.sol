@@ -58,8 +58,8 @@ contract PrizeVaultFactory {
      * @return PrizeVault The newly deployed PrizeVault
      */
     function deployVault(
-      string memory _name,
-      string memory _symbol,
+      string calldata _name,
+      string calldata _symbol,
       IERC4626 _yieldVault,
       PrizePool _prizePool,
       address _claimer,
