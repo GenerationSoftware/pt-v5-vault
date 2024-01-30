@@ -12,6 +12,7 @@ import { TwabERC20, ERC20, IERC20, IERC20Metadata, IERC20Permit } from "./TwabER
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
+import { ObservationLib } from "pt-v5-twab-controller/libraries/ObservationLib.sol";
 
 /**
  * @title  PoolTogether V5 Prize Vault
@@ -22,6 +23,9 @@ import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabC
  *         assumes a one-to-one ratio of underlying assets to receipt tokens when depositing or minting, but a
  *         depositor's ability to withdraw assets or redeem shares is dependent on underlying market conditions;
  *         as is the the available rate of exchange.
+ *
+ * TODO:   Add an explanation for dust collection and rounding error mitigation.
+ *
  * @dev    Balances are stored in the TwabController contract.
  */
 contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownable {
@@ -32,6 +36,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @notice The yield fee decimal precision.
     uint32 public constant FEE_PRECISION = 1e9;
+
+    /// @notice The yield buffer that is reserved for covering rounding errors on withdrawals and deposits.
+    /// @dev The buffer prevents the entire yield balance from being liquidated, which would leave the vault in a
+    ///      state where a single rounding error could reduce the totalAssets to less than the totalSupply.
+    /// @dev If the yield vault does not accrue yield on a regular basis, it is recommended to set the yieldBuffer
+    ///      higher than normal to ensure all rounding errors on deposits and withdrawals are covered between yield
+    ///      accrual periods.
+    uint256 public immutable yieldBuffer;
 
     /// @notice Address of the underlying ERC4626 vault generating yield.
     IERC4626 public immutable yieldVault;
@@ -220,6 +232,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @param claimer_ Address of the claimer
      * @param yieldFeeRecipient_ Address of the yield fee recipient
      * @param yieldFeePercentage_ Yield fee percentage
+     * @param yieldBuffer_ Amount of yield to keep as a buffer
      * @param owner_ Address that will gain ownership of this contract
      */
     constructor(
@@ -230,6 +243,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         address claimer_,
         address yieldFeeRecipient_,
         uint32 yieldFeePercentage_,
+        uint256 yieldBuffer_,
         address owner_
     ) TwabERC20(name_, symbol_, prizePool_.twabController()) Claimable(prizePool_, claimer_) Ownable(owner_) {
         if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
@@ -241,6 +255,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         _asset = asset_;
 
         yieldVault = yieldVault_;
+        yieldBuffer = yieldBuffer_;
 
         _setYieldFeeRecipient(yieldFeeRecipient_);
         _setYieldFeePercentage(yieldFeePercentage_);
@@ -261,8 +276,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc IERC4626
+    /// @dev TODO: add reasoning for inclusion of latent balance
     function totalAssets() public view returns (uint256) {
-        return yieldVault.convertToAssets(yieldVault.balanceOf(address(this)));
+        return yieldVault.convertToAssets(yieldVault.balanceOf(address(this))) + _asset.balanceOf(address(this));
     }
 
     /// @inheritdoc IERC4626
@@ -284,9 +300,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         } else {
             /**
              * If the vault controls less assets than what has been deposited a share will be worth a
-             * proportional amount of the total assets. This can happen on any vault due to small
-             * rounding errors in deposits, so this ensures any accumulation of small rounding errors
-             * are distributed instead of accumulating over time into a larger sum.
+             * proportional amount of the total assets. This can happen due to fees, slippage, or loss
+             * of funds in the underlying yield vault.
              */
             return _shares.mulDiv(_totalAssets, _totalSupply, Math.Rounding.Down);
         }
@@ -294,38 +309,48 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @inheritdoc IERC4626
     /// @dev Considers the uint96 limit on total share supply in the TwabController
+    /// @dev TODO: add reasoning for exclusion of latent balance
+    /// @dev TODO: return 0 if deposits and mints are disabled due to less assets than supply
     function maxDeposit(address) public view returns (uint256) {
         // the vault will never mint more than 1 share per asset, so no need to convert supply buffer to assets
         uint256 _supplyBuffer = type(uint96).max - totalSupply();
-        uint256 _maxAssetDeposit = yieldVault.maxDeposit(address(this));
-        return _supplyBuffer < _maxAssetDeposit ? _supplyBuffer : _maxAssetDeposit;
+        uint256 _maxDeposit;
+        uint256 _latentBalance = _asset.balanceOf(address(this));
+        uint256 _maxYieldVaultDeposit = yieldVault.maxDeposit(address(this));
+        if (_latentBalance >= _maxYieldVaultDeposit) {
+            return 0;
+        } else {
+            unchecked {
+                _maxDeposit = _maxYieldVaultDeposit - _latentBalance;
+            }
+            return _supplyBuffer < _maxDeposit ? _supplyBuffer : _maxDeposit;
+        }
     }
 
     /// @inheritdoc IERC4626
     /// @dev Considers the uint96 limit on total share supply in the TwabController
-    function maxMint(address) public view returns (uint256) {
-        uint256 _supplyBuffer = type(uint96).max - totalSupply();
-
+    function maxMint(address _owner) public view returns (uint256) {
         // shares represent how many assets an account has deposited, so they are 1:1 on mint
-        uint256 _maxShareMint = yieldVault.maxDeposit(address(this));
-        return _supplyBuffer < _maxShareMint ? _supplyBuffer : _maxShareMint;
+        return maxDeposit(_owner);
     }
 
     /// @inheritdoc IERC4626
+    /// @dev TODO: add reasoning for inclusion of latent balance
     function maxWithdraw(address _owner) public view returns (uint256) {
-        uint256 _maxAssetWithdraw = yieldVault.maxWithdraw(address(this));
+        uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
 
         // the owner may receive less than 1 asset per share, so we must convert their balance here
         uint256 _ownerAssets = convertToAssets(balanceOf(_owner));
-        return _ownerAssets < _maxAssetWithdraw ? _ownerAssets : _maxAssetWithdraw;
+        return _ownerAssets < _maxWithdraw ? _ownerAssets : _maxWithdraw;
     }
 
     /// @inheritdoc IERC4626
+    /// @dev TODO: add reasoning for inclusion of latent balance
     function maxRedeem(address _owner) public view returns (uint256) {
         // the owner will never receive more than 1 asset per share, so no need to convert max withdraw to shares
-        uint256 _maxShareRedemption = yieldVault.maxWithdraw(address(this));
+        uint256 _maxRedeem = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
         uint256 _ownerShares = balanceOf(_owner);
-        return _ownerShares < _maxShareRedemption ? _ownerShares : _maxShareRedemption;
+        return _ownerShares < _maxRedeem ? _ownerShares : _maxRedeem;
     }
 
     /// @inheritdoc IERC4626
@@ -352,7 +377,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (_totalAssets >= _totalSupply) {
             return _assets;
         } else {
-            // Follows the same conversion as `convertToAssets`
+            // Follows the inverse conversion of `convertToAssets`
             return _assets.mulDiv(_totalSupply, _totalAssets, Math.Rounding.Up);
         }
     }
@@ -456,23 +481,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _shares;
     }
 
-    /**
-     * @notice Deposit underlying assets that have been mistakenly sent to the Vault into the YieldVault.
-     * @dev The deposited assets will contribute to the yield of the YieldVault.
-     * @return Amount of underlying assets deposited
-     */
-    function sweep() external returns (uint256) {
-        uint256 _assets = _asset.balanceOf(address(this));
-        if (_assets == 0) revert SweepZeroAssets();
-
-        _asset.approve(address(yieldVault), _assets);
-        yieldVault.deposit(_assets, address(this));
-
-        emit Sweep(msg.sender, _assets);
-
-        return _assets;
-    }
-
     /* ============ Yield Functions ============ */
 
     /**
@@ -481,7 +489,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      */
     function availableYieldBalance() public view returns (uint256) {
         uint256 _totalAssets = totalAssets();
-        uint256 _allocatedAssets = totalSupply() + _accruedYieldFee;
+        uint256 _allocatedAssets = totalSupply() + yieldBuffer;
         if (_allocatedAssets >= _totalAssets) {
             return 0;
         } else {
@@ -501,19 +509,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @return The accrued yield fee balance.
      */
     function yieldFeeBalance() public view returns (uint256) {
-        uint256 _totalAssets = totalAssets();
-        uint256 _totalSupply = totalSupply();
-        if (_totalSupply >= _totalAssets) return 0;
-
-        uint256 _totalExcessAssets;
-        unchecked {
-            _totalExcessAssets = _totalAssets - _totalSupply;
-        }
-
+        uint256 _availableYieldBalance = availableYieldBalance();
         if (yieldFeePercentage == FEE_PRECISION) {
-            return _totalExcessAssets;
+            return _availableYieldBalance;
         } else {
-            return _accruedYieldFee > _totalExcessAssets ? _totalExcessAssets : _accruedYieldFee;
+            return _accruedYieldFee >= _availableYieldBalance ? _availableYieldBalance : _accruedYieldFee;
         }
     }
 
@@ -531,7 +531,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         unchecked {
             _accruedYieldFee = _yieldFeeBalance - _amount;
         }
-        yieldVault.withdraw(_amount, msg.sender, address(this));
+        _withdraw(yieldFeeRecipient, _amount);
 
         emit WithdrawYieldFee(msg.sender, _amount);
     }
@@ -544,10 +544,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (_token != address(_asset)) {
             return 0;
         } else {
-            uint256 _availableYield = availableYieldBalance();
-            uint256 _availableYieldMinusFees = _availableYield - (_availableYield * yieldFeePercentage) / FEE_PRECISION;
+            // TODO: Add rounding error explanation for subtracting yield buffer from the available yield balance.
+            uint256 _maxLiquidation = availableYieldBalance() - _accruedYieldFee;
+            uint256 _maxLiquidationMinusFees = _maxLiquidation - (_maxLiquidation * yieldFeePercentage) / FEE_PRECISION;
             uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this));
-            return _maxWithdraw < _availableYieldMinusFees ? _maxWithdraw : _availableYieldMinusFees;
+            return _maxWithdraw < _maxLiquidationMinusFees ? _maxWithdraw : _maxLiquidationMinusFees;
         }
     }
 
@@ -578,7 +579,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             _accruedYieldFee += (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut;
         }
 
-        yieldVault.withdraw(_amountOut, _receiver, address(this));
+        _withdraw(_receiver, _amountOut);
 
         return "";
     }
@@ -677,8 +678,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @param _assets Amount of assets to deposit
      * @param _shares Amount of shares to mint
      * @dev Emits a `Deposit` event.
-     * @dev If there are enough assets in the vault to cover the deposit, no additional transfer
-     * will be made.
      * @dev Will revert if 0 shares are minted back to the receiver or if 0 assets are deposited.
      */
     function _depositAndMint(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal {
@@ -692,17 +691,19 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
         // assets are transferred and before the shares are minted, which is a valid state.
 
-        // We only need to deposit new assets if there is not enough assets in the vault to fulfill the deposit
-        if (_assets > _asset.balanceOf(address(this))) {
-            _asset.safeTransferFrom(
-                _caller,
-                address(this),
-                _assets
-            );
-        }
+        _asset.safeTransferFrom(
+            _caller,
+            address(this),
+            _assets
+        );
+        uint256 _assetsWithDust = _asset.balanceOf(address(this)); // try to sweep previously accumulated dust into the deposit as well
+        _asset.approve(address(yieldVault), _assetsWithDust);
 
-        _asset.approve(address(yieldVault), _assets);
-        yieldVault.deposit(_assets, address(this));
+        uint256 _yieldVaultShares = yieldVault.previewDeposit(_assetsWithDust); // should include any fees charged against the deposit, so the following mint call should not fail
+        uint256 _assetsUsed = yieldVault.mint(_yieldVaultShares, address(this));
+        if (_assetsUsed != _assetsWithDust) {
+            _asset.approve(address(yieldVault), 0); // set back to zero for weird tokens like USDT (and for gas refund)
+        }
 
         _mint(_receiver, _shares);
 
@@ -739,10 +740,25 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
         // shares are burned and after the assets are transferred, which is a valid state.
         _burn(_owner, _shares);
-
-        yieldVault.withdraw(_assets, _receiver, address(this));
+        _withdraw(_receiver, _assets);
 
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+    }
+
+    /**
+     * @notice Withdraws assets to the receiver while accounting for rounding errors.
+     * @param _receiver The receiver of the assets
+     * @param _assets The assets to withdraw
+     */
+    function _withdraw(address _receiver, uint256 _assets) internal {
+        // The vault accumulates dust from rounding errors over time, so if we can fulfill the withdrawal from the
+        // latent balance, we don't need to redeem any yield vault shares.
+        uint256 _latentAssets = _asset.balanceOf(address(this));
+        if (_assets > _latentAssets) {
+            uint256 _yieldVaultShares = yieldVault.previewWithdraw(_assets - _latentAssets); // should include any fees and round up, so the following redeem call should return enough assets
+            yieldVault.redeem(_yieldVaultShares, address(this), address(this)); // send assets to this contract so any leftover dust can be redeposited later
+        }
+        _asset.transfer(_receiver, _assets);
     }
 
     /**
