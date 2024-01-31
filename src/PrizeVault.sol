@@ -313,7 +313,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev TODO: return 0 if deposits and mints are disabled due to less assets than supply
     function maxDeposit(address) public view returns (uint256) {
         // the vault will never mint more than 1 share per asset, so no need to convert supply buffer to assets
-        uint256 _supplyBuffer = type(uint96).max - totalSupply();
+        uint256 _twabSupplyLimit = type(uint96).max - totalSupply();
         uint256 _maxDeposit;
         uint256 _latentBalance = _asset.balanceOf(address(this));
         uint256 _maxYieldVaultDeposit = yieldVault.maxDeposit(address(this));
@@ -323,7 +323,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             unchecked {
                 _maxDeposit = _maxYieldVaultDeposit - _latentBalance;
             }
-            return _supplyBuffer < _maxDeposit ? _supplyBuffer : _maxDeposit;
+            return _twabSupplyLimit < _maxDeposit ? _twabSupplyLimit : _maxDeposit;
         }
     }
 
