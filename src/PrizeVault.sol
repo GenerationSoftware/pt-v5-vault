@@ -191,7 +191,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @param totalToWithdraw The total yield to withdraw
      * @param availableYield The available yield
      */
-    error LiquidationGtAvailable(uint256 totalToWithdraw, uint256 availableYield);
+    error LiquidationExceedsAvailable(uint256 totalToWithdraw, uint256 availableYield);
 
     /* ============ Modifiers ============ */
 
@@ -522,7 +522,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // Ensure total withdrawn does not exceed the available yield balance:
         uint256 _totalToWithdraw = _amountOut + _yieldFee;
         if (_totalToWithdraw > _availableYieldBalance) {
-            revert LiquidationGtAvailable(_totalToWithdraw, _availableYieldBalance);
+            revert LiquidationExceedsAvailable(_totalToWithdraw, _availableYieldBalance);
         }
 
         _withdraw(address(this), _totalToWithdraw);
