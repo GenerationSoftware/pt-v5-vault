@@ -27,6 +27,7 @@ contract UnitBaseSetup is Test {
     event LiquidationPairSet(address indexed tokenOut, address indexed liquidationPair);
     event YieldFeeRecipientSet(address indexed yieldFeeRecipient);
     event YieldFeePercentageSet(uint256 yieldFeePercentage);
+    event MockContribute(address prizeVault, uint256 amount);
 
     /* ============ variables ============ */
 

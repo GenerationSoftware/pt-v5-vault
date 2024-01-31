@@ -162,6 +162,45 @@ contract PrizeVaultTest is UnitBaseSetup {
         vault.setClaimer(address(0));
     }
 
+    /* ============ availableYieldBalance ============ */
+
+    function testAvailableYieldBalance() public {
+        // make an initial deposit so the vault holds some yield vault shares
+        underlyingAsset.mint(alice, 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+
+        assertEq(vault.availableYieldBalance(), 0);
+
+        uint256 yieldBuffer = vault.yieldBuffer();
+
+        // no yield if it doesn't exceed yield buffer
+        underlyingAsset.mint(address(yieldVault), yieldBuffer);
+        assertEq(vault.availableYieldBalance(), 0);
+
+        // now it does
+        underlyingAsset.mint(address(yieldVault), 1e9);
+        assertApproxEqAbs(vault.availableYieldBalance(), 1e9, 1); // 1 wei rounding error
+
+        // mint prize vault shares to simulate supply going up without a deposit
+        vm.startPrank(address(vault));
+        twabController.mint(address(this), 1e9);
+        vm.stopPrank();
+        assertEq(vault.availableYieldBalance(), 0);
+    }
+
+    function testAvailableYieldBalance_tracksAssetsInPrizeVault() public {
+        assertEq(vault.availableYieldBalance(), 0);
+
+        uint256 yieldBuffer = vault.yieldBuffer();
+
+        // mint directly to prize vault
+        underlyingAsset.mint(address(vault), yieldBuffer + 3);
+        assertEq(vault.availableYieldBalance(), 3);
+    }
+
     /* ============ setLiquidationPair ============ */
 
     function testSetLiquidationPair() public {

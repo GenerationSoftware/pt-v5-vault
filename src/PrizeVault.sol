@@ -490,9 +490,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             return 0;
         } else {
             uint256 _availableYieldBalance = availableYieldBalance();
-            uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this));
+            uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
             uint256 _withdrawableYieldBalance = _availableYieldBalance >= _maxWithdraw ? _maxWithdraw : _availableYieldBalance;
-            return _withdrawableYieldBalance * (FEE_PRECISION - yieldFeePercentage) / FEE_PRECISION;
+            return _withdrawableYieldBalance.mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
         }
     }
 
