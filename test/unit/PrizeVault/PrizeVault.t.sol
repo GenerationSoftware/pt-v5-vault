@@ -215,11 +215,15 @@ contract PrizeVaultTest is UnitBaseSetup {
         assertEq(vault.yieldFeePercentage(), YIELD_FEE_PERCENTAGE);
     }
 
-    function testSetYieldFeePercentageGT1e9() public {
+    function testSetYieldFeePercentageExceedsMax() public {
+        uint32 max = vault.MAX_YIELD_FEE();
+
+        vault.setYieldFeePercentage(max); // ok
+
         vm.expectRevert(
-            abi.encodeWithSelector(PrizeVault.YieldFeePercentageGtPrecision.selector, 2e9, 1e9)
+            abi.encodeWithSelector(PrizeVault.YieldFeePercentageExceedsMax.selector, max + 1, max)
         );
-        vault.setYieldFeePercentage(2e9);
+        vault.setYieldFeePercentage(max + 1); // not ok
     }
 
     function testSetYieldFeePercentageOnlyOwner() public {
