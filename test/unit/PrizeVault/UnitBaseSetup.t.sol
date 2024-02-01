@@ -101,6 +101,7 @@ contract UnitBaseSetup is Test {
             claimer,
             address(this),
             0,
+            1e6,
             address(this)
         );
 

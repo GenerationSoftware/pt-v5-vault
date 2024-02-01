@@ -29,6 +29,8 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
     LiquidationPairMock public liquidationPair;
     PrizeVault public prizeVault;
 
+    uint256 yieldBuffer = 1e6;
+
     function setUp() public virtual override {
         _underlying_ = address(new ERC20Mock());
 
@@ -50,6 +52,7 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
                 address(this),
                 address(this),
                 0,
+                yieldBuffer,
                 address(this)
             )
         );
@@ -146,10 +149,10 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
         uint256 totalAssets = prizeVault.totalAssets();
         uint256 depositedAssets = prizeVault.totalSupply();
 
-        if (totalAssets < depositedAssets) {
-            assertEq(liquidatableBalanceOf, 0, "can't liquidate since assets are less than deposits");
+        if (totalAssets < depositedAssets + yieldBuffer) {
+            assertEq(liquidatableBalanceOf, 0, "can't liquidate since assets are less than deposits and yield buffer");
         } else {
-            assertApproxEqAbs(liquidatableBalanceOf, totalAssets - depositedAssets, _delta_, "yield");
+            assertApproxEqAbs(liquidatableBalanceOf, totalAssets - depositedAssets - yieldBuffer, _delta_, "yield");
         }
     }
 

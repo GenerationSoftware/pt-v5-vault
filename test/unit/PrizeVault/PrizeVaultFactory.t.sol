@@ -35,10 +35,14 @@ contract PrizeVaultFactoryTest is Test {
     ERC20Mock public prizeToken;
     PrizePoolMock public prizePool;
 
+    uint32 public yieldFeePercentage;
+    uint256 public yieldBuffer;
+
     string public name;
     string public symbol;
 
     address public claimer;
+    address public owner;
 
     /* ============ Setup ============ */
 
@@ -50,10 +54,14 @@ contract PrizeVaultFactoryTest is Test {
         prizeToken = new ERC20Mock();
         prizePool = new PrizePoolMock(prizeToken, twabController);
 
+        yieldFeePercentage = 0;
+        yieldBuffer = 1e6;
+
         name = "PoolTogether Test Vault";
         symbol = "pTest";
 
         claimer = makeAddr("claimer");
+        owner = makeAddr("owner");
         
         vm.mockCall(
             address(yieldVault),
@@ -78,11 +86,20 @@ contract PrizeVaultFactoryTest is Test {
             PrizePool(address(prizePool)),
             claimer,
             address(this),
-            0,
-            address(this)
+            yieldFeePercentage,
+            yieldBuffer,
+            owner
         );
 
         assertEq(address(PrizeVault(_vault).asset()), address(asset));
+        assertEq(PrizeVault(_vault).name(), name);
+        assertEq(PrizeVault(_vault).symbol(), symbol);
+        assertEq(address(PrizeVault(_vault).yieldVault()), address(yieldVault));
+        assertEq(address(PrizeVault(_vault).prizePool()), address(prizePool));
+        assertEq(PrizeVault(_vault).claimer(), claimer);
+        assertEq(PrizeVault(_vault).yieldFeePercentage(), yieldFeePercentage);
+        assertEq(PrizeVault(_vault).yieldBuffer(), yieldBuffer);
+        assertEq(PrizeVault(_vault).owner(), owner);
 
         assertEq(vaultFactory.totalVaults(), 1);
         assertTrue(vaultFactory.deployedVaults(address(_vault)));
@@ -97,8 +114,9 @@ contract PrizeVaultFactoryTest is Test {
                 PrizePool(address(prizePool)),
                 claimer,
                 address(this),
-                0,
-                address(this)
+                yieldFeePercentage,
+                yieldBuffer,
+                owner
             )
         );
 
@@ -110,8 +128,9 @@ contract PrizeVaultFactoryTest is Test {
                 PrizePool(address(prizePool)),
                 claimer,
                 address(this),
-                0,
-                address(this)
+                yieldFeePercentage,
+                yieldBuffer,
+                owner
             )
         );
 

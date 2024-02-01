@@ -16,19 +16,19 @@ contract YieldVault is ERC4626Mock {
      * Read this comment in the OpenZeppelin documentation to understand why:
      * https://github.com/openzeppelin/openzeppelin-contracts/blob/eedca5d873a559140d79cc7ec674d0e28b2b6ebd/contracts/token/ERC20/extensions/ERC4626.sol#L30
      */
-    function _convertToShares(
-        uint256 assets,
-        Math.Rounding rounding
-    ) internal view virtual override returns (uint256) {
-        uint256 supply = totalSupply();
-        return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
-    }
+    // function _convertToShares(
+    //     uint256 assets,
+    //     Math.Rounding rounding
+    // ) internal view virtual override returns (uint256) {
+    //     uint256 supply = totalSupply();
+    //     return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
+    // }
 
-    function _convertToAssets(
-        uint256 shares,
-        Math.Rounding rounding
-    ) internal view virtual override returns (uint256) {
-        uint256 supply = totalSupply();
-        return (shares == 0 || supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
-    }
+    // function _convertToAssets(
+    //     uint256 shares,
+    //     Math.Rounding rounding
+    // ) internal view virtual override returns (uint256) {
+    //     uint256 supply = totalSupply();
+    //     return (shares == 0 || supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
+    // }
 }

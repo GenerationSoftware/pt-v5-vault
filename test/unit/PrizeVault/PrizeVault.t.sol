@@ -23,6 +23,7 @@ contract PrizeVaultTest is UnitBaseSetup {
             claimer,
             address(this),
             YIELD_FEE_PERCENTAGE,
+            1e6,
             address(this)
         );
 
@@ -50,6 +51,7 @@ contract PrizeVaultTest is UnitBaseSetup {
             claimer,
             address(this),
             YIELD_FEE_PERCENTAGE,
+            1e6,
             address(this)
         );
     }
@@ -64,6 +66,7 @@ contract PrizeVaultTest is UnitBaseSetup {
             claimer,
             address(this),
             YIELD_FEE_PERCENTAGE,
+            1e6,
             address(this)
         );
     }
@@ -79,6 +82,7 @@ contract PrizeVaultTest is UnitBaseSetup {
             claimer,
             address(this),
             YIELD_FEE_PERCENTAGE,
+            1e6,
             address(0)
         );
     }
@@ -94,6 +98,7 @@ contract PrizeVaultTest is UnitBaseSetup {
             address(0),
             address(this),
             YIELD_FEE_PERCENTAGE,
+            1e6,
             address(this)
         );
     }
