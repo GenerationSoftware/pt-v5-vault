@@ -25,16 +25,16 @@ interface IVaultHooks {
      * @param winner The user who won the prize and for whom this hook is attached
      * @param tier The tier of the prize
      * @param prizeIndex The index of the prize in the tier
-     * @param fee The fee portion of the prize that will be allocated to the claimer
-     * @param feeRecipient The recipient of the claim fee
+     * @param reward The reward portion of the prize that will be allocated to the claimer
+     * @param rewardRecipient The recipient of the claim reward
      * @return address The address of the recipient of the prize
      */
     function beforeClaimPrize(
         address winner,
         uint8 tier,
         uint32 prizeIndex,
-        uint96 fee,
-        address feeRecipient
+        uint96 reward,
+        address rewardRecipient
     ) external returns (address);
 
     /**
@@ -42,7 +42,7 @@ interface IVaultHooks {
      * @param winner The user who won the prize and for whom this hook is attached
      * @param tier The tier of the prize
      * @param prizeIndex The index of the prize
-     * @param prize The total size of the prize (payout + fee)
+     * @param prize The total size of the prize (payout + reward)
      * @param recipient The recipient of the prize
      */
     function afterClaimPrize(

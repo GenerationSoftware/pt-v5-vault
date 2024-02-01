@@ -75,8 +75,8 @@ abstract contract Claimable is HookManager, IClaimable {
         address _winner,
         uint8 _tier,
         uint32 _prizeIndex,
-        uint96 _fee,
-        address _feeRecipient
+        uint96 _reward,
+        address _rewardRecipient
     ) external onlyClaimer returns (uint256) {
         address recipient;
 
@@ -85,8 +85,8 @@ abstract contract Claimable is HookManager, IClaimable {
                 _winner,
                 _tier,
                 _prizeIndex,
-                _fee,
-                _feeRecipient
+                _reward,
+                _rewardRecipient
             );
         } else {
             recipient = _winner;
@@ -99,8 +99,8 @@ abstract contract Claimable is HookManager, IClaimable {
             _tier,
             _prizeIndex,
             recipient,
-            _fee,
-            _feeRecipient
+            _reward,
+            _rewardRecipient
         );
 
         if (_hooks[_winner].useAfterClaimPrize) {

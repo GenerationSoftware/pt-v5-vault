@@ -16,8 +16,8 @@ contract ClaimableTest is Test, IVaultHooks {
         address winner,
         uint8 tier,
         uint32 prizeIndex,
-        uint96 fee,
-        address feeRecipient
+        uint96 reward,
+        address rewardRecipient
     );
     event AfterClaimPrizeCalled(
         address winner,
@@ -195,11 +195,11 @@ contract ClaimableTest is Test, IVaultHooks {
     }
 
     function testClaimPrize_returnsPrizeTotal() public {
-        mockClaimPrize(alice, 1, 2, alice, 1e17, bob); // prizeTotal will be 10x fee (1e18)
+        mockClaimPrize(alice, 1, 2, alice, 1e17, bob); // prizeTotal will be 10x reward (1e18)
         uint256 prizeTotal = claimable.claimPrize(alice, 1, 2, 1e17, bob);
         assertEq(prizeTotal, 1e18);
 
-        mockClaimPrize(alice, 1, 2, alice, 3, bob); // prizeTotal will be 10x fee (30)
+        mockClaimPrize(alice, 1, 2, alice, 3, bob); // prizeTotal will be 10x reward (30)
         uint256 prizeTotal2 = claimable.claimPrize(alice, 1, 2, 3, bob);
         assertEq(prizeTotal2, 30);
     }
@@ -255,8 +255,8 @@ contract ClaimableTest is Test, IVaultHooks {
         address winner,
         uint8 tier,
         uint32 prizeIndex,
-        uint96 fee,
-        address feeRecipient
+        uint96 reward,
+        address rewardRecipient
     ) external returns (address) {
         if (useTooMuchGasBefore) {
             for (uint i = 0; i < 1000; i++) {
@@ -267,8 +267,8 @@ contract ClaimableTest is Test, IVaultHooks {
             winner,
             tier,
             prizeIndex,
-            fee,
-            feeRecipient
+            reward,
+            rewardRecipient
         );
         return prizeRedirectionAddress;
     }
@@ -294,14 +294,14 @@ contract ClaimableTest is Test, IVaultHooks {
         );
     }
 
-    /// @dev Mocks a prize claim and returns a prize size of 10 times the claim fee
+    /// @dev Mocks a prize claim and returns a prize size of 10 times the claim reward
     function mockClaimPrize(
         address _winner,
         uint8 _tier,
         uint32 _prizeIndex,
         address _recipient,
-        uint96 _fee,
-        address _feeRecipient
+        uint96 _reward,
+        address _rewardRecipient
     ) public {
         vm.mockCall(
             address(prizePool),
@@ -311,10 +311,10 @@ contract ClaimableTest is Test, IVaultHooks {
                 _tier,
                 _prizeIndex,
                 _recipient,
-                _fee,
-                _feeRecipient
+                _reward,
+                _rewardRecipient
             ),
-            abi.encode(_fee * 10)
+            abi.encode(_reward * 10)
         );
     }
 

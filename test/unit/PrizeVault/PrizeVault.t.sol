@@ -606,10 +606,10 @@ contract PrizeVaultTest is UnitBaseSetup {
         uint8 tier,
         address winner,
         uint32 prizeIndex,
-        uint96 fee,
-        address feeRecipient
+        uint96 reward,
+        address rewardRecipient
     ) public returns (uint256) {
-        return vault.claimPrize(winner, tier, prizeIndex, fee, feeRecipient);
+        return vault.claimPrize(winner, tier, prizeIndex, reward, rewardRecipient);
     }
 
     /* ============ mocks ============ */
@@ -618,8 +618,8 @@ contract PrizeVaultTest is UnitBaseSetup {
         uint8 _tier,
         address _winner,
         uint32 _prizeIndex,
-        uint96 _fee,
-        address _feeRecipient
+        uint96 _reward,
+        address _rewardRecipient
     ) public {
         vm.mockCall(
             address(prizePool),
@@ -629,8 +629,8 @@ contract PrizeVaultTest is UnitBaseSetup {
                 _tier,
                 _prizeIndex,
                 _winner,
-                _fee,
-                _feeRecipient
+                _reward,
+                _rewardRecipient
             ),
             abi.encode(100)
         );
@@ -641,8 +641,8 @@ contract PrizeVaultTest is UnitBaseSetup {
         address _winner,
         uint32 _prizeIndex,
         address _recipient,
-        uint96 _fee,
-        address _feeRecipient
+        uint96 _reward,
+        address _rewardRecipient
     ) public {
         vm.mockCall(
             address(prizePool),
@@ -652,8 +652,8 @@ contract PrizeVaultTest is UnitBaseSetup {
                 _tier,
                 _prizeIndex,
                 _recipient,
-                _fee,
-                _feeRecipient
+                _reward,
+                _rewardRecipient
             ),
             abi.encode(100)
         );
