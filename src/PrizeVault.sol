@@ -203,6 +203,13 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      */
     error LiquidationAmountOutGtYield(uint256 amountOut, uint256 availableYield);
 
+    /**
+     * @notice Thrown when a deposit results in a state where the total assets are less than the total share supply.
+     * @param totalAssets The total assets controlled by the vault
+     * @param totalSupply The total shares minted by the vault
+     */
+    error LossyDeposit(uint256 totalAssets, uint256 totalSupply);
+
     /* ============ Modifiers ============ */
 
     /// @notice Requires the caller to be the liquidation pair.
@@ -309,11 +316,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @inheritdoc IERC4626
     /// @dev Considers the uint96 limit on total share supply in the TwabController
+    /// @dev Returns zero if any deposit would result in a loss of assets
     /// @dev TODO: add reasoning for exclusion of latent balance
-    /// @dev TODO: return 0 if deposits and mints are disabled due to less assets than supply
     function maxDeposit(address) public view returns (uint256) {
+        uint256 _totalSupply = totalSupply();
+        if (totalAssets() < _totalSupply) return 0;
+
         // the vault will never mint more than 1 share per asset, so no need to convert supply buffer to assets
-        uint256 _twabSupplyLimit = type(uint96).max - totalSupply();
+        uint256 _twabSupplyLimit = type(uint96).max - _totalSupply;
         uint256 _maxDeposit;
         uint256 _latentBalance = _asset.balanceOf(address(this));
         uint256 _maxYieldVaultDeposit = yieldVault.maxDeposit(address(this));
@@ -328,9 +338,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc IERC4626
-    /// @dev Considers the uint96 limit on total share supply in the TwabController
+    /// @dev Returns the same value as `maxDeposit` since shares and assets are 1:1 on mint.
     function maxMint(address _owner) public view returns (uint256) {
-        // shares represent how many assets an account has deposited, so they are 1:1 on mint
         return maxDeposit(_owner);
     }
 
@@ -679,6 +688,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @param _shares Amount of shares to mint
      * @dev Emits a `Deposit` event.
      * @dev Will revert if 0 shares are minted back to the receiver or if 0 assets are deposited.
+     * @dev Will revert if the deposit may result in the loss of funds.
      */
     function _depositAndMint(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal {
         if (_shares == 0) revert MintZeroShares();
@@ -706,6 +716,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         }
 
         _mint(_receiver, _shares);
+
+        if (totalAssets() < totalSupply()) revert LossyDeposit(totalAssets(), totalSupply());
 
         emit Deposit(_caller, _receiver, _assets, _shares);
     }
