@@ -36,6 +36,13 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @notice The yield fee decimal precision.
     uint32 public constant FEE_PRECISION = 1e9;
+    
+    /// @notice The max yield fee that can be set.
+    /// @dev Decimal precision is defined by `FEE_PRECISION`.
+    /// @dev If the yield fee is set too high, liquidations won't occur on a regular basis. If a use case requires
+    ///      a yield fee higher than this max, a custom liquidation pair can be set to manipulate the yield as
+    ///      required.
+    uint32 public constant MAX_YIELD_FEE = 9e8;
 
     /// @notice The yield buffer that is reserved for covering rounding errors on withdrawals and deposits.
     /// @dev The buffer prevents the entire yield balance from being liquidated, which would leave the vault in a
@@ -65,9 +72,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @notice Underlying asset decimals.
     uint8 private immutable _underlyingDecimals;
-
-    /// @notice Yield fees accrued through liquidations.
-    uint256 private _accruedYieldFee;
 
     /* ============ Events ============ */
 
@@ -152,13 +156,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     error PermitCallerNotOwner(address caller, address owner);
 
     /**
-     * @notice Thrown when the caller that is withdrawing the yield fee is not the fee recipient.
-     * @param caller The caller address
-     * @param yieldFeeRecipient The yield fee recipient address
-     */
-    error CallerNotYieldFeeRecipient(address caller, address yieldFeeRecipient);
-
-    /**
      * @notice Thrown when a permit call on the underlying asset failed to set the spending allowance.
      * @dev This is likely thrown when the underlying asset does not support permit, but has a fallback function.
      * @param owner The owner of the assets
@@ -169,11 +166,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     error PermitAllowanceNotSet(address owner, address spender, uint256 amount, uint256 allowance);
 
     /**
-     * @notice Thrown when the yield fee percentage being set is greater than 100%.
+     * @notice Thrown when the yield fee percentage being set exceeds the max yield fee allowed.
      * @param yieldFeePercentage The yield fee percentage in integer format
-     * @param maxYieldFeePercentage The max yield fee percentage in integer format (this value is equal to 1 in decimal format)
+     * @param maxYieldFeePercentage The max yield fee percentage in integer format
      */
-    error YieldFeePercentageGtPrecision(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
+    error YieldFeePercentageExceedsMax(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
 
     /**
      * @notice Thrown during the liquidation process when the token in is not the prize token.
@@ -183,13 +180,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     error LiquidationTokenInNotPrizeToken(address tokenIn, address prizeToken);
 
     /**
-     * @notice Thrown when the fee being withdrawn exceeds the available yield fee balance.
-     * @param amount The fee being withdrawn
-     * @param yieldFeeBalance The available yield fee balance
-     */
-    error AmountExceedsYieldFeeBalance(uint256 amount, uint256 yieldFeeBalance);
-
-    /**
      * @notice Thrown during the liquidation process when the token out is not the vault asset.
      * @param tokenOut The provided tokenOut address
      * @param vaultAsset The vault asset address
@@ -197,11 +187,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     error LiquidationTokenOutNotAsset(address tokenOut, address vaultAsset);
 
     /**
-     * @notice Thrown during the liquidation process if the amount out is greater than the available yield.
-     * @param amountOut The amount out
+     * @notice Thrown during the liquidation process if the total to withdraw is greater than the available yield.
+     * @param totalToWithdraw The total yield to withdraw
      * @param availableYield The available yield
      */
-    error LiquidationAmountOutGtYield(uint256 amountOut, uint256 availableYield);
+    error LiquidationExceedsAvailable(uint256 totalToWithdraw, uint256 availableYield);
 
     /**
      * @notice Thrown when a deposit results in a state where the total assets are less than the total share supply.
@@ -216,14 +206,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     modifier onlyLiquidationPair() {
         if (msg.sender != liquidationPair) {
             revert CallerNotLP(msg.sender, liquidationPair);
-        }
-        _;
-    }
-
-    /// @notice Requires the caller to be the yield fee recipient.
-    modifier onlyYieldFeeRecipient() {
-        if (msg.sender != yieldFeeRecipient) {
-            revert CallerNotYieldFeeRecipient(msg.sender, yieldFeeRecipient);
         }
         _;
     }
@@ -508,43 +490,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         }
     }
 
-    /**
-     * @notice The available yield fee balance that can be withdrawn by the fee recipient.
-     * @dev Returns the full excess asset balance if the fee percentage has been set to
-     * 100%. This enables LPs to be bypassed on 100% fee vaults.
-     * @dev Limits the accrued fee to the amount of excess assets available in the vault.
-     * This ensures that the yield fee is used to make depositors whole in the case of an
-     * asset shortage.
-     * @return The accrued yield fee balance.
-     */
-    function yieldFeeBalance() public view returns (uint256) {
-        uint256 _availableYieldBalance = availableYieldBalance();
-        if (yieldFeePercentage == FEE_PRECISION) {
-            return _availableYieldBalance;
-        } else {
-            return _accruedYieldFee >= _availableYieldBalance ? _availableYieldBalance : _accruedYieldFee;
-        }
-    }
-
-    /**
-     * @notice Withdraws the yield fee to the yield fee recipient.
-     * @dev Will revert if the caller is not the recipient.
-     * @dev Will revert if the entire amount cannot be withdrawn due to yield vault limits.
-     * @dev Will revert if the amount exceeds the available fee balance.
-     */
-    function withdrawYieldFee(uint256 _amount) external onlyYieldFeeRecipient {
-        uint256 _yieldFeeBalance = yieldFeeBalance();
-
-        if (_amount > _yieldFeeBalance) revert AmountExceedsYieldFeeBalance(_amount, _yieldFeeBalance);
-        
-        unchecked {
-            _accruedYieldFee = _yieldFeeBalance - _amount;
-        }
-        _withdraw(yieldFeeRecipient, _amount);
-
-        emit WithdrawYieldFee(msg.sender, _amount);
-    }
-
     /* ============ LiquidationSource Functions ============ */
 
     /// @inheritdoc ILiquidationSource
@@ -553,11 +498,10 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (_token != address(_asset)) {
             return 0;
         } else {
-            // TODO: Add rounding error explanation for subtracting yield buffer from the available yield balance.
-            uint256 _maxLiquidation = availableYieldBalance() - _accruedYieldFee;
-            uint256 _maxLiquidationMinusFees = _maxLiquidation - (_maxLiquidation * yieldFeePercentage) / FEE_PRECISION;
-            uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this));
-            return _maxWithdraw < _maxLiquidationMinusFees ? _maxWithdraw : _maxLiquidationMinusFees;
+            uint256 _availableYieldBalance = availableYieldBalance();
+            uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
+            uint256 _withdrawableYieldBalance = _availableYieldBalance >= _maxWithdraw ? _maxWithdraw : _availableYieldBalance;
+            return _withdrawableYieldBalance.mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
         }
     }
 
@@ -571,24 +515,30 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (_tokenOut != address(_asset)) {
             revert LiquidationTokenOutNotAsset(_tokenOut, address(_asset));
         }
+
+        uint32 _yieldFeePercentage = yieldFeePercentage;
         if (_amountOut == 0) revert LiquidationAmountOutZero();
 
-        uint256 _liquidatableYield = liquidatableBalanceOf(_tokenOut);
-        uint32 _yieldFeePercentage = yieldFeePercentage;
+        uint256 _availableYieldBalance = availableYieldBalance();
+        address _yieldFeeRecipient = yieldFeeRecipient;
 
-        if (_amountOut > _liquidatableYield) {
-            revert LiquidationAmountOutGtYield(_amountOut, _liquidatableYield);
+        // Determine the proportional yield fee based on the amount being liquidated:
+        uint256 _yieldFee;
+        if (_yieldFeePercentage != 0 && _yieldFeeRecipient != address(0)) {
+            _yieldFee = (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut;
         }
 
-        // Distributes the specified yield fee percentage.
-        // For instance, with a yield fee percentage of 20% and 8e18 assets being liquidated,
-        // this calculation assigns 2e18 assets to the yield fee recipient.
-        // `_amountOut` is the amount of assets being liquidated after accounting for the yield fee.
-        if (_yieldFeePercentage != 0) {
-            _accruedYieldFee += (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut;
+        // Ensure total withdrawn does not exceed the available yield balance:
+        uint256 _totalToWithdraw = _amountOut + _yieldFee;
+        if (_totalToWithdraw > _availableYieldBalance) {
+            revert LiquidationExceedsAvailable(_totalToWithdraw, _availableYieldBalance);
         }
 
-        _withdraw(_receiver, _amountOut);
+        _withdraw(address(this), _totalToWithdraw);
+        _asset.transfer(_receiver, _amountOut);
+        if (_yieldFee > 0) {
+            _asset.transfer(_yieldFeeRecipient, _yieldFee);
+        }
 
         return "";
     }
@@ -770,17 +720,19 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             uint256 _yieldVaultShares = yieldVault.previewWithdraw(_assets - _latentAssets); // should include any fees and round up, so the following redeem call should return enough assets
             yieldVault.redeem(_yieldVaultShares, address(this), address(this)); // send assets to this contract so any leftover dust can be redeposited later
         }
-        _asset.transfer(_receiver, _assets);
+        if (_receiver != address(this)) {
+            _asset.transfer(_receiver, _assets);
+        }
     }
 
     /**
      * @notice Set yield fee percentage.
-     * @dev Yield fee is defined on a scale from `0` to `FEE_PRECISION`, inclusive.
+     * @dev Yield fee is defined on a scale from `0` to `MAX_YIELD_FEE`, inclusive.
      * @param _yieldFeePercentage The new yield fee percentage to set
      */
     function _setYieldFeePercentage(uint32 _yieldFeePercentage) internal {
-        if (_yieldFeePercentage > FEE_PRECISION) {
-            revert YieldFeePercentageGtPrecision(_yieldFeePercentage, FEE_PRECISION);
+        if (_yieldFeePercentage > MAX_YIELD_FEE) {
+            revert YieldFeePercentageExceedsMax(_yieldFeePercentage, MAX_YIELD_FEE);
         }
         yieldFeePercentage = _yieldFeePercentage;
         emit YieldFeePercentageSet(_yieldFeePercentage);
