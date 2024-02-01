@@ -54,17 +54,19 @@ contract PrizeVaultFactory {
      * @param _claimer Address of the claimer
      * @param _yieldFeeRecipient Address of the yield fee recipient
      * @param _yieldFeePercentage Yield fee percentage
+     * @param _yieldBuffer Amount of yield to keep as a buffer
      * @param _owner Address that will gain ownership of this contract
      * @return PrizeVault The newly deployed PrizeVault
      */
     function deployVault(
-      string calldata _name,
-      string calldata _symbol,
+      string memory _name,
+      string memory _symbol,
       IERC4626 _yieldVault,
       PrizePool _prizePool,
       address _claimer,
       address _yieldFeeRecipient,
       uint32 _yieldFeePercentage,
+      uint256 _yieldBuffer,
       address _owner
     ) external returns (PrizeVault) {
         PrizeVault _vault = new PrizeVault{
@@ -77,6 +79,7 @@ contract PrizeVaultFactory {
             _claimer,
             _yieldFeeRecipient,
             _yieldFeePercentage,
+            _yieldBuffer,
             _owner
         );
 
