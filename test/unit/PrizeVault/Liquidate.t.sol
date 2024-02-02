@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
-import { IERC20, UnitBaseSetup, PrizeVault } from "./UnitBaseSetup.t.sol";
+import { IERC20, UnitBaseSetup, PrizeVault, YieldVault, IERC4626 } from "./UnitBaseSetup.t.sol";
 
 contract PrizeVaultLiquidationTest is UnitBaseSetup {
 
@@ -21,7 +21,9 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vault.setYieldFeePercentage(0); // no fee
 
         underlyingAsset.mint(address(vault), 1e18);
+
         assertEq(vault.liquidatableBalanceOf(address(underlyingAsset)), 1e18 - vault.yieldBuffer());
+        assertEq(vault.liquidatableBalanceOf(address(vault)), 1e18 - vault.yieldBuffer());
     }
 
     function testLiquidatableBalanceOf_withFee() public {
@@ -30,7 +32,54 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         underlyingAsset.mint(address(vault), 1e18);
         uint256 availableYield = 1e18 - vault.yieldBuffer();
         uint256 availableMinusFee = (availableYield * (1e9 - 1e8)) / 1e9;
+
         assertEq(vault.liquidatableBalanceOf(address(underlyingAsset)), availableMinusFee);
+        assertEq(vault.liquidatableBalanceOf(address(vault)), availableMinusFee);
+    }
+
+    function testLiquidatableBalanceOf_respectsMaxAssetWithdraw() public {
+        vault.setYieldFeePercentage(0); // no fee
+
+        // make a small deposit to mint some shares on yield vault
+        underlyingAsset.mint(address(alice), 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+
+        // mint yield to yield vault
+        underlyingAsset.mint(address(yieldVault), 1e18);
+        uint256 availableYield = vault.availableYieldBalance();
+        assertApproxEqAbs(availableYield, 1e18 - vault.yieldBuffer(), 1);
+
+        vm.mockCall(
+            address(yieldVault),
+            abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)),
+            abi.encode(availableYield / 2) // less than available yield, so we shouldn't be able to liquidate more than this
+        );
+
+        assertEq(vault.liquidatableBalanceOf(address(underlyingAsset)), availableYield / 2);
+    }
+
+    function testLiquidatableBalanceOf_respectsMaxShareMint() public {
+        vault.setYieldFeePercentage(0); // no fee
+
+        uint256 supplyCapLeft = 100;
+
+        // make a large deposit to use most of the shares:
+        underlyingAsset.mint(address(alice), type(uint96).max);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), type(uint96).max - supplyCapLeft);
+        vault.deposit(type(uint96).max - supplyCapLeft, alice);
+        vm.stopPrank();
+
+        underlyingAsset.mint(address(vault), 1e18);
+        uint256 availableYield = vault.availableYieldBalance();
+        assertApproxEqAbs(availableYield, 1e18 - vault.yieldBuffer(), 1);
+
+        assertLt(supplyCapLeft, availableYield);
+
+        assertEq(vault.liquidatableBalanceOf(address(vault)), supplyCapLeft); // less than available yield since shares are capped at uint96 max
     }
 
     /* ============ transferTokensOut ============ */
@@ -40,17 +89,29 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vault.setYieldFeeRecipient(bob);
         vault.setLiquidationPair(address(this));
 
-        underlyingAsset.mint(address(vault), 1e18);
-        uint256 amountOut = vault.liquidatableBalanceOf(address(underlyingAsset));
-        assertGt(amountOut, 0);
+        // test with asset and then vault shares
+        uint256 snapshot = vm.snapshot();
+        address tokenOut = address(underlyingAsset);
+        address tokenFrom = address(vault);
+        for (uint i = 0; i < 2; i++) {
+            if (i == 1) {
+                vm.revertTo(snapshot);
+                tokenOut = address(vault);
+                tokenFrom = address(0); // minted
+            }
 
-        vm.expectEmit();
-        emit Transfer(address(vault), alice, amountOut);
+            underlyingAsset.mint(address(vault), 1e18);
+            uint256 amountOut = vault.liquidatableBalanceOf(address(tokenOut));
+            assertGt(amountOut, 0);
 
-        vault.transferTokensOut(address(0), alice, address(underlyingAsset), amountOut);
+            vm.expectEmit();
+            emit Transfer(tokenFrom, alice, amountOut);
 
-        assertEq(underlyingAsset.balanceOf(alice), amountOut);
-        assertEq(underlyingAsset.balanceOf(bob), 0);
+            vault.transferTokensOut(address(0), alice, address(tokenOut), amountOut);
+
+            assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
+            assertEq(IERC20(tokenOut).balanceOf(bob), 0);
+        }
     }
 
     // Fee is set, but recipient is the zero address, so no fee should be transferred
@@ -59,17 +120,29 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vault.setYieldFeeRecipient(address(0));
         vault.setLiquidationPair(address(this));
 
-        underlyingAsset.mint(address(vault), 1e18);
-        uint256 amountOut = vault.liquidatableBalanceOf(address(underlyingAsset));
-        assertGt(amountOut, 0);
+        // test with asset and then vault shares
+        uint256 snapshot = vm.snapshot();
+        address tokenOut = address(underlyingAsset);
+        address tokenFrom = address(vault);
+        for (uint i = 0; i < 2; i++) {
+            if (i == 1) {
+                vm.revertTo(snapshot);
+                tokenOut = address(vault);
+                tokenFrom = address(0); // minted
+            }
 
-        vm.expectEmit();
-        emit Transfer(address(vault), alice, amountOut);
+            underlyingAsset.mint(address(vault), 1e18);
+            uint256 amountOut = vault.liquidatableBalanceOf(tokenOut);
+            assertGt(amountOut, 0);
 
-        vault.transferTokensOut(address(0), alice, address(underlyingAsset), amountOut);
+            vm.expectEmit();
+            emit Transfer(tokenFrom, alice, amountOut);
 
-        assertEq(underlyingAsset.balanceOf(alice), amountOut);
-        assertEq(underlyingAsset.balanceOf(address(0)), 0);
+            vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
+
+            assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
+            assertEq(IERC20(tokenOut).balanceOf(address(0)), 0);
+        }
     }
 
     function testTransferTokensOut_withFee() public {
@@ -77,23 +150,35 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vault.setYieldFeeRecipient(bob);
         vault.setLiquidationPair(address(this));
 
-        underlyingAsset.mint(address(vault), 1e18);
-        uint256 amountOut = vault.liquidatableBalanceOf(address(underlyingAsset));
-        uint256 yieldFee = 1e18 - vault.yieldBuffer() - amountOut;
-        assertGt(amountOut, 0);
+        // test with asset and then vault shares
+        uint256 snapshot = vm.snapshot();
+        address tokenOut = address(underlyingAsset);
+        address tokenFrom = address(vault);
+        for (uint i = 0; i < 2; i++) {
+            if (i == 1) {
+                vm.revertTo(snapshot);
+                tokenOut = address(vault);
+                tokenFrom = address(0); // minted
+            }
 
-        vm.expectEmit();
-        emit Transfer(address(vault), alice, amountOut);
+            underlyingAsset.mint(address(vault), 1e18);
+            uint256 amountOut = vault.liquidatableBalanceOf(tokenOut);
+            uint256 yieldFee = 1e18 - vault.yieldBuffer() - amountOut;
+            assertGt(amountOut, 0);
 
-        vm.expectEmit();
-        emit Transfer(address(vault), bob, yieldFee);
+            vm.expectEmit();
+            emit Transfer(tokenFrom, alice, amountOut);
 
-        vault.transferTokensOut(address(0), alice, address(underlyingAsset), amountOut);
+            vm.expectEmit();
+            emit Transfer(tokenFrom, bob, yieldFee);
 
-        assertEq(underlyingAsset.balanceOf(alice), amountOut);
-        assertEq(underlyingAsset.balanceOf(bob), yieldFee);
+            vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
 
-        assertEq(amountOut / yieldFee, (1e9 - 1e8) / 1e8); // ratio of (amountOut : yieldFee) equal to (1 - feePercentage : feePercentage) 
+            assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
+            assertEq(IERC20(tokenOut).balanceOf(bob), yieldFee);
+
+            assertEq(amountOut / yieldFee, (1e9 - 1e8) / 1e8); // ratio of (amountOut : yieldFee) equal to (1 - feePercentage : feePercentage) 
+        }
     }
 
     function testTransferTokensOut_CallerNotLP() public {
@@ -103,17 +188,23 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vm.stopPrank();
     }
 
-    function testTransferTokensOut_LiquidationTokenOutNotAsset() public {
+    function testTransferTokensOut_LiquidationTokenOutNotSupported() public {
+        underlyingAsset.mint(address(vault), 1e18);
         vm.startPrank(vault.liquidationPair());
-        vm.expectRevert(abi.encodeWithSelector(PrizeVault.LiquidationTokenOutNotAsset.selector, address(vault), address(underlyingAsset)));
-        vault.transferTokensOut(address(0), bob, address(vault), 0);
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.LiquidationTokenOutNotSupported.selector, alice));
+        vault.transferTokensOut(address(0), bob, alice, 1);
         vm.stopPrank();
     }
 
     function testTransferTokensOut_LiquidationAmountOutZero() public {
         vm.startPrank(vault.liquidationPair());
+
         vm.expectRevert(abi.encodeWithSelector(PrizeVault.LiquidationAmountOutZero.selector));
         vault.transferTokensOut(address(0), bob, address(underlyingAsset), 0);
+
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.LiquidationAmountOutZero.selector));
+        vault.transferTokensOut(address(0), bob, address(vault), 0);
+
         vm.stopPrank();
     }
 
@@ -122,11 +213,18 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vault.setLiquidationPair(address(this));
 
         underlyingAsset.mint(address(vault), 1e18);
+
+        // assets
         uint256 amountOut = vault.liquidatableBalanceOf(address(underlyingAsset));
         assertGt(amountOut, 0);
-
         vm.expectRevert(abi.encodeWithSelector(PrizeVault.LiquidationExceedsAvailable.selector, amountOut + 1, amountOut));
         vault.transferTokensOut(address(0), bob, address(underlyingAsset), amountOut + 1);
+
+        // vault shares
+        amountOut = vault.liquidatableBalanceOf(address(vault));
+        assertGt(amountOut, 0);
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.LiquidationExceedsAvailable.selector, amountOut + 1, amountOut));
+        vault.transferTokensOut(address(0), bob, address(vault), amountOut + 1);
     }
 
     /* ============ verifyTokensIn ============ */

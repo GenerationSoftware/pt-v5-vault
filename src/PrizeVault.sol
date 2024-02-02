@@ -180,11 +180,10 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     error LiquidationTokenInNotPrizeToken(address tokenIn, address prizeToken);
 
     /**
-     * @notice Thrown during the liquidation process when the token out is not the vault asset.
+     * @notice Thrown during the liquidation process when the token out is not supported.
      * @param tokenOut The provided tokenOut address
-     * @param vaultAsset The vault asset address
      */
-    error LiquidationTokenOutNotAsset(address tokenOut, address vaultAsset);
+    error LiquidationTokenOutNotSupported(address tokenOut);
 
     /**
      * @notice Thrown during the liquidation process if the total to withdraw is greater than the available yield.
@@ -475,12 +474,19 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /* ============ Yield Functions ============ */
 
     /**
-     * @notice Total available yield on the vault.
+     * @notice Total available yield on the vault
      * @return The available yield balance
      */
     function availableYieldBalance() public view returns (uint256) {
-        uint256 _totalAssets = totalAssets();
-        uint256 _allocatedAssets = totalSupply() + yieldBuffer;
+        return _availableYieldBalance(totalAssets(), totalSupply());
+    }
+
+    /**
+     * @notice Total available yield given the total assets and total share supply
+     * @return The available yield balance
+     */
+    function _availableYieldBalance(uint256 _totalAssets, uint256 _totalSupply) internal view returns (uint256) {
+        uint256 _allocatedAssets = _totalSupply + yieldBuffer;
         if (_allocatedAssets >= _totalAssets) {
             return 0;
         } else {
@@ -494,32 +500,36 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @inheritdoc ILiquidationSource
     /// @dev Returns the withdrawable amount of the available yield minus any yield fees.
+    /// @dev Supports the liquidation of either assets or prize vault shares.
     function liquidatableBalanceOf(address _token) public view returns (uint256) {
-        if (_token != address(_asset)) {
-            return 0;
+        uint256 _totalSupply = totalSupply();
+        uint256 _maxLiquidation;
+        if (_token == address(this)) {
+            // Liquidation of vault shares is capped to the TWAB supply cap (max uint96).
+            _maxLiquidation = type(uint96).max - _totalSupply;
+        } else if (_token == address(_asset)) {
+            // Liquidation of yield assets is capped at the max withdraw.
+            _maxLiquidation = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
         } else {
-            uint256 _availableYieldBalance = availableYieldBalance();
-            uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
-            uint256 _withdrawableYieldBalance = _availableYieldBalance >= _maxWithdraw ? _maxWithdraw : _availableYieldBalance;
-            return _withdrawableYieldBalance.mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
+            return 0;
         }
+        uint256 _availableYield = _availableYieldBalance(totalAssets(), _totalSupply);
+        uint256 _liquidYield = _availableYield >= _maxLiquidation ? _maxLiquidation : _availableYield;
+        return _liquidYield.mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
     }
 
     /// @inheritdoc ILiquidationSource
+    /// @dev Supports the liquidation of either assets or prize vault shares.
     function transferTokensOut(
         address,
         address _receiver,
         address _tokenOut,
         uint256 _amountOut
     ) external onlyLiquidationPair returns (bytes memory) {
-        if (_tokenOut != address(_asset)) {
-            revert LiquidationTokenOutNotAsset(_tokenOut, address(_asset));
-        }
-
-        uint32 _yieldFeePercentage = yieldFeePercentage;
         if (_amountOut == 0) revert LiquidationAmountOutZero();
 
-        uint256 _availableYieldBalance = availableYieldBalance();
+        uint256 _availableYield = availableYieldBalance();
+        uint32 _yieldFeePercentage = yieldFeePercentage;
         address _yieldFeeRecipient = yieldFeeRecipient;
 
         // Determine the proportional yield fee based on the amount being liquidated:
@@ -528,16 +538,27 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             _yieldFee = (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut;
         }
 
-        // Ensure total withdrawn does not exceed the available yield balance:
-        uint256 _totalToWithdraw = _amountOut + _yieldFee;
-        if (_totalToWithdraw > _availableYieldBalance) {
-            revert LiquidationExceedsAvailable(_totalToWithdraw, _availableYieldBalance);
+        // Ensure total liquidation does not exceed the available yield balance:
+        uint256 _totalLiquidation = _amountOut + _yieldFee;
+        if (_totalLiquidation > _availableYield) {
+            revert LiquidationExceedsAvailable(_totalLiquidation, _availableYield);
         }
 
-        _withdraw(address(this), _totalToWithdraw);
-        _asset.transfer(_receiver, _amountOut);
-        if (_yieldFee > 0) {
-            _asset.transfer(_yieldFeeRecipient, _yieldFee);
+        if (_tokenOut == address(_asset)) {
+            // Withdraw assets:
+            _withdraw(address(this), _totalLiquidation);
+            _asset.transfer(_receiver, _amountOut);
+            if (_yieldFee > 0) {
+                _asset.transfer(_yieldFeeRecipient, _yieldFee);
+            }
+        } else if (_tokenOut == address(this)) {
+            // Mint shares:
+            _mint(_receiver, _amountOut);
+            if (_yieldFee > 0) {
+                _mint(_yieldFeeRecipient, _yieldFee);
+            }
+        } else {
+            revert LiquidationTokenOutNotSupported(_tokenOut);
         }
 
         return "";
@@ -566,7 +587,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         address _tokenOut,
         address _liquidationPair
     ) external view returns (bool) {
-        return _tokenOut == address(_asset) && _liquidationPair == liquidationPair;
+        return (_tokenOut == address(_asset) || _tokenOut == address(this)) && _liquidationPair == liquidationPair;
     }
 
     /* ============ Setter Functions ============ */

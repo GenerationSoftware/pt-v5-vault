@@ -25,8 +25,12 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
     ERC20Mock public prizeToken;
     IERC4626 public yieldVault;
 
-    LiquidationRouterMock public liquidationRouter;
-    LiquidationPairMock public liquidationPair;
+    // test with either asset liquidation OR share liquidation
+    LiquidationRouterMock public assetLiquidationRouter;
+    LiquidationPairMock public assetLiquidationPair;
+    LiquidationRouterMock public shareLiquidationRouter;
+    LiquidationPairMock public shareLiquidationPair;
+
     PrizeVault public prizeVault;
 
     uint256 yieldBuffer = 1e6;
@@ -58,13 +62,22 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
         );
 
         prizeVault = PrizeVault(address(_vault_));
-        liquidationPair = new LiquidationPairMock(
+
+        assetLiquidationPair = new LiquidationPairMock(
             address(prizeVault),
             address(prizePool),
             address(prizeToken),
-            address(_underlying_)
+            address(_underlying_) // asset is tokenOut
         );
-        liquidationRouter = new LiquidationRouterMock();
+        assetLiquidationRouter = new LiquidationRouterMock();
+
+        shareLiquidationPair = new LiquidationPairMock(
+            address(prizeVault),
+            address(prizePool),
+            address(prizeToken),
+            address(prizeVault) // share is tokenOut
+        );
+        shareLiquidationRouter = new LiquidationRouterMock();
 
         _delta_ = 0;
         _vaultMayBeEmpty = true;
@@ -163,23 +176,24 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
 
     /* ============ liquidate ============ */
 
-    function propLiquidate(address caller) public {
+    function propLiquidate(address caller, LiquidationRouterMock router, LiquidationPairMock lp) public {
         vm.startPrank(caller);
 
+        address tokenOut = lp.tokenOut();
         uint256 yield = _call_vault(
-            abi.encodeWithSelector(PrizeVault.liquidatableBalanceOf.selector, _underlying_)
+            abi.encodeWithSelector(PrizeVault.liquidatableBalanceOf.selector, tokenOut)
         );
 
         // Skips test if no yield is liquidatable
         vm.assume(yield != 0);
         require(yield != 0);
 
-        uint256 callerAssetBalanceBefore = IERC20(_underlying_).balanceOf(caller);
-        uint256 vaultTotalAssetsBefore = prizeVault.totalAssets();
+        uint256 callerTokenOutBalanceBefore = IERC20(tokenOut).balanceOf(caller);
+        uint256 vaultAvailableYieldBefore = prizeVault.availableYieldBalance();
 
         (uint256 callerPrizeTokenBalanceBefore, uint256 prizeTokenContributed) = _liquidate(
-            liquidationRouter,
-            liquidationPair,
+            router,
+            lp,
             prizeToken,
             yield,
             caller
@@ -200,21 +214,21 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
         );
 
         assertApproxEqAbs(
-            IERC20(_underlying_).balanceOf(caller),
-            callerAssetBalanceBefore + yield,
+            IERC20(tokenOut).balanceOf(caller),
+            callerTokenOutBalanceBefore + yield,
             _delta_,
-            "caller assets balance after liquidation"
+            "caller tokenOut balance after liquidation"
         );
 
         assertApproxEqAbs(
-            prizeVault.totalAssets(),
-            vaultTotalAssetsBefore - yield,
+            prizeVault.availableYieldBalance(),
+            vaultAvailableYieldBefore - yield,
             _delta_,
-            "vault total assets after liquidation"
+            "vault available yield after liquidation"
         );
 
         assertApproxEqAbs(
-            prizeVault.liquidatableBalanceOf(_underlying_),
+            prizeVault.liquidatableBalanceOf(tokenOut),
             0,
             _delta_,
             "vault liquidatable balance after liquidation"
@@ -223,16 +237,26 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
         vm.stopPrank();
     }
 
-    function test_liquidate(Init memory init, uint256 assets) public virtual {
+    function test_liquidate(Init memory init, uint256 assets, bool liquidateAssets) public virtual {
         init.yield = int256(bound(assets, 10e18, type(uint96).max));
 
+        LiquidationRouterMock router;
+        LiquidationPairMock lp;
+        if (liquidateAssets) {
+            router = assetLiquidationRouter;
+            lp = assetLiquidationPair;
+        } else {
+            router = shareLiquidationRouter;
+            lp = shareLiquidationPair;
+        }
+
         setUpVault(init);
-        prizeVault.setLiquidationPair(address(liquidationPair));
+        prizeVault.setLiquidationPair(address(lp));
 
         address caller = init.user[0];
         prizeToken.mint(caller, type(uint256).max);
 
-        propLiquidate(caller);
+        propLiquidate(caller, router, lp);
     }
 
     /* ============ helpers ============ */
