@@ -110,7 +110,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
             vault.transferTokensOut(address(0), alice, address(tokenOut), amountOut);
 
             assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
-            assertEq(IERC20(tokenOut).balanceOf(bob), 0);
+            assertEq(vault.yieldFeeBalance(), 0);
         }
     }
 
@@ -141,7 +141,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
             vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
 
             assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
-            assertEq(IERC20(tokenOut).balanceOf(address(0)), 0);
+            assertEq(vault.yieldFeeBalance(), 0);
         }
     }
 
@@ -169,13 +169,10 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
             vm.expectEmit();
             emit Transfer(tokenFrom, alice, amountOut);
 
-            vm.expectEmit();
-            emit Transfer(tokenFrom, bob, yieldFee);
-
             vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
 
             assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
-            assertEq(IERC20(tokenOut).balanceOf(bob), yieldFee);
+            assertEq(vault.yieldFeeBalance(), yieldFee);
 
             assertEq(amountOut / yieldFee, (1e9 - 1e8) / 1e8); // ratio of (amountOut : yieldFee) equal to (1 - feePercentage : feePercentage) 
         }
@@ -258,6 +255,89 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vault.verifyTokensIn(address(underlyingAsset), 1e18, "");
 
         vm.stopPrank();
+    }
+
+    /* ============ claimYieldFeeShares ============ */
+
+    function testWithdrawYieldFeeShares_CallerNotYieldFeeRecipient() public {
+        vault.setYieldFeeRecipient(bob);
+
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.CallerNotYieldFeeRecipient.selector, alice, bob));
+        vault.claimYieldFeeShares(100);
+        vm.stopPrank();
+    }
+
+    function testWithdrawYieldFeeShares_MintZeroShares() public {
+        vault.setYieldFeeRecipient(address(this));
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.MintZeroShares.selector));
+        vault.claimYieldFeeShares(0);
+    }
+
+    function testWithdrawYieldFeeShares_SharesExceedsYieldFeeBalance() public {
+        vault.setYieldFeePercentage(1e8); // 10% fee
+        vault.setYieldFeeRecipient(bob);
+        vault.setLiquidationPair(address(this));
+
+        // liquidate some yield
+        underlyingAsset.mint(address(vault), 1e18);
+        uint256 amountOut = vault.liquidatableBalanceOf(address(underlyingAsset));
+        assertGt(amountOut, 0);
+
+        vault.transferTokensOut(address(0), alice, address(underlyingAsset), amountOut);
+        uint256 yieldFeeBalance = vault.yieldFeeBalance();
+        assertGt(yieldFeeBalance, 0);
+        
+        vm.startPrank(bob);
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.SharesExceedsYieldFeeBalance.selector, yieldFeeBalance + 1, yieldFeeBalance));
+        vault.claimYieldFeeShares(yieldFeeBalance + 1);
+        vm.stopPrank();
+    }
+
+    function testWithdrawYieldFeeShares_withdrawFullBalance() public {
+        vault.setYieldFeePercentage(1e8); // 10% fee
+        vault.setYieldFeeRecipient(bob);
+        vault.setLiquidationPair(address(this));
+
+        // liquidate some yield
+        underlyingAsset.mint(address(vault), 1e18);
+        uint256 amountOut = vault.liquidatableBalanceOf(address(underlyingAsset));
+        assertGt(amountOut, 0);
+
+        vault.transferTokensOut(address(0), alice, address(underlyingAsset), amountOut);
+        uint256 yieldFeeBalance = vault.yieldFeeBalance();
+        assertGt(yieldFeeBalance, 0);
+        
+        vm.startPrank(bob);
+        vm.expectEmit();
+        emit Transfer(address(0), bob, yieldFeeBalance);
+        vault.claimYieldFeeShares(yieldFeeBalance);
+        vm.stopPrank();
+
+        assertEq(vault.balanceOf(bob), yieldFeeBalance);
+    }
+
+    function testWithdrawYieldFeeShares_withdrawPartialBalance() public {
+        vault.setYieldFeePercentage(1e8); // 10% fee
+        vault.setYieldFeeRecipient(bob);
+        vault.setLiquidationPair(address(this));
+
+        // liquidate some yield
+        underlyingAsset.mint(address(vault), 1e18);
+        uint256 amountOut = vault.liquidatableBalanceOf(address(underlyingAsset));
+        assertGt(amountOut, 0);
+
+        vault.transferTokensOut(address(0), alice, address(underlyingAsset), amountOut);
+        uint256 yieldFeeBalance = vault.yieldFeeBalance();
+        assertGt(yieldFeeBalance, 0);
+        
+        vm.startPrank(bob);
+        vm.expectEmit();
+        emit Transfer(address(0), bob, yieldFeeBalance / 3);
+        vault.claimYieldFeeShares(yieldFeeBalance / 3);
+        vm.stopPrank();
+
+        assertEq(vault.balanceOf(bob), yieldFeeBalance / 3);
     }
 
 }

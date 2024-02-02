@@ -62,6 +62,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Address of the yield fee recipient.
     address public yieldFeeRecipient;
 
+    /// @notice The accrued yield fee balance that the fee recipient can claim as vault shares.
+    uint256 public yieldFeeBalance;
+
     /// @notice Address of the liquidation pair used to liquidate yield for prize token.
     address public liquidationPair;
 
@@ -149,6 +152,13 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     error CallerNotLP(address caller, address liquidationPair);
 
     /**
+     * @notice Thrown if the caller is not the yield fee recipient when withdrawing yield fee shares.
+     * @param caller The caller address
+     * @param yieldFeeRecipient The yield fee recipient address
+     */
+    error CallerNotYieldFeeRecipient(address caller, address yieldFeeRecipient);
+
+    /**
      * @notice Thrown when the caller of a permit function is not the owner of the assets being permitted.
      * @param caller The address of the caller
      * @param owner The address of the owner
@@ -171,6 +181,13 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @param maxYieldFeePercentage The max yield fee percentage in integer format
      */
     error YieldFeePercentageExceedsMax(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
+
+    /**
+     * @notice Thrown when the yield fee shares being withdrawn exceeds the available yieldFee Balance.
+     * @param shares The shares being withdrawn
+     * @param yieldFeeBalance The available yield fee shares
+     */
+    error SharesExceedsYieldFeeBalance(uint256 shares, uint256 yieldFeeBalance);
 
     /**
      * @notice Thrown during the liquidation process when the token in is not the prize token.
@@ -205,6 +222,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     modifier onlyLiquidationPair() {
         if (msg.sender != liquidationPair) {
             revert CallerNotLP(msg.sender, liquidationPair);
+        }
+        _;
+    }
+
+    /// @notice Requires the caller to be the yield fee recipient.
+    modifier onlyYieldFeeRecipient() {
+        if (msg.sender != yieldFeeRecipient) {
+            revert CallerNotYieldFeeRecipient(msg.sender, yieldFeeRecipient);
         }
         _;
     }
@@ -256,6 +281,13 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _underlyingDecimals;
     }
 
+    /// @inheritdoc IERC20
+    /// @dev Adds the yield fee balance to the total supply since it's cheaper to keep track of those shares
+    ///      internally instead of doing an additional mint on every liquidation.
+    function totalSupply() public view override(TwabERC20, IERC20) returns (uint256) {
+        return twabController.totalSupply(address(this)) + yieldFeeBalance;
+    }
+
     /* ============ ERC4626 Implementation ============ */
 
     /// @inheritdoc IERC4626
@@ -304,7 +336,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (totalAssets() < _totalSupply) return 0;
 
         // the vault will never mint more than 1 share per asset, so no need to convert supply buffer to assets
-        uint256 _twabSupplyLimit = type(uint96).max - _totalSupply;
+        uint256 twabSupplyLimit_ = _twabSupplyLimit(_totalSupply);
         uint256 _maxDeposit;
         uint256 _latentBalance = _asset.balanceOf(address(this));
         uint256 _maxYieldVaultDeposit = yieldVault.maxDeposit(address(this));
@@ -314,7 +346,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             unchecked {
                 _maxDeposit = _maxYieldVaultDeposit - _latentBalance;
             }
-            return _twabSupplyLimit < _maxDeposit ? _twabSupplyLimit : _maxDeposit;
+            return twabSupplyLimit_ < _maxDeposit ? twabSupplyLimit_ : _maxDeposit;
         }
     }
 
@@ -496,26 +528,39 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         }
     }
 
+    /**
+     * @notice Transfers yield fee shares to the yield fee recipient
+     * @dev Will revert if the caller is not the yield fee recipient or if zero shares are withdrawn
+     */
+    function claimYieldFeeShares(uint256 _shares) external onlyYieldFeeRecipient {
+        if (_shares == 0) revert MintZeroShares();
+
+        uint256 _yieldFeeBalance = yieldFeeBalance;
+        if (_shares > _yieldFeeBalance) revert SharesExceedsYieldFeeBalance(_shares, _yieldFeeBalance);
+
+        yieldFeeBalance -= _yieldFeeBalance;
+        _mint(yieldFeeRecipient, _shares);
+    }
+
     /* ============ LiquidationSource Functions ============ */
 
     /// @inheritdoc ILiquidationSource
-    /// @dev Returns the withdrawable amount of the available yield minus any yield fees.
+    /// @dev Returns the liquid amount of `_tokenOut` minus any yield fees.
     /// @dev Supports the liquidation of either assets or prize vault shares.
-    function liquidatableBalanceOf(address _token) public view returns (uint256) {
+    function liquidatableBalanceOf(address _tokenOut) public view returns (uint256) {
         uint256 _totalSupply = totalSupply();
-        uint256 _maxLiquidation;
-        if (_token == address(this)) {
-            // Liquidation of vault shares is capped to the TWAB supply cap (max uint96).
-            _maxLiquidation = type(uint96).max - _totalSupply;
-        } else if (_token == address(_asset)) {
+        uint256 _maxAmountOut;
+        if (_tokenOut == address(this)) {
+            // Liquidation of vault shares is capped to the TWAB supply limit.
+            _maxAmountOut = _twabSupplyLimit(_totalSupply);
+        } else if (_tokenOut == address(_asset)) {
             // Liquidation of yield assets is capped at the max withdraw.
-            _maxLiquidation = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
+            _maxAmountOut = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
         } else {
             return 0;
         }
-        uint256 _availableYield = _availableYieldBalance(totalAssets(), _totalSupply);
-        uint256 _liquidYield = _availableYield >= _maxLiquidation ? _maxLiquidation : _availableYield;
-        return _liquidYield.mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
+        uint256 _liquidYield = _availableYieldBalance(totalAssets(), _totalSupply).mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
+        return _liquidYield >= _maxAmountOut ? _maxAmountOut : _liquidYield;
     }
 
     /// @inheritdoc ILiquidationSource
@@ -538,25 +583,21 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             _yieldFee = (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut;
         }
 
-        // Ensure total liquidation does not exceed the available yield balance:
-        uint256 _totalLiquidation = _amountOut + _yieldFee;
-        if (_totalLiquidation > _availableYield) {
-            revert LiquidationExceedsAvailable(_totalLiquidation, _availableYield);
+        // Ensure total liquidation amount does not exceed the available yield balance:
+        if (_amountOut + _yieldFee > _availableYield) {
+            revert LiquidationExceedsAvailable(_amountOut + _yieldFee, _availableYield);
         }
 
+        // Increase yield fee balance:
+        if (_yieldFee > 0) {
+            yieldFeeBalance += _yieldFee;
+        }
+
+        // Mint or withdraw amountOut to `_receiver`:
         if (_tokenOut == address(_asset)) {
-            // Withdraw assets:
-            _withdraw(address(this), _totalLiquidation);
-            _asset.transfer(_receiver, _amountOut);
-            if (_yieldFee > 0) {
-                _asset.transfer(_yieldFeeRecipient, _yieldFee);
-            }
+            _withdraw(_receiver, _amountOut);            
         } else if (_tokenOut == address(this)) {
-            // Mint shares:
             _mint(_receiver, _amountOut);
-            if (_yieldFee > 0) {
-                _mint(_yieldFeeRecipient, _yieldFee);
-            }
         } else {
             revert LiquidationTokenOutNotSupported(_tokenOut);
         }
@@ -649,6 +690,15 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             }
         }
         return (false, 0);
+    }
+
+    /// @notice Returns the remaining supply that can be minted without exceeding the TwabController limits.
+    /// @dev The TwabController limits the total supply for each vault to uint96.
+    /// @return The remaining supply that can be minted without exceeding TWAB limits
+    function _twabSupplyLimit(uint256 _totalSupply) internal view returns (uint256) {
+        unchecked {
+            return type(uint96).max - (_totalSupply - yieldFeeBalance);
+        }
     }
 
     /**

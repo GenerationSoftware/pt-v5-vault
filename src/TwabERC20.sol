@@ -51,12 +51,12 @@ contract TwabERC20 is ERC20, ERC20Permit {
     /// @inheritdoc ERC20
     function balanceOf(
         address _account
-    ) public view override(ERC20) returns (uint256) {
+    ) public view virtual override(ERC20) returns (uint256) {
         return twabController.balanceOf(address(this), _account);
     }
 
     /// @inheritdoc ERC20
-    function totalSupply() public view override(ERC20) returns (uint256) {
+    function totalSupply() public view virtual override(ERC20) returns (uint256) {
         return twabController.totalSupply(address(this));
     }
 
