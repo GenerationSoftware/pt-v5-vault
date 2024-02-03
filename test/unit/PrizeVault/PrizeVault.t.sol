@@ -103,6 +103,63 @@ contract PrizeVaultTest is UnitBaseSetup {
         );
     }
 
+    /* ============ totalDebt ============ */
+
+    function testTotalDebt_IncreasesWithDepositsAndDecreasesWithWithdrawals() public {
+        assertEq(vault.totalDebt(), 0);
+
+        underlyingAsset.mint(alice, 1e18);
+
+        vm.startPrank(alice);
+
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        assertEq(vault.totalDebt(), 1e18);
+
+        vault.withdraw(1e9, alice, alice);
+        assertEq(vault.totalDebt(), 1e18 - 1e9);
+
+        vault.withdraw(1e18 - 1e9, alice, alice);
+        assertEq(vault.totalDebt(), 0);
+
+        vm.stopPrank();
+    }
+
+    function testTotalDebt_IncreasesWithYieldFeeAccrualAndDecreasesWithFeeClaims() public {
+        vault.setYieldFeePercentage(1e8); // 10%
+        vault.setYieldFeeRecipient(bob);
+        assertEq(vault.totalDebt(), 0);
+
+        // make an initial deposit
+        underlyingAsset.mint(alice, 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+
+        assertEq(vault.totalAssets(), 1e18);
+        assertEq(vault.totalSupply(), 1e18);
+        assertEq(vault.totalDebt(), 1e18);
+
+        // mint yield to the vault and liquidate
+        underlyingAsset.mint(address(vault), 1e18);
+        vault.setLiquidationPair(address(this));
+        uint256 maxLiquidation = vault.liquidatableBalanceOf(address(underlyingAsset));
+        uint256 amountOut = maxLiquidation / 2;
+        uint256 yieldFee = (1e18 - vault.yieldBuffer()) / (2 * 10); // 10% yield fee + 90% amountOut = 100%
+        vault.transferTokensOut(address(0), bob, address(underlyingAsset), amountOut);
+
+        assertEq(vault.totalAssets(), 1e18 + 1e18 - amountOut); // existing balance + yield - amountOut
+        assertEq(vault.totalSupply(), 1e18); // no change in supply since liquidation was for assets
+        assertEq(vault.totalDebt(), 1e18 + yieldFee); // debt increased since we reserved shares for the yield fee
+
+        vm.startPrank(bob);
+        vault.claimYieldFeeShares(yieldFee);
+        assertEq(vault.totalDebt(), vault.totalSupply());
+        assertEq(vault.yieldFeeBalance(), 0);
+        vm.stopPrank();
+    }
+
     /* ============ targetOf ============ */
 
     function testTargetOf() public {

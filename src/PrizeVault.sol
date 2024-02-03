@@ -212,7 +212,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /**
      * @notice Thrown when a deposit results in a state where the total assets are less than the total share supply.
      * @param totalAssets The total assets controlled by the vault
-     * @param totalSupply The total shares minted by the vault
+     * @param totalSupply The total shares minted and internally accounted for by the vault
      */
     error LossyDeposit(uint256 totalAssets, uint256 totalSupply);
 
@@ -281,13 +281,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _underlyingDecimals;
     }
 
-    /// @inheritdoc IERC20
-    /// @dev Adds the yield fee balance to the total supply since it's cheaper to keep track of those shares
-    ///      internally instead of doing an additional mint on every liquidation.
-    function totalSupply() public view override(TwabERC20, IERC20) returns (uint256) {
-        return twabController.totalSupply(address(this)) + yieldFeeBalance;
-    }
-
     /* ============ ERC4626 Implementation ============ */
 
     /// @inheritdoc IERC4626
@@ -313,9 +306,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @inheritdoc IERC4626
     function convertToAssets(uint256 _shares) public view returns (uint256) {
-        uint256 _totalSupply = totalSupply();
+        uint256 totalDebt_ = totalDebt();
         uint256 _totalAssets = totalAssets();
-        if (_totalAssets >= _totalSupply) {
+        if (_totalAssets >= totalDebt_) {
             return _shares;
         } else {
             /**
@@ -323,7 +316,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
              * proportional amount of the total assets. This can happen due to fees, slippage, or loss
              * of funds in the underlying yield vault.
              */
-            return _shares.mulDiv(_totalAssets, _totalSupply, Math.Rounding.Down);
+            return _shares.mulDiv(_totalAssets, totalDebt_, Math.Rounding.Down);
         }
     }
 
@@ -333,7 +326,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev TODO: add reasoning for exclusion of latent balance
     function maxDeposit(address) public view returns (uint256) {
         uint256 _totalSupply = totalSupply();
-        if (totalAssets() < _totalSupply) return 0;
+        uint256 totalDebt_ = _totalDebt(_totalSupply);
+        if (totalAssets() < totalDebt_) return 0;
 
         // the vault will never mint more than 1 share per asset, so no need to convert supply buffer to assets
         uint256 twabSupplyLimit_ = _twabSupplyLimit(_totalSupply);
@@ -395,12 +389,12 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // No withdrawals can occur if the vault controls no assets.
         if (_totalAssets == 0) revert ZeroTotalAssets();
 
-        uint256 _totalSupply = totalSupply();
-        if (_totalAssets >= _totalSupply) {
+        uint256 totalDebt_ = totalDebt();
+        if (_totalAssets >= totalDebt_) {
             return _assets;
         } else {
             // Follows the inverse conversion of `convertToAssets`
-            return _assets.mulDiv(_totalSupply, _totalAssets, Math.Rounding.Up);
+            return _assets.mulDiv(totalDebt_, _totalAssets, Math.Rounding.Up);
         }
     }
 
@@ -503,6 +497,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _shares;
     }
 
+    /* ============ Additional Accounting ============ */
+
+    /// @notice Returns the total assets that are owed to share holders and any other internal balances.
+    /// @return The total asset debt of the vault
+    function totalDebt() public view returns (uint256) {
+        return _totalDebt(totalSupply());
+    }
+
     /* ============ Yield Functions ============ */
 
     /**
@@ -510,7 +512,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @return The available yield balance
      */
     function availableYieldBalance() public view returns (uint256) {
-        return _availableYieldBalance(totalAssets(), totalSupply());
+        return _availableYieldBalance(totalAssets(), totalDebt());
     }
 
     /**
@@ -559,7 +561,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         } else {
             return 0;
         }
-        uint256 _liquidYield = _availableYieldBalance(totalAssets(), _totalSupply).mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
+        uint256 _liquidYield = 
+            _availableYieldBalance(totalAssets(), _totalDebt(_totalSupply))
+            .mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
         return _liquidYield >= _maxAmountOut ? _maxAmountOut : _liquidYield;
     }
 
@@ -692,12 +696,26 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return (false, 0);
     }
 
-    /// @notice Returns the remaining supply that can be minted without exceeding the TwabController limits.
-    /// @dev The TwabController limits the total supply for each vault to uint96.
-    /// @return The remaining supply that can be minted without exceeding TWAB limits
+    /**
+     * @notice Returns the total assets that are owed to share holders and any other internal balances.
+     * @dev The yield fee balance is included since it's cheaper to keep track of those shares
+     *      internally instead of doing an additional TWAB mint on every liquidation.
+     * @param _totalSupply The total share supply of the vault
+     * @return The total asset debt of the vault
+     */
+    function _totalDebt(uint256 _totalSupply) internal view returns (uint256) {
+        return _totalSupply + yieldFeeBalance;
+    }
+
+    /**
+     * @notice Returns the remaining supply that can be minted without exceeding the TwabController limits.
+     * @dev The TwabController limits the total supply for each vault to uint96
+     * @param _totalSupply The total share supply of the vault
+     * @return The remaining supply that can be minted without exceeding TWAB limits
+     */
     function _twabSupplyLimit(uint256 _totalSupply) internal view returns (uint256) {
         unchecked {
-            return type(uint96).max - (_totalSupply - yieldFeeBalance);
+            return type(uint96).max - _totalSupply;
         }
     }
 
@@ -738,7 +756,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
         _mint(_receiver, _shares);
 
-        if (totalAssets() < totalSupply()) revert LossyDeposit(totalAssets(), totalSupply());
+        if (totalAssets() < totalDebt()) revert LossyDeposit(totalAssets(), totalDebt());
 
         emit Deposit(_caller, _receiver, _assets, _shares);
     }
