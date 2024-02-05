@@ -521,11 +521,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /**
      * @notice Total available yield given the total assets and total share supply
      * @param _totalAssets The total assets controlled by the vault
-     * @param _totalDebt The total asset debt owed
+     * @param totalDebt_ The total asset debt owed
      * @return The available yield balance
      */
-    function _availableYieldBalance(uint256 _totalAssets, uint256 _totalDebt) internal view returns (uint256) {
-        uint256 _allocatedAssets = _totalDebt + yieldBuffer;
+    function _availableYieldBalance(uint256 _totalAssets, uint256 totalDebt_) internal view returns (uint256) {
+        uint256 _allocatedAssets = totalDebt_ + yieldBuffer;
         if (_allocatedAssets >= _totalAssets) {
             return 0;
         } else {
