@@ -99,18 +99,21 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
     /**
-     * @notice Emitted when a user sweeps assets held by the Vault into the YieldVault.
-     * @param caller Address that called the function
-     * @param assets Amount of assets swept into the YieldVault
+     * @notice Emitted when yield is transferred out by the liquidation pair address.
+     * @param liquidationPair The liquidation pair address that initiated the transfer
+     * @param tokenOut The token that was transferred out
+     * @param recipient The recipient of the tokens
+     * @param amountOut The amount of tokens sent to the recipient
+     * @param yieldFee The amount of shares accrued on the yield fee balance
      */
-    event Sweep(address indexed caller, uint256 assets);
+    event TransferYieldOut(address indexed liquidationPair, address indexed tokenOut, address indexed recipient, uint256 amountOut, uint256 yieldFee);
 
     /**
-     * @notice Emitted when yield fee is withdrawn to the yield recipient.
-     * @param recipient Address receiving the fee
-     * @param amount Amount of assets withdrawn to `recipient`
+     * @notice Emitted when yield fee shares are claimed by the yield fee recipient.
+     * @param recipient Address receiving the fee shares
+     * @param shares Amount of shares claimed
      */
-    event WithdrawYieldFee(address indexed recipient, uint256 amount);
+    event ClaimYieldFeeShares(address indexed recipient, uint256 shares);
 
     /* ============ Errors ============ */
 
@@ -543,7 +546,10 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (_shares > _yieldFeeBalance) revert SharesExceedsYieldFeeBalance(_shares, _yieldFeeBalance);
 
         yieldFeeBalance -= _yieldFeeBalance;
-        _mint(yieldFeeRecipient, _shares);
+
+        _mint(msg.sender, _shares);
+
+        emit ClaimYieldFeeShares(msg.sender, _shares);
     }
 
     /* ============ LiquidationSource Functions ============ */
@@ -616,6 +622,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         } else {
             revert LiquidationTokenOutNotSupported(_tokenOut);
         }
+
+        emit TransferYieldOut(msg.sender, _tokenOut, _receiver, _amountOut, _yieldFee);
 
         return "";
     }

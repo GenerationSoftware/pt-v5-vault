@@ -28,6 +28,8 @@ contract UnitBaseSetup is Test {
     event YieldFeeRecipientSet(address indexed yieldFeeRecipient);
     event YieldFeePercentageSet(uint256 yieldFeePercentage);
     event MockContribute(address prizeVault, uint256 amount);
+    event ClaimYieldFeeShares(address indexed recipient, uint256 shares);
+    event TransferYieldOut(address indexed liquidationPair, address indexed tokenOut, address indexed recipient, uint256 amountOut, uint256 yieldFee);
 
     /* ============ variables ============ */
 

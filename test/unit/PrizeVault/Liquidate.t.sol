@@ -107,6 +107,9 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
             vm.expectEmit();
             emit Transfer(tokenFrom, alice, amountOut);
 
+            vm.expectEmit();
+            emit TransferYieldOut(address(this), tokenFrom, alice, amountOut, 0);
+
             vault.transferTokensOut(address(0), alice, address(tokenOut), amountOut);
 
             assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
@@ -138,6 +141,9 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
             vm.expectEmit();
             emit Transfer(tokenFrom, alice, amountOut);
 
+            vm.expectEmit();
+            emit TransferYieldOut(address(this), tokenFrom, alice, amountOut, 0);
+
             vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
 
             assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
@@ -168,6 +174,9 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
 
             vm.expectEmit();
             emit Transfer(tokenFrom, alice, amountOut);
+
+            vm.expectEmit();
+            emit TransferYieldOut(address(this), tokenFrom, alice, amountOut, yieldFee);
 
             vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
 
@@ -259,7 +268,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
 
     /* ============ claimYieldFeeShares ============ */
 
-    function testWithdrawYieldFeeShares_CallerNotYieldFeeRecipient() public {
+    function testClaimYieldFeeShares_CallerNotYieldFeeRecipient() public {
         vault.setYieldFeeRecipient(bob);
 
         vm.startPrank(alice);
@@ -268,13 +277,13 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vm.stopPrank();
     }
 
-    function testWithdrawYieldFeeShares_MintZeroShares() public {
+    function testClaimYieldFeeShares_MintZeroShares() public {
         vault.setYieldFeeRecipient(address(this));
         vm.expectRevert(abi.encodeWithSelector(PrizeVault.MintZeroShares.selector));
         vault.claimYieldFeeShares(0);
     }
 
-    function testWithdrawYieldFeeShares_SharesExceedsYieldFeeBalance() public {
+    function testClaimYieldFeeShares_SharesExceedsYieldFeeBalance() public {
         vault.setYieldFeePercentage(1e8); // 10% fee
         vault.setYieldFeeRecipient(bob);
         vault.setLiquidationPair(address(this));
@@ -294,7 +303,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vm.stopPrank();
     }
 
-    function testWithdrawYieldFeeShares_withdrawFullBalance() public {
+    function testClaimYieldFeeShares_withdrawFullBalance() public {
         vault.setYieldFeePercentage(1e8); // 10% fee
         vault.setYieldFeeRecipient(bob);
         vault.setLiquidationPair(address(this));
@@ -311,13 +320,15 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vm.startPrank(bob);
         vm.expectEmit();
         emit Transfer(address(0), bob, yieldFeeBalance);
+        vm.expectEmit();
+        emit ClaimYieldFeeShares(bob, yieldFeeBalance);
         vault.claimYieldFeeShares(yieldFeeBalance);
         vm.stopPrank();
 
         assertEq(vault.balanceOf(bob), yieldFeeBalance);
     }
 
-    function testWithdrawYieldFeeShares_withdrawPartialBalance() public {
+    function testClaimYieldFeeShares_withdrawPartialBalance() public {
         vault.setYieldFeePercentage(1e8); // 10% fee
         vault.setYieldFeeRecipient(bob);
         vault.setLiquidationPair(address(this));
@@ -334,6 +345,8 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vm.startPrank(bob);
         vm.expectEmit();
         emit Transfer(address(0), bob, yieldFeeBalance / 3);
+        vm.expectEmit();
+        emit ClaimYieldFeeShares(bob, yieldFeeBalance / 3);
         vault.claimYieldFeeShares(yieldFeeBalance / 3);
         vm.stopPrank();
 
