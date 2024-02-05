@@ -517,10 +517,12 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /**
      * @notice Total available yield given the total assets and total share supply
+     * @param _totalAssets The total assets controlled by the vault
+     * @param _totalDebt The total asset debt owed
      * @return The available yield balance
      */
-    function _availableYieldBalance(uint256 _totalAssets, uint256 _totalSupply) internal view returns (uint256) {
-        uint256 _allocatedAssets = _totalSupply + yieldBuffer;
+    function _availableYieldBalance(uint256 _totalAssets, uint256 _totalDebt) internal view returns (uint256) {
+        uint256 _allocatedAssets = _totalDebt + yieldBuffer;
         if (_allocatedAssets >= _totalAssets) {
             return 0;
         } else {
@@ -561,9 +563,16 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         } else {
             return 0;
         }
+
+        // The liquid yield is computed by taking the available yield balance and multiplying it
+        // by (1 - yieldFeePercentage), rounding down, to ensure that enough yield is left for the
+        // yield fee.
         uint256 _liquidYield = 
             _availableYieldBalance(totalAssets(), _totalDebt(_totalSupply))
             .mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
+
+        // The liquid yield is limited by the max that can be minted or withdrawn, depending on
+        // `_tokenOut`.
         return _liquidYield >= _maxAmountOut ? _maxAmountOut : _liquidYield;
     }
 
@@ -584,6 +593,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // Determine the proportional yield fee based on the amount being liquidated:
         uint256 _yieldFee;
         if (_yieldFeePercentage != 0 && _yieldFeeRecipient != address(0)) {
+            // The yield fee is calculated as a portion of the total yield being consumed, such that 
+            // `total = amountOut + yieldFee` and `yieldFee / total = yieldFeePercentage`. 
             _yieldFee = (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut;
         }
 
