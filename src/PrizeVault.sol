@@ -732,7 +732,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @param _totalSupply The total share supply of the vault
      * @return The remaining supply that can be minted without exceeding TWAB limits
      */
-    function _twabSupplyLimit(uint256 _totalSupply) internal view returns (uint256) {
+    function _twabSupplyLimit(uint256 _totalSupply) internal pure returns (uint256) {
         unchecked {
             return type(uint96).max - _totalSupply;
         }
