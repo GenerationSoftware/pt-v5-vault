@@ -366,10 +366,28 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc IERC4626
     /// @dev TODO: add reasoning for inclusion of latent balance
     function maxRedeem(address _owner) public view returns (uint256) {
-        // the owner will never receive more than 1 asset per share, so no need to convert max withdraw to shares
-        uint256 _maxRedeem = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
+        uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
         uint256 _ownerShares = balanceOf(_owner);
-        return _ownerShares < _maxRedeem ? _ownerShares : _maxRedeem;
+
+        // The owner will never receive more than 1 asset per share, so there is no need to convert max
+        // withdraw to shares unless the owner has more shares than the max withdraw and is redeeming
+        // at a loss (when 1 share is worth less than 1 asset).
+        if (_ownerShares > _maxWithdraw) {
+            uint256 _totalAssets = totalAssets();
+            uint256 totalDebt_ = totalDebt();
+            if (_totalAssets >= totalDebt_) {
+                return _maxWithdraw;
+            } else {
+                // Convert to shares while rounding up. Since 1 asset is guaranteed to be worth more than
+                // 1 share and any upwards rounding will not exceed 1 share, we can be sure that when the
+                // shares are converted back to assets (rounding down) the resulting asset value won't
+                // exceed `_maxWithdraw`.
+                uint256 _maxScaledRedeem = _maxWithdraw.mulDiv(totalDebt_, _totalAssets, Math.Rounding.Up);
+                return _maxScaledRedeem >= _ownerShares ? _ownerShares : _maxScaledRedeem;
+            }
+        } else {
+            return _ownerShares;
+        }
     }
 
     /// @inheritdoc IERC4626
