@@ -108,7 +108,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
             emit Transfer(tokenFrom, alice, amountOut);
 
             vm.expectEmit();
-            emit TransferYieldOut(address(this), tokenFrom, alice, amountOut, 0);
+            emit TransferYieldOut(address(this), tokenOut, alice, amountOut, 0);
 
             vault.transferTokensOut(address(0), alice, address(tokenOut), amountOut);
 
@@ -142,7 +142,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
             emit Transfer(tokenFrom, alice, amountOut);
 
             vm.expectEmit();
-            emit TransferYieldOut(address(this), tokenFrom, alice, amountOut, 0);
+            emit TransferYieldOut(address(this), tokenOut, alice, amountOut, 0);
 
             vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
 
@@ -176,7 +176,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
             emit Transfer(tokenFrom, alice, amountOut);
 
             vm.expectEmit();
-            emit TransferYieldOut(address(this), tokenFrom, alice, amountOut, yieldFee);
+            emit TransferYieldOut(address(this), tokenOut, alice, amountOut, yieldFee);
 
             vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
 
