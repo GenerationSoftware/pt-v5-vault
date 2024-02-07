@@ -3,7 +3,6 @@ pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
 import { ERC20, IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
-import { IERC20Permit } from "openzeppelin/token/ERC20/extensions/draft-ERC20Permit.sol";
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
@@ -14,10 +13,11 @@ import { LiquidationPairMock } from "../../contracts/mock/LiquidationPairMock.so
 import { LiquidationRouterMock } from "../../contracts/mock/LiquidationRouterMock.sol";
 import { PrizePoolMock } from "../../contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "../../contracts/mock/YieldVault.sol";
+import { Permit } from "../../contracts/utility/Permit.sol";
 
 import { PrizeVault } from "../../../src/PrizeVault.sol";
 
-contract UnitBaseSetup is Test {
+contract UnitBaseSetup is Test, Permit {
 
     /* ============ events ============ */
 
@@ -36,9 +36,6 @@ contract UnitBaseSetup is Test {
     address internal owner;
     uint256 internal ownerPrivateKey;
 
-    address internal manager;
-    uint256 internal managerPrivateKey;
-
     address internal alice;
     uint256 internal alicePrivateKey;
 
@@ -56,18 +53,12 @@ contract UnitBaseSetup is Test {
     ERC20PermitMock public prizeToken;
     LiquidationRouterMock public liquidationRouter;
     LiquidationPairMock public liquidationPair;
-    address public liquidationPairTarget = 0xcbE704e38ddB2E6A8bA9f4d335f2637132C20113;
 
     address public claimer;
     PrizePoolMock public prizePool;
 
-    uint256 public winningRandomNumber = 123456;
     uint32 public drawPeriodSeconds = 1 days;
     TwabController public twabController;
-
-    bytes32 private constant _PERMIT_TYPEHASH = keccak256(
-        "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-    );
 
     /* ============ setup ============ */
 
@@ -77,14 +68,13 @@ contract UnitBaseSetup is Test {
 
     function setUp() public virtual {
         (owner, ownerPrivateKey) = makeAddrAndKey("Owner");
-        (manager, managerPrivateKey) = makeAddrAndKey("Manager");
         (alice, alicePrivateKey) = makeAddrAndKey("Alice");
         (bob, bobPrivateKey) = makeAddrAndKey("Bob");
 
         underlyingAsset = setUpUnderlyingAsset();
         prizeToken = new ERC20PermitMock("PoolTogether");
 
-        twabController = new TwabController(1 days, uint32(block.timestamp));
+        twabController = new TwabController(1 hours, uint32(block.timestamp));
 
         prizePool = new PrizePoolMock(prizeToken, twabController);
 
@@ -122,28 +112,6 @@ contract UnitBaseSetup is Test {
 
     function _setLiquidationPair() internal {
         vault.setLiquidationPair(address(liquidationPair));
-    }
-    
-    function _signPermit(
-        IERC20Permit _underlyingAsset,
-        PrizeVault _vault,
-        uint256 _assets,
-        address _owner,
-        uint256 _ownerPrivateKey
-    ) internal view returns (uint8 _v, bytes32 _r, bytes32 _s) {
-        uint256 _nonce = _underlyingAsset.nonces(_owner);
-        (_v, _r, _s) = vm.sign(
-            _ownerPrivateKey,
-            keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    _underlyingAsset.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(_PERMIT_TYPEHASH, _owner, address(_vault), _assets, _nonce, block.timestamp)
-                    )
-                )
-            )
-        );
     }
 
     function _accrueYield(ERC20Mock _underlyingAsset, IERC4626 _yieldVault, uint256 _yield) internal {
