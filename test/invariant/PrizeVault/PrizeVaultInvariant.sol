@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
-import { PrizeVaultFuzzHarness } from "./PrizeVaultFuzzHarness.sol";
+import { PrizeVaultFuzzHarness, PrizeVault } from "./PrizeVaultFuzzHarness.sol";
 
 /// @dev This contract runs tests in a scenario where the yield vault can never lose funds (strictly increasing).
 contract PrizeVaultInvariant is Test {
@@ -40,5 +40,15 @@ contract PrizeVaultInvariant is Test {
         uint256 liquidBalance = vaultHarness.vault().liquidatableBalanceOf(vault);
         uint256 availableYieldBalance = vaultHarness.vault().availableYieldBalance();
         assertLe(liquidBalance, availableYieldBalance);
+    }
+
+    function invariantAllAssetsAccountedFor() external {
+        PrizeVault vault = vaultHarness.vault();
+        uint256 totalAssets = vault.totalAssets();
+        uint256 totalDebt = vault.totalDebt();
+        uint256 availableYieldBuffer = vault.availableYieldBuffer();
+        uint256 availableYieldBalance = vault.availableYieldBalance();
+        uint256 totalAccounted = totalDebt + availableYieldBuffer + availableYieldBalance;
+        assertEq(totalAssets, totalAccounted);
     }
 }

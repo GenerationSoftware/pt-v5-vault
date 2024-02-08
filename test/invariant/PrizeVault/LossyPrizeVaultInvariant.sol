@@ -34,4 +34,20 @@ contract LossyPrizeVaultInvariant is Test {
             assertEq(lossyVaultHarness.vault().availableYieldBalance(), 0);
         }
     }
+
+    function invariantAllAssetsAccountedFor() external {
+        uint256 totalAssets = lossyVaultHarness.vault().totalAssets();
+        uint256 totalDebt = lossyVaultHarness.vault().totalDebt();
+        if (totalDebt >= totalAssets) {
+            // 1 wei rounding error since the convertToAssets function rounds down which means up to 1 asset may be lost on total conversion
+            assertApproxEqAbs(totalAssets, lossyVaultHarness.vault().convertToAssets(totalDebt), 1);
+        } else {
+            // When assets cover debts, we have essentially the same test as the the sister test in `PrizeVaultInvariant.sol`
+            // The debt is converted to assets using `convertToAssets` to test that it will always be 1:1 when the vault has ample collateral.
+            uint256 availableYieldBuffer = lossyVaultHarness.vault().availableYieldBuffer();
+            uint256 availableYieldBalance = lossyVaultHarness.vault().availableYieldBalance();
+            uint256 totalAccounted = lossyVaultHarness.vault().convertToAssets(totalDebt) + availableYieldBuffer + availableYieldBalance;
+            assertEq(totalAssets, totalAccounted);
+        }
+    }
 }
