@@ -258,6 +258,32 @@ contract PrizeVaultTest is UnitBaseSetup {
         assertEq(vault.availableYieldBalance(), 3);
     }
 
+    /* ============ availableYieldBuffer ============ */
+
+    function testAvailableYieldBuffer() public {
+        assertEq(vault.availableYieldBuffer(), 0); // no yield
+
+        uint256 yieldBuffer = vault.yieldBuffer();
+
+        // 1 asset available in buffer
+        underlyingAsset.mint(address(vault), 1);
+        assertEq(vault.availableYieldBuffer(), 1);
+
+        // full buffer
+        underlyingAsset.mint(address(vault), yieldBuffer - 1);
+        assertEq(vault.availableYieldBuffer(), yieldBuffer);
+
+        // can't exceed full buffer
+        underlyingAsset.mint(address(vault), 1e18);
+        assertEq(vault.availableYieldBuffer(), yieldBuffer);
+
+        // mint prize vault shares to simulate supply going up without a deposit
+        vm.startPrank(address(vault));
+        twabController.mint(address(this), uint96(1e18 + yieldBuffer));
+        vm.stopPrank();
+        assertEq(vault.availableYieldBuffer(), 0);
+    }
+
     /* ============ setLiquidationPair ============ */
 
     function testSetLiquidationPair() public {
