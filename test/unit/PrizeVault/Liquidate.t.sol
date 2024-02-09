@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
-import { IERC20, UnitBaseSetup, PrizeVault, YieldVault, IERC4626 } from "./UnitBaseSetup.t.sol";
+import { IERC20, UnitBaseSetup, PrizeVault, YieldVault, IERC4626, PrizePool } from "./UnitBaseSetup.t.sol";
 
 contract PrizeVaultLiquidationTest is UnitBaseSetup {
 
@@ -12,9 +12,18 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
     function testLiquidatableBalanceOf_wrongToken() public {
         ERC20Mock otherToken = new ERC20Mock();
         assertNotEq(address(otherToken), address(vault.asset()));
+        assertNotEq(address(otherToken), address(vault));
 
         otherToken.mint(address(vault), 1e18);
         assertEq(vault.liquidatableBalanceOf(address(otherToken)), 0);
+    }
+
+    function testLiquidatableBalanceOf_yieldVaultReverts() public {
+        // This is for branch coverage, maxWithdraw must never revert in the ERC4626 standard, but forge thinks it can
+        // since it does a mulDiv call.
+        vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), "revert");
+        vm.expectRevert("revert");
+        vault.liquidatableBalanceOf(address(underlyingAsset));
     }
 
     function testLiquidatableBalanceOf_noFee() public {
@@ -265,6 +274,15 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
 
         vm.stopPrank();
     }
+
+    // function testVerifyTokensIn_LiquidationTokenInNotPrizeToken_prizePoolReverts() public {
+    //     // This is just for branch coverage since foundry thinks the prize pool `prizeToken` call can revert.
+    //     vm.startPrank(vault.liquidationPair());
+    //     vm.mockCallRevert(address(prizePool), abi.encodeWithSignature("prizeToken()"), "revert");
+    //     vm.expectRevert("revert");
+    //     vault.verifyTokensIn(address(underlyingAsset), 1e18, "");
+    //     vm.stopPrank();
+    // }
 
     /* ============ claimYieldFeeShares ============ */
 

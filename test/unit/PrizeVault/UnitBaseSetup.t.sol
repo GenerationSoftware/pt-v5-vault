@@ -15,7 +15,7 @@ import { PrizePoolMock } from "../../contracts/mock/PrizePoolMock.sol";
 import { YieldVault } from "../../contracts/mock/YieldVault.sol";
 import { Permit } from "../../contracts/utility/Permit.sol";
 
-import { PrizeVault } from "../../../src/PrizeVault.sol";
+import { PrizeVaultWrapper, PrizeVault } from "../../contracts/wrapper/PrizeVaultWrapper.sol";
 
 contract UnitBaseSetup is Test, Permit {
 
@@ -30,6 +30,7 @@ contract UnitBaseSetup is Test, Permit {
     event MockContribute(address prizeVault, uint256 amount);
     event ClaimYieldFeeShares(address indexed recipient, uint256 shares);
     event TransferYieldOut(address indexed liquidationPair, address indexed tokenOut, address indexed recipient, uint256 amountOut, uint256 yieldFee);
+    event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
     /* ============ variables ============ */
 
@@ -44,7 +45,7 @@ contract UnitBaseSetup is Test, Permit {
 
     address public constant SPONSORSHIP_ADDRESS = address(1);
 
-    PrizeVault public vault;
+    PrizeVaultWrapper public vault;
     string public vaultName = "PoolTogether Test Vault";
     string public vaultSymbol = "pTest";
 
@@ -86,7 +87,7 @@ contract UnitBaseSetup is Test, Permit {
             "yvTest"
         );
 
-        vault = new PrizeVault(
+        vault = new PrizeVaultWrapper(
             vaultName,
             vaultSymbol,
             yieldVault,

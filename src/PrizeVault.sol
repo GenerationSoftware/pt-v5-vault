@@ -332,7 +332,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         uint256 totalDebt_ = _totalDebt(_totalSupply);
         if (totalAssets() < totalDebt_) return 0;
 
-        // the vault will never mint more than 1 share per asset, so no need to convert supply buffer to assets
+        // the vault will never mint more than 1 share per asset, so no need to convert supply limit to assets
         uint256 twabSupplyLimit_ = _twabSupplyLimit(_totalSupply);
         uint256 _maxDeposit;
         uint256 _latentBalance = _asset.balanceOf(address(this));
@@ -670,8 +670,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         uint256 _amountIn,
         bytes calldata
     ) external onlyLiquidationPair {
-        if (_tokenIn != address(prizePool.prizeToken())) {
-            revert LiquidationTokenInNotPrizeToken(_tokenIn, address(prizePool.prizeToken()));
+        address _prizeToken = address(prizePool.prizeToken());
+        if (_tokenIn != _prizeToken) {
+            revert LiquidationTokenInNotPrizeToken(_tokenIn, _prizeToken);
         }
 
         prizePool.contributePrizeTokens(address(this), _amountIn);
@@ -738,7 +739,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @return True if the attempt was successful, false otherwise
      * @return Number of token decimals
      */
-    function _tryGetAssetDecimals(IERC20 asset_) private view returns (bool, uint8) {
+    function _tryGetAssetDecimals(IERC20 asset_) internal view returns (bool, uint8) {
         (bool success, bytes memory encodedDecimals) = address(asset_).staticcall(
             abi.encodeWithSelector(IERC20Metadata.decimals.selector)
         );

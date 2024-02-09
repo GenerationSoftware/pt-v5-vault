@@ -3,10 +3,15 @@ pragma solidity ^0.8.19;
 
 import { UnitBaseSetup, PrizePool, TwabController, ERC20, IERC20, IERC4626 } from "./UnitBaseSetup.t.sol";
 import { IVaultHooks, VaultHooks } from "../../../src/interfaces/IVaultHooks.sol";
+import { ERC20BrokenDecimalMock } from "../../contracts/mock/ERC20BrokenDecimalMock.sol";
 
 import "../../../src/PrizeVault.sol";
 
 contract PrizeVaultTest is UnitBaseSetup {
+
+    /* ============ errors ============ */
+
+    error SameDelegateAlreadySet(address delegate);
 
     /* ============ variables ============ */
 
@@ -158,6 +163,227 @@ contract PrizeVaultTest is UnitBaseSetup {
         assertEq(vault.totalDebt(), vault.totalSupply());
         assertEq(vault.yieldFeeBalance(), 0);
         vm.stopPrank();
+    }
+
+    /* ============ tryGetAssetDecimals ============ */
+
+    function testTryGetAssetDecimals() public {
+        (bool success, uint8 decimals) = vault.tryGetAssetDecimals(IERC20(underlyingAsset));
+        assertEq(success, true);
+        assertEq(decimals, 18);
+    }
+
+    function testTryGetAssetDecimals_DecimalFail() public {
+        IERC20 brokenDecimalToken = new ERC20BrokenDecimalMock();
+        (bool success, uint8 decimals) = vault.tryGetAssetDecimals(brokenDecimalToken);
+        assertEq(success, false);
+        assertEq(decimals, 0);
+    }
+
+    /* ============ maxDeposit / maxMint ============ */
+
+    function testMaxDeposit_SubtractsLatentBalance() public {
+        uint256 yieldVaultMaxDeposit = 1e18;
+
+        // no latent balance, so full amount available
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxDeposit.selector, address(vault)), abi.encode(yieldVaultMaxDeposit));
+        assertEq(vault.maxDeposit(address(this)), yieldVaultMaxDeposit);
+
+        // 1/4 max is in latent balance, so 3/4 amount available
+        underlyingAsset.mint(address(vault), yieldVaultMaxDeposit / 4);
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxDeposit.selector, address(vault)), abi.encode(yieldVaultMaxDeposit));
+        assertEq(vault.maxDeposit(address(this)), (3 * yieldVaultMaxDeposit) / 4); // latent balance lowers user's max deposit
+
+        // latent balance is over the max deposit so no more assets can be deposited
+        underlyingAsset.mint(address(vault), yieldVaultMaxDeposit);
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxDeposit.selector, address(vault)), abi.encode(yieldVaultMaxDeposit));
+        assertEq(vault.maxDeposit(address(this)), 0); // no more deposits
+    }
+
+    function testMaxDeposit_LimitedByTwabSupplyLimit() public {
+        assertEq(vault.maxDeposit(address(this)), type(uint96).max);
+
+        // deposit a bunch of tokens
+        uint256 deposited = (9 * uint256(type(uint96).max)) / 10;
+        underlyingAsset.mint(address(this), deposited);
+        underlyingAsset.approve(address(vault), deposited);
+        vault.deposit(deposited, address(this));
+
+        // maxDeposit is now only 10% of total twab supply cap
+        assertEq(vault.maxDeposit(address(this)), uint256(type(uint96).max) - deposited); // remaining deposit room
+    }
+
+    /* ============ maxWithdraw ============ */
+
+    function testMaxWithdraw_CappedByYieldVaultMaxWithdraw() public {
+        // deposit some tokens
+        uint256 deposited = 3e18;
+        underlyingAsset.mint(address(this), deposited);
+        underlyingAsset.approve(address(vault), deposited);
+        vault.deposit(deposited, address(this));
+
+        // can withdraw full amount
+        assertEq(vault.maxWithdraw(address(this)), deposited);
+
+        // check if maxWithdraw is limited by a mocked yieldVault maxWithdraw
+        uint256 yieldVaultMaxWithdraw = 1e18;
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(yieldVaultMaxWithdraw));
+        assertEq(vault.maxWithdraw(address(this)), yieldVaultMaxWithdraw);
+
+        // check for 0 maxWithdraw
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(0));
+        assertEq(vault.maxWithdraw(address(this)), 0);
+    }
+
+    /* ============ maxRedeem ============ */
+
+    function testMaxRedeem_CappedByYieldVaultMaxRedeem() public {
+        // deposit some tokens
+        uint256 deposited = 3e18;
+        underlyingAsset.mint(address(this), deposited);
+        underlyingAsset.approve(address(vault), deposited);
+        vault.deposit(deposited, address(this));
+
+        // can redeem full amount 1:1
+        assertEq(vault.maxRedeem(address(this)), deposited);
+
+        // check if maxRedeem is limited by a mocked yieldVault maxWithdraw
+        uint256 yieldVaultMaxWithdraw = 1e18;
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(yieldVaultMaxWithdraw));
+        assertEq(vault.maxRedeem(address(this)), yieldVaultMaxWithdraw);
+
+        // check for 0 maxRedeem
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(0));
+        assertEq(vault.maxRedeem(address(this)), 0);
+    }
+
+    function testMaxRedeem_ReturnsProportionalSharesWhenLossy() public {
+        // deposit some tokens
+        uint256 deposited = 3e18;
+        underlyingAsset.mint(address(this), deposited);
+        underlyingAsset.approve(address(vault), deposited);
+        vault.deposit(deposited, address(this));
+
+        // can redeem full amount 1:1
+        assertEq(vault.maxRedeem(address(this)), deposited);
+
+        // yield vault loses some funds
+        underlyingAsset.burn(address(yieldVault), deposited / 2);
+
+        // check for full maxRedeem
+        assertEq(vault.maxRedeem(address(this)), deposited);
+    }
+
+    function testMaxRedeem_ReturnsProportionalSharesWhenLossy_YieldVaultWithdrawCapped() public {
+        // deposit some tokens
+        uint256 deposited = 4e18;
+        underlyingAsset.mint(address(this), deposited);
+        underlyingAsset.approve(address(vault), deposited);
+        vault.deposit(deposited, address(this));
+
+        // can redeem full amount 1:1
+        assertEq(vault.maxRedeem(address(this)), deposited);
+
+        // yield vault loses some funds
+        underlyingAsset.burn(address(yieldVault), 2e18);
+
+        // yield vault caps withdraws at 1/2 of what's left, check for half redemption on vault
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(1e18));
+        assertEq(vault.maxRedeem(address(this)), deposited / 2);
+    }
+
+    /* ============ previewWithdraw ============ */
+
+    function testPreviewWithdraw() public {
+        // deposit some tokens
+        uint256 deposited = 4e18;
+        underlyingAsset.mint(address(this), deposited);
+        underlyingAsset.approve(address(vault), deposited);
+        uint256 shares = vault.deposit(deposited, address(this));
+
+        // 1:1
+        assertEq(vault.previewWithdraw(deposited), shares);
+    }
+
+    function testPreviewWithdraw_Lossy() public {
+        // deposit some tokens
+        uint256 deposited = 4e18;
+        underlyingAsset.mint(address(this), deposited);
+        underlyingAsset.approve(address(vault), deposited);
+        uint256 shares = vault.deposit(deposited, address(this));
+
+        // 1:1
+        assertEq(vault.previewWithdraw(deposited), shares);
+
+        // yield vault loses half of the funds
+        underlyingAsset.burn(address(yieldVault), 2e18);
+        assertEq(vault.previewWithdraw(deposited / 2), shares);
+    }
+
+    function testPreviewWithdraw_ZeroTotalAssets() public {
+        assertEq(vault.totalAssets(), 0);
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.ZeroTotalAssets.selector));
+        vault.previewWithdraw(1);
+    }
+
+    /* ============ sponsor ============ */
+
+    function testSponsor() public {
+        // sponsor the vault
+        uint256 assets = 4e18;
+        underlyingAsset.mint(address(this), assets);
+        underlyingAsset.approve(address(vault), assets);
+        vm.expectEmit();
+        emit Sponsor(address(this), assets, assets); // 1:1
+        uint256 shares = vault.sponsor(assets);
+        assertEq(shares, assets);
+        assertEq(twabController.delegateOf(address(vault), address(this)), address(1));
+
+        // sponsor again
+        underlyingAsset.mint(address(this), assets);
+        underlyingAsset.approve(address(vault), assets);
+        vm.expectEmit();
+        emit Sponsor(address(this), assets, assets); // 1:1
+        shares = vault.sponsor(assets);
+        assertEq(shares, assets);
+        assertEq(twabController.delegateOf(address(vault), address(this)), address(1));
+    }
+
+    // tests if the TWAB sponsor call reverts
+    function testSponsor_SameDelegateAlreadySet() public {
+        uint256 assets = 4e18;
+        underlyingAsset.mint(address(this), assets);
+        underlyingAsset.approve(address(vault), assets);
+
+        // spoof sponsor revert
+        bytes memory err = abi.encodeWithSelector(SameDelegateAlreadySet.selector, address(this));
+        vm.mockCallRevert(address(twabController), abi.encodeWithSelector(TwabController.sponsor.selector, address(this)), err);
+        vm.expectRevert(err);
+        vault.sponsor(assets);
+    }
+
+    /* ============ depositAndMint ============ */
+
+    function testDepositAndMint_DepositZeroAssets() public {
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.DepositZeroAssets.selector));
+        vault.depositAndMint(alice, alice, 0, 1);
+    }
+
+    function testDepositAndMint_MintZeroShares() public {
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.MintZeroShares.selector));
+        vault.depositAndMint(alice, alice, 1, 0);
+    }
+
+    /* ============ burnAndWithdraw ============ */
+
+    function testDepositAndMint_BurnZeroShares() public {
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.BurnZeroShares.selector));
+        vault.burnAndWithdraw(alice, alice, alice, 0, 1);
+    }
+
+    function testDepositAndMint_WithdrawZeroAssets() public {
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.WithdrawZeroAssets.selector));
+        vault.burnAndWithdraw(alice, alice, alice, 1, 0);
     }
 
     /* ============ targetOf ============ */
