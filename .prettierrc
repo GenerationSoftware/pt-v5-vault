@@ -6,7 +6,7 @@
       "options": {
         "bracketSpacing": true,
         "printWidth": 100,
-        "tabWidth": 2
+        "tabWidth": 4
       }
     }
   ]
