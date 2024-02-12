@@ -529,6 +529,15 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /* ============ Yield Functions ============ */
 
     /**
+     * @notice Total yield balance of the vault
+     * @dev Equal to total assets minus total debt
+     * @return The total yield balance
+     */
+    function totalYieldBalance() public view returns (uint256) {
+        return _totalYieldBalance(totalAssets(), totalDebt());
+    }
+
+    /**
      * @notice Total available yield on the vault
      * @dev Equal to total assets minus total allocation (total debt + yield buffer)
      * @return The available yield balance
@@ -538,19 +547,37 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /**
-     * @notice Total available yield given the total assets and total share supply
+     * @notice Total yield balance of the vault (including the yield buffer).
+     * @param _totalAssets The total assets controlled by the vault
+     * @param totalDebt_ The total asset debt owed
+     * @return The total yield balance
+     */
+    function _totalYieldBalance(uint256 _totalAssets, uint256 totalDebt_) internal view returns (uint256) {
+        if (totalDebt_ >= _totalAssets) {
+            return 0;
+        } else {
+            unchecked {
+                return _totalAssets - totalDebt_;
+            }
+        }
+    }
+
+    /**
+     * @notice Available yield balance given the total assets and total share supply.
+     * @dev Subtracts the yield buffer from the total yield balance.
      * @param _totalAssets The total assets controlled by the vault
      * @param totalDebt_ The total asset debt owed
      * @return The available yield balance
      */
     function _availableYieldBalance(uint256 _totalAssets, uint256 totalDebt_) internal view returns (uint256) {
-        uint256 _allocatedAssets = totalDebt_ + yieldBuffer;
-        if (_allocatedAssets >= _totalAssets) {
-            return 0;
-        } else {
+        uint256 totalYieldBalance_ = _totalYieldBalance(_totalAssets, totalDebt_);
+        uint256 _yieldBuffer = yieldBuffer;
+        if (totalYieldBalance_ >= _yieldBuffer) {
             unchecked {
-                return _totalAssets - _allocatedAssets;
+                return totalYieldBalance_ - _yieldBuffer;
             }
+        } else {
+            return 0;
         }
     }
 
@@ -558,17 +585,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
      * @notice Current amount of assets available in the yield buffer
      * @return The available assets in the yield buffer
      */
-    function availableYieldBuffer() external view returns (uint256) {
-        uint256 _totalAssets = totalAssets();
-        uint256 totalDebt_ = totalDebt();
+    function currentYieldBuffer() external view returns (uint256) {
+        uint256 totalYieldBalance_ = _totalYieldBalance(totalAssets(), totalDebt());
         uint256 _yieldBuffer = yieldBuffer;
-        uint256 _excessAssets;
-        if (_totalAssets > totalDebt_) {
-            unchecked {
-                _excessAssets = _totalAssets - totalDebt_;
-            }
+        if (totalYieldBalance_ >= _yieldBuffer) {
+            return _yieldBuffer;
+        } else {
+            return totalYieldBalance_;
         }
-        return _excessAssets > _yieldBuffer ? _yieldBuffer : _excessAssets;
     }
 
     /**

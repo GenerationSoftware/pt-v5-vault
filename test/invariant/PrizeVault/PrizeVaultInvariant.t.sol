@@ -51,9 +51,13 @@ contract PrizeVaultInvariant is Test {
         PrizeVault vault = vaultHarness.vault();
         uint256 totalAssets = vault.totalAssets();
         uint256 totalDebt = vault.totalDebt();
-        uint256 availableYieldBuffer = vault.availableYieldBuffer();
+        uint256 currentYieldBuffer = vault.currentYieldBuffer();
         uint256 availableYieldBalance = vault.availableYieldBalance();
-        uint256 totalAccounted = totalDebt + availableYieldBuffer + availableYieldBalance;
+        uint256 totalAccounted = totalDebt + currentYieldBuffer + availableYieldBalance;
         assertEq(totalAssets, totalAccounted);
+
+        // totalYieldBalance = currentYieldBuffer + availableYieldBalance
+        uint256 totalAccounted2 = totalDebt + vault.totalYieldBalance();
+        assertEq(totalAssets, totalAccounted2);
     }
 }

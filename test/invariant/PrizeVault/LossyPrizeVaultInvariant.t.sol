@@ -44,10 +44,14 @@ contract LossyPrizeVaultInvariant is Test {
         } else {
             // When assets cover debts, we have essentially the same test as the the sister test in `PrizeVaultInvariant.sol`
             // The debt is converted to assets using `convertToAssets` to test that it will always be 1:1 when the vault has ample collateral.
-            uint256 availableYieldBuffer = lossyVaultHarness.vault().availableYieldBuffer();
+            uint256 currentYieldBuffer = lossyVaultHarness.vault().currentYieldBuffer();
             uint256 availableYieldBalance = lossyVaultHarness.vault().availableYieldBalance();
-            uint256 totalAccounted = lossyVaultHarness.vault().convertToAssets(totalDebt) + availableYieldBuffer + availableYieldBalance;
+            uint256 totalAccounted = lossyVaultHarness.vault().convertToAssets(totalDebt) + currentYieldBuffer + availableYieldBalance;
             assertEq(totalAssets, totalAccounted);
+
+            // totalYieldBalance = currentYieldBuffer + availableYieldBalance
+            uint256 totalAccounted2 = totalDebt + lossyVaultHarness.vault().totalYieldBalance();
+            assertEq(totalAssets, totalAccounted2);
         }
     }
 }
