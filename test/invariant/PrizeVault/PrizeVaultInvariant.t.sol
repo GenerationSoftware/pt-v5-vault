@@ -8,7 +8,12 @@ import { PrizeVaultFuzzHarness, PrizeVault } from "./PrizeVaultFuzzHarness.sol";
 contract PrizeVaultInvariant is Test {
     PrizeVaultFuzzHarness public vaultHarness;
 
-    function setUp() external {
+    modifier useCurrentTime() {
+        vm.warp(vaultHarness.currentTime());
+        _;
+    }
+
+    function setUp() external virtual {
         vaultHarness = new PrizeVaultFuzzHarness(1e5);
         targetContract(address(vaultHarness));
 
@@ -16,33 +21,33 @@ contract PrizeVaultInvariant is Test {
         vaultHarness.accrueYield(1e5);
     }
 
-    function invariantAssetsCoverDebt() external {
+    function invariantAssetsCoverDebt() external useCurrentTime {
         uint256 totalAssets = vaultHarness.vault().totalAssets();
         uint256 totalDebt = vaultHarness.vault().totalDebt();
         assertGe(totalAssets, totalDebt);
     }
 
-    function invariantDebtAtLeastSupply() external {
+    function invariantDebtAtLeastSupply() external useCurrentTime {
         uint256 totalDebt = vaultHarness.vault().totalDebt();
         uint256 totalSupply = vaultHarness.vault().totalSupply();
         assertGe(totalDebt, totalSupply);
     }
 
-    function invariantLiquidBalanceOfAssetsNoMoreThanAvailableYield() external {
+    function invariantLiquidBalanceOfAssetsNoMoreThanAvailableYield() external useCurrentTime {
         address asset = address(vaultHarness.underlyingAsset());
         uint256 liquidBalance = vaultHarness.vault().liquidatableBalanceOf(asset);
         uint256 availableYieldBalance = vaultHarness.vault().availableYieldBalance();
         assertLe(liquidBalance, availableYieldBalance);
     }
 
-    function invariantLiquidBalanceOfSharesNoMoreThanAvailableYield() external {
+    function invariantLiquidBalanceOfSharesNoMoreThanAvailableYield() external useCurrentTime {
         address vault = address(vaultHarness.vault());
         uint256 liquidBalance = vaultHarness.vault().liquidatableBalanceOf(vault);
         uint256 availableYieldBalance = vaultHarness.vault().availableYieldBalance();
         assertLe(liquidBalance, availableYieldBalance);
     }
 
-    function invariantAllAssetsAccountedFor() external {
+    function invariantAllAssetsAccountedFor() external useCurrentTime {
         PrizeVault vault = vaultHarness.vault();
         uint256 totalAssets = vault.totalAssets();
         uint256 totalDebt = vault.totalDebt();

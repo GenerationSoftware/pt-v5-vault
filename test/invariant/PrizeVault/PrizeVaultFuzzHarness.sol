@@ -56,7 +56,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
     string public vaultName = "PoolTogether Test Vault";
     string public vaultSymbol = "pTest";
 
-    YieldVault public yieldVault;
+    IERC4626 public yieldVault;
     ERC20PermitMock public underlyingAsset;
     ERC20PermitMock public prizeToken;
 
@@ -71,12 +71,26 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
     uint256 numWithdraws;
     uint256 numDeposits;
 
+    uint256 public currentTime;
+
+    /* ============ Time Warp Helpers ============ */
+
+    modifier useCurrentTime() {
+        vm.warp(currentTime);
+        _;
+    }
+
+    function setCurrentTime(uint256 newTime) internal {
+        currentTime = newTime;
+        vm.warp(currentTime);
+    }
+
     /* ============ Constructor ============ */
 
     constructor(
         uint256 _yieldBuffer
     ) {
-        (owner, ownerPrivateKey) = makeAddrAndKey("Owner");
+        (owner, ownerPrivateKey) = makeAddrAndKey("PrizeVaultOwner");
         (alice, alicePrivateKey) = makeAddrAndKey("Alice");
         (bob, bobPrivateKey) = makeAddrAndKey("Bob");
         (joe, joePrivateKey) = makeAddrAndKey("Joe");
@@ -116,6 +130,20 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
             _yieldBuffer, // yield buffer
             owner // owner
         );
+
+        setCurrentTime(block.timestamp);
+    }
+
+    /* ============ Asset Helpers ============ */
+
+    function _dealAssets(address to, uint256 amount) internal virtual {
+        underlyingAsset.mint(to, amount);
+    }
+
+    // Limited to uint128 since the yield vault math can't handle max uint256 assets and uint128 still exceeds
+    // the max TWAB supply limit (uint96).
+    function _maxDealAssets() internal virtual view returns(uint256) {
+        return type(uint128).max - underlyingAsset.totalSupply();
     }
 
     /* ============ Actor Helpers ============ */
@@ -139,20 +167,21 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
     /* ============ accrue yield ============ */
 
     /// @dev amount is limited to int88 to prevent too much yield from accruing over the test period
-    function accrueYield(int88 yield) public virtual {
+    function accrueYield(int88 yield) public virtual useCurrentTime {
         if (yield < 0) yield = yield * -1; // this harness assumes no loss in the yield vault
-        underlyingAsset.mint(address(yieldVault), uint256(uint88(yield)));
+        uint256 boundedYield = _bound(uint256(uint88(yield)), 0, _maxDealAssets());
+        _dealAssets(address(yieldVault), boundedYield);
     }
 
     /* ============ deposit directly to yield vault ============ */
 
     /// @dev This helps discover scenarios that are only possible when there are other owners of yield
     /// vault shares.
-    function depositDirectToYieldVault(uint256 callerSeed, uint256 receiverSeed, uint256 assets) public useActor(callerSeed) {
+    function depositDirectToYieldVault(uint256 callerSeed, uint256 receiverSeed, uint256 assets) public useCurrentTime useActor(callerSeed) {
         assets = _bound(assets, 0, yieldVault.maxDeposit(currentActor));
-        assets = _bound(assets, 0, type(uint128).max); // restrict max deposit further to prevent overflows on yield vault and token supply
-        underlyingAsset.mint(currentActor, assets);
-        underlyingAsset.approve(address(yieldVault), assets);
+        assets = _bound(assets, 0, _maxDealAssets()); // restrict max deposit further to prevent overflows on yield vault and token supply
+        _dealAssets(currentActor, assets);
+        IERC20(vault.asset()).approve(address(yieldVault), assets);
 
         vm.expectEmit();
         emit Deposit(currentActor, _actor(receiverSeed), assets, yieldVault.previewDeposit(assets));
@@ -163,7 +192,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /// @dev This helps discover scenarios that are only possible when there are other owners of yield
     /// vault shares.
-    function withdrawDirectFromYieldVault(uint256 callerSeed, uint256 receiverSeed, uint256 assets) public useActor(callerSeed) {
+    function withdrawDirectFromYieldVault(uint256 callerSeed, uint256 receiverSeed, uint256 assets) public useCurrentTime useActor(callerSeed) {
         assets = _bound(assets, 0, yieldVault.maxWithdraw(currentActor));
 
         vm.expectEmit();
@@ -173,24 +202,25 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ transfer assets directly to vault on accident ============ */
 
-    function transferAssetsToVaultOnAccident(uint256 fromSeed, uint256 assets) public useActor(fromSeed) {
+    function transferAssetsToVaultOnAccident(uint256 fromSeed, uint256 assets) public useCurrentTime useActor(fromSeed) {
         assets = _bound(assets, 0, underlyingAsset.balanceOf(currentActor));
         underlyingAsset.transfer(address(vault), assets);
     }
 
     /* ============ transfer ============ */
 
-    function transferShares(uint256 fromSeed, uint256 toSeed, uint256 amount) public useActor(fromSeed) {
+    function transferShares(uint256 fromSeed, uint256 toSeed, uint256 amount) public useCurrentTime useActor(fromSeed) {
         amount = _bound(amount, 0, vault.balanceOf(currentActor));
         vault.transfer(_actor(toSeed), amount);
     }
 
     /* ============ deposit ============ */
 
-    function deposit(uint256 callerSeed, uint256 receiverSeed, uint256 assets) public useActor(callerSeed) {
+    function deposit(uint256 callerSeed, uint256 receiverSeed, uint256 assets) public useCurrentTime useActor(callerSeed) {
         assets = _bound(assets, 0, vault.maxDeposit(currentActor));
-        underlyingAsset.mint(currentActor, assets);
-        underlyingAsset.approve(address(vault), assets);
+        assets = _bound(assets, 0, _maxDealAssets());
+        _dealAssets(currentActor, assets);
+        IERC20(vault.asset()).approve(address(vault), assets);
 
         vm.expectEmit();
         emit Deposit(currentActor, _actor(receiverSeed), assets, vault.previewDeposit(assets));
@@ -199,11 +229,12 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ mint ============ */
 
-    function mint(uint256 callerSeed, uint256 receiverSeed, uint256 shares) public useActor(callerSeed) {
+    function mint(uint256 callerSeed, uint256 receiverSeed, uint256 shares) public useCurrentTime useActor(callerSeed) {
         shares = _bound(shares, 0, vault.maxMint(currentActor));
+        shares = _bound(shares, 0, _maxDealAssets());
         uint256 assets = vault.previewMint(shares); // use previewMint to get the amount of assets that will be taken
-        underlyingAsset.mint(currentActor, assets);
-        underlyingAsset.approve(address(vault), assets);
+        _dealAssets(currentActor, assets);
+        IERC20(vault.asset()).approve(address(vault), assets);
 
         vm.expectEmit();
         emit Deposit(currentActor, _actor(receiverSeed), vault.previewMint(assets), shares);
@@ -212,7 +243,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ withdraw ============ */
 
-    function withdraw(uint256 assets, uint256 callerSeed, uint256 receiverSeed, uint256 ownerSeed) public useActor(callerSeed) {
+    function withdraw(uint256 assets, uint256 callerSeed, uint256 receiverSeed, uint256 ownerSeed) public useCurrentTime useActor(callerSeed) {
         assets = _bound(assets, 0, vault.maxWithdraw( _actor(ownerSeed)));
         uint256 shares = vault.previewWithdraw(assets);
 
@@ -227,7 +258,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ redeem ============ */
 
-    function redeem(uint256 shares, uint256 callerSeed, uint256 receiverSeed, uint256 ownerSeed) public useActor(callerSeed) {
+    function redeem(uint256 shares, uint256 callerSeed, uint256 receiverSeed, uint256 ownerSeed) public useCurrentTime useActor(callerSeed) {
         shares = _bound(shares, 0, vault.maxRedeem(_actor(ownerSeed)));
         uint256 assets = vault.previewRedeem(shares);
 
@@ -242,9 +273,10 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ depositWithPermit ============ */
 
-    function depositWithPermit(uint256 callerSeed, uint256 ownerSeed, uint256 assets) public useActor(ownerSeed) {
+    function depositWithPermit(uint256 callerSeed, uint256 ownerSeed, uint256 assets) public useCurrentTime useActor(ownerSeed) {
         assets = _bound(assets, 0, vault.maxDeposit(currentActor));
-        underlyingAsset.mint(currentActor, assets);
+        assets = _bound(assets, 0, _maxDealAssets());
+        _dealAssets(currentActor, assets);
         (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
             underlyingAsset,
             vault,
@@ -267,10 +299,11 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ sponsor ============ */
 
-    function sponsor(uint256 callerSeed, uint256 assets) public useActor(callerSeed) {
+    function sponsor(uint256 callerSeed, uint256 assets) public useCurrentTime useActor(callerSeed) {
         assets = _bound(assets, 0, vault.maxDeposit(currentActor));
-        underlyingAsset.mint(currentActor, assets);
-        underlyingAsset.approve(address(vault), assets);
+        assets = _bound(assets, 0, _maxDealAssets());
+        _dealAssets(currentActor, assets);
+        IERC20(vault.asset()).approve(address(vault), assets);
 
         vm.expectEmit();
         emit Deposit(currentActor, currentActor, assets, vault.previewDeposit(assets));
@@ -279,7 +312,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ claimYieldFeeShares ============ */
 
-    function claimYieldFeeShares(uint256 callerSeed, uint256 shares) public useActor(callerSeed) {
+    function claimYieldFeeShares(uint256 callerSeed, uint256 shares) public useCurrentTime useActor(callerSeed) {
         shares = _bound(shares, 0, vault.yieldFeeBalance());
         if (currentActor != vault.yieldFeeRecipient()) {
             vm.expectRevert(abi.encodeWithSelector(PrizeVault.CallerNotYieldFeeRecipient.selector, currentActor, vault.yieldFeeRecipient()));
@@ -289,7 +322,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ transferTokensOut ============ */
 
-    function transferTokensOut(uint256 callerSeed, uint256 receiverSeed, bool useAssetForTokenOut, uint256 amountOut) public useActor(callerSeed) {
+    function transferTokensOut(uint256 callerSeed, uint256 receiverSeed, bool useAssetForTokenOut, uint256 amountOut) public useCurrentTime useActor(callerSeed) {
         address tokenOut = address(vault); // share token
         if (useAssetForTokenOut) {
             tokenOut = address(underlyingAsset); // asset token
@@ -304,7 +337,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
     /* ============ verifyTokensIn ============ */
 
     /// @dev amountIn is uint88 to ensure we don't mint too many prize tokens over the course of the tests.
-    function verifyTokensIn(uint88 amountIn, uint256 callerSeed) public useActor(callerSeed) {
+    function verifyTokensIn(uint88 amountIn, uint256 callerSeed) public useCurrentTime useActor(callerSeed) {
         prizeToken.mint(address(prizePool), amountIn);
         if (currentActor != vault.liquidationPair()) {
             vm.expectRevert(abi.encodeWithSelector(PrizeVault.CallerNotLP.selector, currentActor, vault.liquidationPair()));
@@ -314,7 +347,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ setLiquidationPair ============ */
 
-    function setLiquidationPair(uint256 callerSeed, uint256 lpAddressSeed) public useActor(callerSeed) {
+    function setLiquidationPair(uint256 callerSeed, uint256 lpAddressSeed) public useCurrentTime useActor(callerSeed) {
         if (currentActor != vault.owner()) {
             vm.expectRevert("Ownable/caller-not-owner");
         }
@@ -323,7 +356,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ setYieldFeePercentage ============ */
 
-    function setYieldFeePercentage(uint256 callerSeed, uint256 yieldFeePercentage) public useActor(callerSeed) {
+    function setYieldFeePercentage(uint256 callerSeed, uint256 yieldFeePercentage) public useCurrentTime useActor(callerSeed) {
         yieldFeePercentage = _bound(yieldFeePercentage, 0, vault.MAX_YIELD_FEE());
         if (currentActor != vault.owner()) {
             vm.expectRevert("Ownable/caller-not-owner");
@@ -333,7 +366,7 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
 
     /* ============ setYieldFeeRecipient ============ */
 
-    function setYieldFeeRecipient(uint256 callerSeed, uint256 yieldFeeRecipientSeed) public useActor(callerSeed) {
+    function setYieldFeeRecipient(uint256 callerSeed, uint256 yieldFeeRecipientSeed) public useCurrentTime useActor(callerSeed) {
         if (currentActor != vault.owner()) {
             vm.expectRevert("Ownable/caller-not-owner");
         }

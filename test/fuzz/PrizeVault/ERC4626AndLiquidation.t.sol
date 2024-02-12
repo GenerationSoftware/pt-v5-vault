@@ -160,12 +160,12 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
         );
 
         uint256 totalAssets = prizeVault.totalAssets();
-        uint256 depositedAssets = prizeVault.totalSupply();
+        uint256 totalDebt = prizeVault.totalDebt();
 
-        if (totalAssets < depositedAssets + yieldBuffer) {
+        if (totalAssets < totalDebt + yieldBuffer) {
             assertEq(liquidatableBalanceOf, 0, "can't liquidate since assets are less than deposits and yield buffer");
         } else {
-            assertApproxEqAbs(liquidatableBalanceOf, totalAssets - depositedAssets - yieldBuffer, _delta_, "yield");
+            assertApproxEqAbs(liquidatableBalanceOf, totalAssets - totalDebt - yieldBuffer, _delta_, "yield");
         }
     }
 
