@@ -49,7 +49,7 @@ contract UnitBaseSetup is Test, Permit {
     string public vaultName = "PoolTogether Test Vault";
     string public vaultSymbol = "pTest";
 
-    YieldVault public yieldVault;
+    IERC4626 public yieldVault;
     ERC20PermitMock public underlyingAsset;
     ERC20PermitMock public prizeToken;
     LiquidationRouterMock public liquidationRouter;
@@ -67,6 +67,14 @@ contract UnitBaseSetup is Test, Permit {
         return new ERC20PermitMock("Dai Stablecoin");
     }
 
+    function setUpYieldVault() public virtual returns (IERC4626) {
+        return new YieldVault(
+            address(underlyingAsset),
+            "Test Yield Vault",
+            "yvTest"
+        );
+    }
+
     function setUp() public virtual {
         (owner, ownerPrivateKey) = makeAddrAndKey("Owner");
         (alice, alicePrivateKey) = makeAddrAndKey("Alice");
@@ -81,11 +89,7 @@ contract UnitBaseSetup is Test, Permit {
 
         claimer = address(0xe291d9169F0316272482dD82bF297BB0a11D267f);
 
-        yieldVault = new YieldVault(
-            address(underlyingAsset),
-            "Test Yield Vault",
-            "yvTest"
-        );
+        yieldVault = setUpYieldVault();
 
         vault = new PrizeVaultWrapper(
             vaultName,
