@@ -48,7 +48,7 @@ contract PrizeVaultFactoryTest is Test {
 
     function setUp() public {
         vaultFactory = new PrizeVaultFactory();
-        twabController = TwabController(makeAddr("twabController"));
+        twabController = new TwabController(1 hours, uint32(block.timestamp));
         asset = new ERC20Mock();
         yieldVault = new YieldVault(address(asset), "Yield Vault", "yv");
         prizeToken = new ERC20Mock();
@@ -75,6 +75,9 @@ contract PrizeVaultFactoryTest is Test {
     function testDeployVault() external {
         PrizeVault _vault;
 
+        asset.mint(address(this), yieldBuffer);
+        asset.approve(address(vaultFactory), yieldBuffer);
+
         // We don't know the vault address in advance, so we don't check topic 1
         vm.expectEmit(false, true, true, true);
         emit NewPrizeVault(PrizeVault(_vault), yieldVault, PrizePool(address(prizePool)), name, symbol);
@@ -99,6 +102,9 @@ contract PrizeVaultFactoryTest is Test {
         assertEq(PrizeVault(_vault).claimer(), claimer);
         assertEq(PrizeVault(_vault).yieldFeePercentage(), yieldFeePercentage);
         assertEq(PrizeVault(_vault).yieldBuffer(), yieldBuffer);
+        assertEq(PrizeVault(_vault).currentYieldBuffer(), yieldBuffer);
+        assertEq(asset.balanceOf(address(_vault)), yieldBuffer);
+        assertEq(asset.balanceOf(address(this)), 0);
         assertEq(PrizeVault(_vault).owner(), owner);
 
         assertEq(vaultFactory.totalVaults(), 1);
@@ -106,6 +112,8 @@ contract PrizeVaultFactoryTest is Test {
     }
 
     function testDeployVault_secondDeployShouldHaveDiffAddress() public {
+        asset.mint(address(this), yieldBuffer);
+        asset.approve(address(vaultFactory), yieldBuffer);
         PrizeVault _vault1 = PrizeVault(
             vaultFactory.deployVault(
                 name,
@@ -120,6 +128,8 @@ contract PrizeVaultFactoryTest is Test {
             )
         );
 
+        asset.mint(address(this), yieldBuffer);
+        asset.approve(address(vaultFactory), yieldBuffer);
         PrizeVault _vault2 = PrizeVault(
             vaultFactory.deployVault(
                 name,
@@ -135,5 +145,40 @@ contract PrizeVaultFactoryTest is Test {
         );
 
         assertNotEq(address(_vault1), address(_vault2));
+    }
+
+    function testDeployVault_deploymentFailsIfYieldBufferNotSupplied() public {
+        assertEq(asset.allowance(address(this), address(vaultFactory)), 0);
+        assertGt(yieldBuffer, 0);
+
+        vm.expectRevert("ERC20: insufficient allowance");
+        vaultFactory.deployVault(
+            name,
+            symbol,
+            yieldVault,
+            PrizePool(address(prizePool)),
+            claimer,
+            address(this),
+            yieldFeePercentage,
+            yieldBuffer,
+            owner
+        );
+    }
+
+    function testDeployVault_deploymentSucceedsIfYieldBufferIsZero() public {
+        assertEq(asset.allowance(address(this), address(vaultFactory)), 0);
+        PrizeVault _vault = vaultFactory.deployVault(
+            name,
+            symbol,
+            yieldVault,
+            PrizePool(address(prizePool)),
+            claimer,
+            address(this),
+            yieldFeePercentage,
+            0, // 0 yield buffer
+            owner
+        );
+        assertEq(_vault.yieldBuffer(), 0);
+        assertEq(asset.balanceOf(address(_vault)), 0);
     }
 }

@@ -47,6 +47,8 @@ contract PrizeVaultFactory {
     /**
      * @notice Deploy a new vault
      * @dev `claimer` can be set to address zero if none is available yet.
+     * @dev The caller MUST approve this factory to spend underlying assets equal to `_yieldBuffer` so the yield
+     * buffer can be filled on deployment. This value is unrecoverable and is expected to be insignificant.
      * @param _name Name of the ERC20 share minted by the vault
      * @param _symbol Symbol of the ERC20 share minted by the vault
      * @param _yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
@@ -82,6 +84,12 @@ contract PrizeVaultFactory {
             _yieldBuffer,
             _owner
         );
+
+        // A donation to fill the yield buffer is made to ensure that early depositors have
+        // rounding errors covered in the time before yield is actually generated.
+        if (_yieldBuffer > 0) {
+            IERC20(_vault.asset()).transferFrom(msg.sender, address(_vault), _yieldBuffer);
+        }
 
         allVaults.push(_vault);
         deployedVaults[address(_vault)] = true;
