@@ -36,7 +36,7 @@ contract PrizeVaultFactory {
     /// @notice The yield buffer to use for vault deployments.
     /// @dev The yield buffer is expected to be of insignificant value and is used to cover rounding
     /// errors on deposits and withdrawals. Yield is expected to accrue faster than the yield buffer
-    /// can be depleted.
+    /// can be reasonably depleted.
     uint256 public constant YIELD_BUFFER = 1e5;
 
     /// @notice List of all vaults deployed by this factory.
@@ -53,7 +53,7 @@ contract PrizeVaultFactory {
     /**
      * @notice Deploy a new vault
      * @dev `claimer` can be set to address zero if none is available yet.
-     * @dev The caller MUST approve this factory to spend underlying assets equal to `_yieldBuffer` so the yield
+     * @dev The caller MUST approve this factory to spend underlying assets equal to `YIELD_BUFFER` so the yield
      * buffer can be filled on deployment. This value is unrecoverable and is expected to be insignificant.
      * @param _name Name of the ERC20 share minted by the vault
      * @param _symbol Symbol of the ERC20 share minted by the vault
@@ -85,15 +85,13 @@ contract PrizeVaultFactory {
             _claimer,
             _yieldFeeRecipient,
             _yieldFeePercentage,
-            _yieldBuffer,
+            YIELD_BUFFER,
             _owner
         );
 
         // A donation to fill the yield buffer is made to ensure that early depositors have
         // rounding errors covered in the time before yield is actually generated.
-        if (_yieldBuffer > 0) {
-            IERC20(_vault.asset()).transferFrom(msg.sender, address(_vault), _yieldBuffer);
-        }
+        IERC20(_vault.asset()).transferFrom(msg.sender, address(_vault), YIELD_BUFFER);
 
         allVaults.push(_vault);
         deployedVaults[address(_vault)] = true;
