@@ -33,6 +33,12 @@ contract PrizeVaultFactory {
 
     /* ============ Variables ============ */
 
+    /// @notice The yield buffer to use for vault deployments.
+    /// @dev The yield buffer is expected to be of insignificant value and is used to cover rounding
+    /// errors on deposits and withdrawals. Yield is expected to accrue faster than the yield buffer
+    /// can be depleted.
+    uint256 public constant YIELD_BUFFER = 1e5;
+
     /// @notice List of all vaults deployed by this factory.
     PrizeVault[] public allVaults;
 
@@ -56,7 +62,6 @@ contract PrizeVaultFactory {
      * @param _claimer Address of the claimer
      * @param _yieldFeeRecipient Address of the yield fee recipient
      * @param _yieldFeePercentage Yield fee percentage
-     * @param _yieldBuffer Amount of yield to keep as a buffer
      * @param _owner Address that will gain ownership of this contract
      * @return PrizeVault The newly deployed PrizeVault
      */
@@ -68,7 +73,6 @@ contract PrizeVaultFactory {
       address _claimer,
       address _yieldFeeRecipient,
       uint32 _yieldFeePercentage,
-      uint256 _yieldBuffer,
       address _owner
     ) external returns (PrizeVault) {
         PrizeVault _vault = new PrizeVault{
