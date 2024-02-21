@@ -55,7 +55,7 @@ contract PrizeVaultFactoryTest is Test {
         prizePool = new PrizePoolMock(prizeToken, twabController);
 
         yieldFeePercentage = 0;
-        yieldBuffer = 1e6;
+        yieldBuffer = vaultFactory.YIELD_BUFFER();
 
         name = "PoolTogether Test Vault";
         symbol = "pTest";
@@ -90,7 +90,6 @@ contract PrizeVaultFactoryTest is Test {
             claimer,
             address(this),
             yieldFeePercentage,
-            yieldBuffer,
             owner
         );
 
@@ -123,7 +122,6 @@ contract PrizeVaultFactoryTest is Test {
                 claimer,
                 address(this),
                 yieldFeePercentage,
-                yieldBuffer,
                 owner
             )
         );
@@ -139,7 +137,6 @@ contract PrizeVaultFactoryTest is Test {
                 claimer,
                 address(this),
                 yieldFeePercentage,
-                yieldBuffer,
                 owner
             )
         );
@@ -160,25 +157,7 @@ contract PrizeVaultFactoryTest is Test {
             claimer,
             address(this),
             yieldFeePercentage,
-            yieldBuffer,
             owner
         );
-    }
-
-    function testDeployVault_deploymentSucceedsIfYieldBufferIsZero() public {
-        assertEq(asset.allowance(address(this), address(vaultFactory)), 0);
-        PrizeVault _vault = vaultFactory.deployVault(
-            name,
-            symbol,
-            yieldVault,
-            PrizePool(address(prizePool)),
-            claimer,
-            address(this),
-            yieldFeePercentage,
-            0, // 0 yield buffer
-            owner
-        );
-        assertEq(_vault.yieldBuffer(), 0);
-        assertEq(asset.balanceOf(address(_vault)), 0);
     }
 }

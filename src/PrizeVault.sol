@@ -45,11 +45,35 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     uint32 public constant MAX_YIELD_FEE = 9e8;
 
     /// @notice The yield buffer that is reserved for covering rounding errors on withdrawals and deposits.
-    /// @dev The buffer prevents the entire yield balance from being liquidated, which would leave the vault in a
-    ///      state where a single rounding error could reduce the totalAssets to less than the totalSupply.
-    /// @dev If the yield vault does not accrue yield on a regular basis, it is recommended to set the yieldBuffer
-    ///      higher than normal to ensure all rounding errors on deposits and withdrawals are covered between yield
-    ///      accrual periods.
+    /// @dev The buffer prevents the entire yield balance from being liquidated, which would leave the vault
+    /// in a state where a single rounding error could reduce the totalAssets to less than the totalSupply.
+    /// 
+    /// The yield buffer is expected to be of insignificant value and is used to cover rounding
+    /// errors on deposits and withdrawals. Yield is expected to accrue faster than the yield buffer
+    /// can be reasonably depleted.
+    ///
+    /// IT IS RECOMMENDED TO DONATE ASSETS DIRECTLY TO THE PRIZE VAULT AFTER DEPLOYMENT TO FILL THE YIELD
+    /// BUFFER AND COVER ROUNDING ERRORS UNTIL THE DEPOSITS CAN GENERATE ENOUGH YIELD TO KEEP THE BUFFER 
+    /// FULL WITHOUT ASSISTANCE.
+    ///
+    /// The yield buffer should be set as high as possible while still being considered insignificant
+    /// for the underlying asset. For example, a reasonable yield buffer for USDC with 6 decimals might be
+    /// 1e5 ($0.10), which will cover up to 100k rounding errors while still being an insignificant value.
+    /// Some assets may be considered incompatible with the prize vault if the yield vault incurs rounding
+    /// errors and the underlying asset has a low precision per dollar ratio.
+    /// 
+    /// Precision per dollar (PPD) can be calculated by: (10 ^ DECIMALS) / ($ value of 1 asset).
+    /// For example, USDC has a PPD of (10 ^ 6) / ($1) = 10e6 p/$.
+    /// 
+    /// As a rule of thumb, assets with lower PPD than USDC should not be assumed to be compatible since
+    /// the potential loss of a single unit rounding error is likely too high to be made up by yield at 
+    /// a reasonable rate. Actual results may vary based on expected gas costs, asset fluctuation, and yield
+    /// accrual rates. If the underlying yield vault does not incur any rounding errors, then the yield buffer
+    /// can be set to zero.
+    ///
+    /// If the yield buffer is depleted on the prize vault, new deposits will be prevented if it would result in
+    /// a rounding error and any rounding errors incurred by withdrawals will not be covered by yield. The yield
+    /// buffer will be replenished automatically as yield accrues.
     uint256 public immutable yieldBuffer;
 
     /// @notice Address of the underlying ERC4626 vault generating yield.

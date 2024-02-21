@@ -33,6 +33,34 @@ contract PrizeVaultFactory {
 
     /* ============ Variables ============ */
 
+    /// @notice The yield buffer to use for vault deployments.
+    /// @dev The yield buffer is expected to be of insignificant value and is used to cover rounding
+    /// errors on deposits and withdrawals. Yield is expected to accrue faster than the yield buffer
+    /// can be reasonably depleted.
+    ///
+    /// The yield buffer should be set as high as possible while still being considered
+    /// insignificant for the lowest precision per dollar asset that is expected to be supported.
+    /// 
+    /// Precision per dollar (PPD) can be calculated by: (10 ^ DECIMALS) / ($ value of 1 asset).
+    /// For example, USDC has a PPD of (10 ^ 6) / ($1) = 10e6 p/$.
+    /// 
+    /// As a rule of thumb, assets with lower PPD than USDC should not be assumed to be compatible since
+    /// the potential loss of a single unit rounding error is likely too high to be made up by yield at 
+    /// a reasonable rate. Actual results may vary based on expected gas costs, asset fluctuation, and
+    /// yield accrual rates.
+    ///
+    /// The yield buffer of vaults deployed by this factory is 1e5. This means that if you deploy a 
+    /// vault with USDC as the underlying asset, you will have to approve this factory to spend 1e5
+    /// USDC ($0.10) to be sent to the prize vault during deployment. This value will cover the first
+    /// 100k rounding errors on deposits and withdraws to the vault and is not recoverable by the 
+    /// deployer.
+    ///
+    /// If the yield buffer is depleted on a vault, the vault will prevent any further 
+    /// deposits if it would result in a rounding error and any rounding errors incurred by withdrawals
+    /// will not be covered by yield. The yield buffer will be replenished automatically as yield accrues
+    /// on deposits.
+    uint256 public constant YIELD_BUFFER = 1e5;
+
     /// @notice List of all vaults deployed by this factory.
     PrizeVault[] public allVaults;
 
@@ -47,7 +75,7 @@ contract PrizeVaultFactory {
     /**
      * @notice Deploy a new vault
      * @dev `claimer` can be set to address zero if none is available yet.
-     * @dev The caller MUST approve this factory to spend underlying assets equal to `_yieldBuffer` so the yield
+     * @dev The caller MUST approve this factory to spend underlying assets equal to `YIELD_BUFFER` so the yield
      * buffer can be filled on deployment. This value is unrecoverable and is expected to be insignificant.
      * @param _name Name of the ERC20 share minted by the vault
      * @param _symbol Symbol of the ERC20 share minted by the vault
@@ -56,7 +84,6 @@ contract PrizeVaultFactory {
      * @param _claimer Address of the claimer
      * @param _yieldFeeRecipient Address of the yield fee recipient
      * @param _yieldFeePercentage Yield fee percentage
-     * @param _yieldBuffer Amount of yield to keep as a buffer
      * @param _owner Address that will gain ownership of this contract
      * @return PrizeVault The newly deployed PrizeVault
      */
@@ -68,7 +95,6 @@ contract PrizeVaultFactory {
       address _claimer,
       address _yieldFeeRecipient,
       uint32 _yieldFeePercentage,
-      uint256 _yieldBuffer,
       address _owner
     ) external returns (PrizeVault) {
         PrizeVault _vault = new PrizeVault{
@@ -81,15 +107,13 @@ contract PrizeVaultFactory {
             _claimer,
             _yieldFeeRecipient,
             _yieldFeePercentage,
-            _yieldBuffer,
+            YIELD_BUFFER,
             _owner
         );
 
         // A donation to fill the yield buffer is made to ensure that early depositors have
         // rounding errors covered in the time before yield is actually generated.
-        if (_yieldBuffer > 0) {
-            IERC20(_vault.asset()).transferFrom(msg.sender, address(_vault), _yieldBuffer);
-        }
+        IERC20(_vault.asset()).transferFrom(msg.sender, address(_vault), YIELD_BUFFER);
 
         allVaults.push(_vault);
         deployedVaults[address(_vault)] = true;
