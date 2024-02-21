@@ -38,21 +38,27 @@ contract PrizeVaultFactory {
     /// errors on deposits and withdrawals. Yield is expected to accrue faster than the yield buffer
     /// can be reasonably depleted.
     ///
-    /// @dev The yield buffer should be set as high as possible while still being considered
+    /// The yield buffer should be set as high as possible while still being considered
     /// insignificant for the lowest precision per dollar asset that is expected to be supported.
     /// 
     /// Precision per dollar (PPD) can be calculated by: (10 ^ DECIMALS) / ($ value of 1 asset).
     /// For example, USDC has a PPD of (10 ^ 6) / ($1) = 10e6 p/$.
     /// 
-    /// Assets with lower PPD than USDC should not be assumed to be compatible since the potential
-    /// loss of a single unit rounding error is likely too high to be made up by yield at a reasonable
-    /// rate.
+    /// As a rule of thumb, assets with lower PPD than USDC should not be assumed to be compatible since
+    /// the potential loss of a single unit rounding error is likely too high to be made up by yield at 
+    /// a reasonable rate. Actual results may vary based on expected gas costs, asset fluctuation, and
+    /// yield accrual rates.
     ///
     /// The yield buffer of vaults deployed by this factory is 1e5. This means that if you deploy a 
     /// vault with USDC as the underlying asset, you will have to approve this factory to spend 1e5
-    /// USDC ($0.10) to be sent to the prize vault after deployment. This value will cover the first
+    /// USDC ($0.10) to be sent to the prize vault during deployment. This value will cover the first
     /// 100k rounding errors on deposits and withdraws to the vault and is not recoverable by the 
     /// deployer.
+    ///
+    /// If the yield buffer is depleted on a vault, the vault will prevent any further 
+    /// deposits if it would result in a rounding error and any rounding errors incurred by withdrawals
+    /// will not be covered by yield. The yield buffer will be replenished automatically as yield accrues
+    /// on deposits.
     uint256 public constant YIELD_BUFFER = 1e5;
 
     /// @notice List of all vaults deployed by this factory.
