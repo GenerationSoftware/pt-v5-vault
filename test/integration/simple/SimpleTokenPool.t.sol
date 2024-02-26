@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
-contract SimpleTokenPoolTest is BaseIntegration {
+contract SimpleTokenPoolIntegrationTest is BaseIntegration {
     uint256 fork;
     uint256 forkBlock = 116520679;
     uint256 forkBlockTimestamp = 1708640134;

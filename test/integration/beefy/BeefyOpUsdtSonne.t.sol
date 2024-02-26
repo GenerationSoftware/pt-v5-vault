@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
-contract BeefyOpUsdtSonneTest is BaseIntegration {
+contract BeefyOpUsdtSonneIntegrationTest is BaseIntegration {
     uint256 fork;
     uint256 forkBlock = 116368447;
     uint256 forkBlockTimestamp = 1708335672;
