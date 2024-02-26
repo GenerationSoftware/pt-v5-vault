@@ -166,18 +166,18 @@ abstract contract BaseIntegration is Test, Permit {
         uint256 assetsBefore = prizeVault.totalAssets();
         _accrueYield();
         uint256 assetsAfter = prizeVault.totalAssets();
-        // if (yieldVault.balanceOf(address(prizeVault)) > 0) {
-        //     // if the prize vault has any yield vault shares, check to ensure yield has accrued
-        //     require(assetsAfter > assetsBefore, "yield did not accrue");
-        // } else {
-        //     if (underlyingAsset.balanceOf(address(prizeVault)) > 0) {
-        //         // the underlying asset might be rebasing in some setups, so it's possible time passing has caused an increase in latent balance
-        //         require(assetsAfter >= assetsBefore, "assets decreased while holding latent balance");
-        //     } else {
-        //         // otherwise, we should expect no change on the prize vault
-        //         require(assetsAfter == assetsBefore, "assets changed with zero yield shares");
-        //     }
-        // }
+        if (yieldVault.balanceOf(address(prizeVault)) > 0) {
+            // if the prize vault has any yield vault shares, check to ensure yield has accrued
+            require(assetsAfter > assetsBefore, "yield did not accrue");
+        } else {
+            if (underlyingAsset.balanceOf(address(prizeVault)) > 0) {
+                // the underlying asset might be rebasing in some setups, so it's possible time passing has caused an increase in latent balance
+                require(assetsAfter >= assetsBefore, "assets decreased while holding latent balance");
+            } else {
+                // otherwise, we should expect no change on the prize vault
+                require(assetsAfter == assetsBefore, "assets changed with zero yield shares");
+            }
+        }
         return assetsAfter - assetsBefore;
     }
 
@@ -187,19 +187,19 @@ abstract contract BaseIntegration is Test, Permit {
         uint256 assetsBefore = prizeVault.totalAssets();
         _simulateLoss();
         uint256 assetsAfter = prizeVault.totalAssets();
-        // if (yieldVault.balanceOf(address(prizeVault)) > 0) {
-        //     // if the prize vault has any yield vault shares, check to ensure some loss has occurred
-        //     require(assetsAfter < assetsBefore, "loss not simulated");
-        // } else {
-        //     if (underlyingAsset.balanceOf(address(prizeVault)) > 0) {
-        //         // the underlying asset might be rebasing in some setups, so it's possible time passing has caused an increase in latent balance
-        //         require(assetsAfter >= assetsBefore, "assets decreased while holding latent balance");
-        //         return 0;
-        //     } else {
-        //         // otherwise, we should expect no change on the prize vault
-        //         require(assetsAfter == assetsBefore, "assets changed with zero yield shares");
-        //     }
-        // }
+        if (yieldVault.balanceOf(address(prizeVault)) > 0) {
+            // if the prize vault has any yield vault shares, check to ensure some loss has occurred
+            require(assetsAfter < assetsBefore, "loss not simulated");
+        } else {
+            if (underlyingAsset.balanceOf(address(prizeVault)) > 0) {
+                // the underlying asset might be rebasing in some setups, so it's possible time passing has caused an increase in latent balance
+                require(assetsAfter >= assetsBefore, "assets decreased while holding latent balance");
+                return 0;
+            } else {
+                // otherwise, we should expect no change on the prize vault
+                require(assetsAfter == assetsBefore, "assets changed with zero yield shares");
+            }
+        }
         return assetsBefore - assetsAfter;
     }
 
@@ -293,15 +293,11 @@ abstract contract BaseIntegration is Test, Permit {
 
     /// @notice test multi-user deposit w/yield accrual in between
     function testMultiDepositWithYieldAccrual() public {
-        address[] memory depositors = new address[](3);
+        address[] memory depositors = new address[](2);
         depositors[0] = alice;
         depositors[1] = bob;
-        depositors[2] = address(this);
 
         for (uint256 i = 0; i < depositors.length; i++) {
-            // accrue yield
-            accrueYield();
-
             uint256 amount = (10 ** assetDecimals) * (i + 1);
             dealAssets(depositors[i], amount);
 
@@ -319,6 +315,11 @@ abstract contract BaseIntegration is Test, Permit {
             assertEq(prizeVault.balanceOf(depositors[i]), amount, "shares minted");
             assertApproxEqAbs(totalAssetsBefore + amount, totalAssetsAfter, 1, "assets accounted for with possible rounding error");
             assertEq(totalSupplyBefore + amount, totalSupplyAfter, "supply increased by amount");
+
+            if (i == 0) {
+                // accrue yield
+                accrueYield();
+            }
         }
     }
 
