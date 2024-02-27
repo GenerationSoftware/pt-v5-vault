@@ -678,11 +678,10 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
         uint256 _availableYield = availableYieldBalance();
         uint32 _yieldFeePercentage = yieldFeePercentage;
-        address _yieldFeeRecipient = yieldFeeRecipient;
 
         // Determine the proportional yield fee based on the amount being liquidated:
         uint256 _yieldFee;
-        if (_yieldFeePercentage != 0 && _yieldFeeRecipient != address(0)) {
+        if (_yieldFeePercentage != 0) {
             // The yield fee is calculated as a portion of the total yield being consumed, such that 
             // `total = amountOut + yieldFee` and `yieldFee / total = yieldFeePercentage`. 
             _yieldFee = (_amountOut * FEE_PRECISION) / (FEE_PRECISION - _yieldFeePercentage) - _amountOut;

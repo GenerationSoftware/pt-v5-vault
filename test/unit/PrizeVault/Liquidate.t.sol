@@ -126,7 +126,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         }
     }
 
-    // Fee is set, but recipient is the zero address, so no fee should be transferred
+    // Fee is set, and current recipient is the zero address, but the fee should still accrue
     function testTransferTokensOut_noFeeSinceFeeRecipientZero() public {
         vault.setYieldFeePercentage(1e8); // 10% fee
         vault.setYieldFeeRecipient(address(0));
@@ -145,18 +145,19 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
 
             underlyingAsset.mint(address(vault), 1e18);
             uint256 amountOut = vault.liquidatableBalanceOf(tokenOut);
+            uint256 yieldFee = 1e18 - vault.yieldBuffer() - amountOut;
             assertGt(amountOut, 0);
 
             vm.expectEmit();
             emit Transfer(tokenFrom, alice, amountOut);
 
             vm.expectEmit();
-            emit TransferYieldOut(address(this), tokenOut, alice, amountOut, 0);
+            emit TransferYieldOut(address(this), tokenOut, alice, amountOut, yieldFee);
 
             vault.transferTokensOut(address(0), alice, tokenOut, amountOut);
 
             assertEq(IERC20(tokenOut).balanceOf(alice), amountOut);
-            assertEq(vault.yieldFeeBalance(), 0);
+            assertEq(vault.yieldFeeBalance(), yieldFee);
         }
     }
 
