@@ -109,6 +109,7 @@ abstract contract BaseIntegration is Test, Permit {
             yieldBuffer, // yield buffer
             address(this)
         );
+        prizeVault.setLiquidationPair(address(this));
 
         // Fill yield buffer if non-zero:
         if (yieldBuffer > 0) {
@@ -328,6 +329,7 @@ abstract contract BaseIntegration is Test, Permit {
     //////////////////////////////////////////////////////////
 
     /// @notice test withdraw
+    /// @dev also tests for any active deposit / withdraw fees
     function testWithdraw() public {
         uint256 amount = 10 ** assetDecimals;
         dealAssets(alice, amount);
@@ -459,18 +461,61 @@ abstract contract BaseIntegration is Test, Permit {
         }
     }
 
-    /// @notice test yield vault loss
-
     /// @notice test liquidation of assets
+    function testAssetLiquidation() public {
+        // Deposit
+        uint256 amount = 1000 * (10 ** assetDecimals);
+        dealAssets(alice, amount);
 
-    /// @notice test for yield vault deposit / withdraw fees
+        startPrank(alice);
+        underlyingAsset.approve(address(prizeVault), amount);
+        prizeVault.deposit(amount, alice);
+        stopPrank();
 
-    //////////////////////////////////////////////////////////
-    /// State Tests
-    //////////////////////////////////////////////////////////
-
-    /// @notice test liquidatable balance of when yield available
+        // Yield Accrual
+        uint256 approxYield = accrueYield();
+        uint256 availableYield = prizeVault.availableYieldBalance();
+        assertApproxEqAbs(approxYield, availableYield, 1, "approx yield equals available yield balance");
+        uint256 availableAssets = prizeVault.liquidatableBalanceOf(address(underlyingAsset));
+        assertGt(availableAssets, 0, "assets are available for liquidation");
+        
+        // Liquidate
+        prizeVault.transferTokensOut(address(0), bob, address(underlyingAsset), availableAssets);
+        assertEq(underlyingAsset.balanceOf(bob), availableAssets, "liquidator is transferred expected assets");
+        assertApproxEqAbs(prizeVault.availableYieldBalance(), availableYield - availableAssets, 1, "available yield decreased (w / 1 wei rounding error)");
+        assertApproxEqAbs(prizeVault.liquidatableBalanceOf(address(underlyingAsset)), 0, 1, "no more assets can be liquidated (w/ 1 wei rounding error)");
+    }
 
     /// @notice test liquidatable balance of when lossy
+    function testNoLiquidationWhenLossy() public {
+        // Deposit
+        uint256 amount = 1000 * (10 ** assetDecimals);
+        dealAssets(alice, amount);
+
+        startPrank(alice);
+        underlyingAsset.approve(address(prizeVault), amount);
+        prizeVault.deposit(amount, alice);
+        stopPrank();
+
+        // Yield Accrual
+        uint256 approxYield = accrueYield();
+        uint256 availableYield = prizeVault.availableYieldBalance();
+        assertApproxEqAbs(approxYield, availableYield, 1, "approx yield equals available yield balance");
+        uint256 availableAssets = prizeVault.liquidatableBalanceOf(address(underlyingAsset));
+        assertGt(availableAssets, 0, "assets are available for liquidation");
+        uint256 availableShares = prizeVault.liquidatableBalanceOf(address(prizeVault));
+        assertGt(availableShares, 0, "shares are available for liquidation");
+
+        // Loss Occurs
+        simulateLoss();
+
+        // No liquidations can occur if assets < debt
+        availableYield = prizeVault.availableYieldBalance();
+        assertEq(availableYield, 0, "no available yield after loss");
+        availableAssets = prizeVault.liquidatableBalanceOf(address(underlyingAsset));
+        assertEq(availableAssets, 0, "no available asset liquidation after loss");
+        availableShares = prizeVault.liquidatableBalanceOf(address(prizeVault));
+        assertEq(availableShares, 0, "no available share liquidation after loss");
+    }
     
 }

@@ -57,21 +57,22 @@ contract YearnV3EthereumAjnaDaiIntegrationTest is BaseIntegration {
 
     /// @dev Simulates loss by transferring some yield bearing tokens out of the vault
     function _simulateLoss() internal virtual override prankception(_daiPoolUnderlying) {
+        revert("unable to simulate loss");
         // transfer some yield bearing assets out of the vault
         // IERC20(_ysDaiPool).transfer(_assetWhale, IERC20(_ysDaiPool).balanceOf(_yieldVault)); 
         // IERC20(_ysDaiPool2).transfer(_assetWhale, IERC20(_ysDaiPool2).balanceOf(_yieldVault));
 
-        underlyingAsset.transfer(_assetWhale, underlyingAsset.balanceOf(_daiPoolUnderlying) / 2); // one of the pools experiences a loss
+        // underlyingAsset.transfer(_assetWhale, underlyingAsset.balanceOf(_daiPoolUnderlying) / 2); // one of the pools experiences a loss
 
-        uint256 totalAssetsBefore = yieldVault.totalAssets();
+        // uint256 totalAssetsBefore = yieldVault.totalAssets();
 
-        startPrank(_someDepositor);
-        uint256 shares = yieldVault.maxRedeem(_someDepositor);
-        assertEq(shares, 0, "test");
-        uint256 assets = yieldVault.redeem(shares, _someDepositor, _someDepositor);
-        assertEq(assets, 0, "test");
-        assertEq(yieldVault.totalAssets(), totalAssetsBefore, "test");
-        stopPrank();
+        // startPrank(_someDepositor);
+        // uint256 shares = yieldVault.maxRedeem(_someDepositor);
+        // assertEq(shares, 0, "test");
+        // uint256 assets = yieldVault.redeem(shares, _someDepositor, _someDepositor);
+        // assertEq(assets, 0, "test");
+        // assertEq(yieldVault.totalAssets(), totalAssetsBefore, "test");
+        // stopPrank();
     }
 
 }
