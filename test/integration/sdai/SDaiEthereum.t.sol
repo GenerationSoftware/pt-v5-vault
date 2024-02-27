@@ -72,8 +72,9 @@ contract SDaiEthereumIntegrationTest is BaseIntegration {
     //     vm.warp(block.timestamp + 10 days);
     // }
 
-    function _simulateLoss() internal virtual override {
-        revert("wat do?");
+    /// @dev Since it's difficult to simulate any loss in the DSR system, we'll simulate loss by removing sDAI from the prize vault
+    function _simulateLoss() internal virtual override prankception(address(prizeVault)) {
+        yieldVault.transfer(_assetWhale, yieldVault.balanceOf(address(prizeVault)) / 2);
     }
 
 }
