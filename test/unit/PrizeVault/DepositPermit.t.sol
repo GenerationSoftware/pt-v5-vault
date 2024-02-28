@@ -63,4 +63,39 @@ contract PrizeVaultDepositPermitTest is UnitBaseSetup {
         vault.depositWithPermit(_amount, alice, block.timestamp, _v, _r, _s);
     }
 
+    function testDepositWithPermit_Frontrun() external {
+        vm.startPrank(alice);
+
+        uint256 _amount = 1000e18;
+        underlyingAsset.mint(alice, _amount);
+
+        (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
+            underlyingAsset,
+            vault,
+            _amount,
+            alice,
+            alicePrivateKey
+        );
+
+        // should normally go through:
+        uint256 beforeDeposit = vm.snapshot();
+        vault.depositWithPermit(_amount, alice, block.timestamp, _v, _r, _s);
+        assertEq(vault.balanceOf(alice), _amount);
+        vm.revertTo(beforeDeposit);
+
+        vm.stopPrank();
+
+        // Alice gets frontrun by a griefer that wants to prevent her transaction from going through.
+        // They call `permit` with her signature on the underlying asset to try and cause her tx to fail.
+        underlyingAsset.permit(alice, address(vault), _amount, block.timestamp, _v, _r, _s);
+        assertEq(underlyingAsset.allowance(alice, address(vault)), _amount);
+
+        // Since the allowance is the same as alice's deposit call, it goes through anyway and alice spends
+        // a bit less gas thanks to the frontrunner.
+        vm.startPrank(alice);
+        vault.depositWithPermit(_amount, alice, block.timestamp, _v, _r, _s);
+        assertEq(vault.balanceOf(alice), _amount);
+        vm.stopPrank();
+    }
+
 }

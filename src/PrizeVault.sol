@@ -510,8 +510,15 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             revert PermitCallerNotOwner(msg.sender, _owner);
         }
 
-        IERC20Permit(address(_asset)).permit(_owner, address(this), _assets, _deadline, _v, _r, _s);
+        // We should try to submit the permit, even if we already have ample allowance since the intention
+        // of the permit may be to *lower* the permission down to `_assets` if it were previously higher.
+        // However, if it fails, we should continue since it's possible someone has frontrun the permit call
+        // and submitted it on behalf of `_owner` as a griefing attempt.
+        try IERC20Permit(address(_asset)).permit(_owner, address(this), _assets, _deadline, _v, _r, _s) { } catch { }
 
+        // We must ensure that the allowance is *exactly* what the permit specified, otherwise the
+        // underlying asset may not support permit functionality. Some assets like WETH do not support
+        // the permit flow, but do not revert when called which can lead to unexpected outcomes.
         uint256 _allowance = _asset.allowance(_owner, address(this));
         if (_allowance != _assets) {
             revert PermitAllowanceNotSet(_owner, address(this), _assets, _allowance);
