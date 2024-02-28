@@ -380,7 +380,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc IERC4626
     /// @dev TODO: add reasoning for inclusion of latent balance
     function maxWithdraw(address _owner) public view returns (uint256) {
-        uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
+        uint256 _maxWithdraw = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
 
         // the owner may receive less than 1 asset per share, so we must convert their balance here
         uint256 _ownerAssets = convertToAssets(balanceOf(_owner));
@@ -390,7 +390,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc IERC4626
     /// @dev TODO: add reasoning for inclusion of latent balance
     function maxRedeem(address _owner) public view returns (uint256) {
-        uint256 _maxWithdraw = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
+        uint256 _maxWithdraw = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
         uint256 _ownerShares = balanceOf(_owner);
 
         // The owner will never receive more than 1 asset per share, so there is no need to convert max
@@ -649,7 +649,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             _maxAmountOut = _twabSupplyLimit(_totalSupply);
         } else if (_tokenOut == address(_asset)) {
             // Liquidation of yield assets is capped at the max withdraw.
-            _maxAmountOut = yieldVault.maxWithdraw(address(this)) + _asset.balanceOf(address(this));
+            _maxAmountOut = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
         } else {
             return 0;
         }
@@ -897,6 +897,21 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         _withdraw(_receiver, _assets);
 
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+    }
+
+    /**
+     * @notice Returns the max assets that can be withdrawn from the yield vault through this vault's
+     * `_withdraw` function.
+     * @dev This should be used over `yieldVault.maxWithdraw` when considering withdrawal limits since
+     * this function takes into account the yield vault redemption limits, which is necessary since the
+     * `_withdraw` function uses `yieldVault.redeem` instead of `yieldVault.withdraw`. Since we convert
+     * the max redeemable shares to assets rounding down, the `yieldVault.previewWithdraw` call in the
+     * `_withdraw` function is guaranteed to return less than or equal shares to the max yield vault 
+     * redemption.
+     * @return The max assets that can be withdrawn from the yield vault.
+     */
+    function _maxYieldVaultWithdraw() internal view returns (uint256) {
+        return yieldVault.convertToAssets(yieldVault.maxRedeem(address(this)));
     }
 
     /**
