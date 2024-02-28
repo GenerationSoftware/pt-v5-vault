@@ -19,9 +19,9 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
     }
 
     function testLiquidatableBalanceOf_yieldVaultReverts() public {
-        // This is for branch coverage, maxWithdraw must never revert in the ERC4626 standard, but forge thinks it can
+        // This is for branch coverage, maxRedeem must never revert in the ERC4626 standard, but forge thinks it can
         // since it does a mulDiv call.
-        vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), "revert");
+        vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)), "revert");
         vm.expectRevert("revert");
         vault.liquidatableBalanceOf(address(underlyingAsset));
     }
@@ -61,10 +61,11 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         uint256 availableYield = vault.availableYieldBalance();
         assertApproxEqAbs(availableYield, 1e18 - vault.yieldBuffer(), 1);
 
+        // mock the yield vault maxRedeem to half the available shares
         vm.mockCall(
             address(yieldVault),
-            abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)),
-            abi.encode(availableYield / 2) // less than available yield, so we shouldn't be able to liquidate more than this
+            abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)),
+            abi.encode(yieldVault.previewWithdraw(availableYield / 2)) // using previewWithdraw to get share value rounded up
         );
 
         assertEq(vault.liquidatableBalanceOf(address(underlyingAsset)), availableYield / 2);

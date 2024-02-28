@@ -215,7 +215,8 @@ contract PrizeVaultTest is UnitBaseSetup {
 
     /* ============ maxWithdraw ============ */
 
-    function testMaxWithdraw_CappedByYieldVaultMaxWithdraw() public {
+    /// @dev all withdraw/redeem flows in prize vault go through the yield vault redeem, so the prize vault max must be limited appropriately
+    function testMaxWithdraw_CappedByYieldVaultMaxRedeem() public {
         // deposit some tokens
         uint256 deposited = 3e18;
         underlyingAsset.mint(address(this), deposited);
@@ -225,18 +226,20 @@ contract PrizeVaultTest is UnitBaseSetup {
         // can withdraw full amount
         assertEq(vault.maxWithdraw(address(this)), deposited);
 
-        // check if maxWithdraw is limited by a mocked yieldVault maxWithdraw
-        uint256 yieldVaultMaxWithdraw = 1e18;
-        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(yieldVaultMaxWithdraw));
-        assertEq(vault.maxWithdraw(address(this)), yieldVaultMaxWithdraw);
+        // check if maxWithdraw is limited by a mocked yieldVault maxRedeem converted to assets
+        uint256 expectedMaxWithdraw = 1e18;
+        uint256 yieldVaultMaxRedeem = yieldVault.previewWithdraw(expectedMaxWithdraw); // we use previewWithdraw to convert assets to shares rounding up
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)), abi.encode(yieldVaultMaxRedeem));
+        assertEq(vault.maxWithdraw(address(this)), expectedMaxWithdraw);
 
         // check for 0 maxWithdraw
-        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(0));
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)), abi.encode(0));
         assertEq(vault.maxWithdraw(address(this)), 0);
     }
 
     /* ============ maxRedeem ============ */
 
+    /// @dev all withdraw/redeem flows in prize vault go through the yield vault redeem, so the prize vault max must be limited appropriately
     function testMaxRedeem_CappedByYieldVaultMaxRedeem() public {
         // deposit some tokens
         uint256 deposited = 3e18;
@@ -247,13 +250,14 @@ contract PrizeVaultTest is UnitBaseSetup {
         // can redeem full amount 1:1
         assertEq(vault.maxRedeem(address(this)), deposited);
 
-        // check if maxRedeem is limited by a mocked yieldVault maxWithdraw
-        uint256 yieldVaultMaxWithdraw = 1e18;
-        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(yieldVaultMaxWithdraw));
-        assertEq(vault.maxRedeem(address(this)), yieldVaultMaxWithdraw);
+        // check if maxRedeem is limited by a mocked yieldVault maxRedeem converted to assets
+        uint256 expectedMaxPrizeVaultRedeem = 1e18;
+        uint256 yieldVaultMaxRedeem = yieldVault.previewWithdraw(expectedMaxPrizeVaultRedeem); // we use previewWithdraw to convert assets to shares rounding up
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)), abi.encode(yieldVaultMaxRedeem));
+        assertEq(vault.maxRedeem(address(this)), expectedMaxPrizeVaultRedeem);
 
         // check for 0 maxRedeem
-        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(0));
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)), abi.encode(0));
         assertEq(vault.maxRedeem(address(this)), 0);
     }
 
@@ -287,8 +291,8 @@ contract PrizeVaultTest is UnitBaseSetup {
         // yield vault loses some funds
         underlyingAsset.burn(address(yieldVault), 2e18);
 
-        // yield vault caps withdraws at 1/2 of what's left, check for half redemption on vault
-        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxWithdraw.selector, address(vault)), abi.encode(1e18));
+        // yield vault caps redemptions at 1/2 of what's left, check for half redemption on vault
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)), abi.encode(yieldVault.previewWithdraw(1e18)));
         assertEq(vault.maxRedeem(address(this)), deposited / 2);
     }
 
