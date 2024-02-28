@@ -18,28 +18,20 @@ contract PrizeVaultDepositPermitFallbackTest is UnitBaseSetup {
 
     /* ============ tests ============ */
 
-    function testDepositWithoutPermit_AllowanceNotSet() external {
+    function testDepositWithoutPermit_SucceedsIfApprovalIsExact() external {
         vm.startPrank(alice);
 
         uint256 _amount = 1000e18;
         underlyingAsset.mint(alice, _amount);
 
-        underlyingAsset.approve(address(vault), _amount * 2);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PrizeVault.PermitAllowanceNotSet.selector,
-                alice,
-                address(vault),
-                _amount,
-                _amount * 2
-            )
-        );
+        underlyingAsset.approve(address(vault), _amount); // exact approval
 
         uint8 _v = 0;
         bytes32 _r = bytes32(0);
         bytes32 _s = bytes32(0);
         vault.depositWithPermit(_amount, alice, block.timestamp, _v, _r, _s);
+
+        assertEq(vault.balanceOf(alice), _amount);
 
         vm.stopPrank();
     }
