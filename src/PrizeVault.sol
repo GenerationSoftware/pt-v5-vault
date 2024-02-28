@@ -193,16 +193,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     error PermitCallerNotOwner(address caller, address owner);
 
     /**
-     * @notice Thrown when a permit call on the underlying asset failed to set the spending allowance.
-     * @dev This is likely thrown when the underlying asset does not support permit, but has a fallback function.
-     * @param owner The owner of the assets
-     * @param spender The spender of the assets
-     * @param amount The amount of assets permitted
-     * @param allowance The allowance after the permit was called
-     */
-    error PermitAllowanceNotSet(address owner, address spender, uint256 amount, uint256 allowance);
-
-    /**
      * @notice Thrown when the yield fee percentage being set exceeds the max yield fee allowed.
      * @param yieldFeePercentage The yield fee percentage in integer format
      * @param maxYieldFeePercentage The max yield fee percentage in integer format
@@ -510,18 +500,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             revert PermitCallerNotOwner(msg.sender, _owner);
         }
 
-        // We should try to submit the permit, even if we already have ample allowance since the intention
-        // of the permit may be to *lower* the permission down to `_assets` if it were previously higher.
-        // However, if it fails, we should continue since it's possible someone has frontrun the permit call
-        // and submitted it on behalf of `_owner` as a griefing attempt.
-        try IERC20Permit(address(_asset)).permit(_owner, address(this), _assets, _deadline, _v, _r, _s) { } catch { }
-
-        // We must ensure that the allowance is *exactly* what the permit specified, otherwise the
-        // underlying asset may not support permit functionality. Some assets like WETH do not support
-        // the permit flow, but do not revert when called which can lead to unexpected outcomes.
-        uint256 _allowance = _asset.allowance(_owner, address(this));
-        if (_allowance != _assets) {
-            revert PermitAllowanceNotSet(_owner, address(this), _assets, _allowance);
+        // Skip the permit call if the allowance has already been set to exactly what is needed. This prevents
+        // griefing attacks where the signature is used by another actor to complete the permit before this
+        // function is executed.
+        if (_asset.allowance(_owner, address(this)) != _assets) {
+            IERC20Permit(address(_asset)).permit(_owner, address(this), _assets, _deadline, _v, _r, _s);
         }
 
         uint256 _shares = previewDeposit(_assets);
