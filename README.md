@@ -18,7 +18,7 @@
 
 ## Overview
 
-In PoolTogether V5 deposits are held in Vaults. Vaults are [ERC4626](https://eips.ethereum.org/EIPS/eip-4626) compatible. Vaults are the entry point for users interacting with the PoolTogether protocol. Users deposit an underlying asset (i.e. USDC) in this contract which is then funnelled to a yield source and in exchange users receive an ERC20 token representing their share of deposits in the vault.
+In PoolTogether V5 deposits are held in prize vaults. Prize vaults are [ERC4626](https://eips.ethereum.org/EIPS/eip-4626) compatible and are the entry point for users interacting with the PoolTogether protocol. Users deposit an underlying asset (i.e. USDC) in this contract which is then funnelled to a yield source and in exchange users receive an ERC20 token representing their share of deposits in the vault.
 
 - Balances are stored in a TWAB Controller.
 - Yield is forwarded to the Liquidator to be sold.
@@ -93,13 +93,12 @@ npm run hint
 
 ### Tests
 
-Test names including `SLOW` will be skipped on default test runs and need to be explicitly run.
+You can run tests with the following commands:
 
-You can run tests with:
-
-```
-forge test
-```
+- **unit tests:** `npm run test`
+- **fuzz tests:** `npm run fuzz`
+- **invariant tests:** `npm run invariant`
+- **integration tests:** `npm run integration` (*informative for which integrations have potential issues*)
 
 ### CI
 
@@ -109,4 +108,4 @@ It will build the contracts and run the test coverage.
 
 You can modify it here: [.github/workflows/coverage.yml](.github/workflows/coverage.yml)
 
-For the coverage to work, you will need to setup the `MAINNET_RPC_URL` repository secret in the settings of your Github repository.
+For the coverage to work, you will need to setup the relevant `{X}_RPC_URL` repository secrets in the settings of your Github repository.

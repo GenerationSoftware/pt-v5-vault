@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { PrizeVault, IERC4626, IERC20, PrizePool } from "../../../src/PrizeVault.sol";
 

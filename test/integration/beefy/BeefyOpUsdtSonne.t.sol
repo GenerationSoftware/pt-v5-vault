@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 

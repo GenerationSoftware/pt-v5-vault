@@ -33,7 +33,7 @@ jobs:
         env:
           MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
           OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
-        run: forge test --gas-report --nmc IntegrationTest
+        run: forge test --gas-report --nmc 'Integration|Invariant|Fuzz'
         id: gas
 
       - name: Install lcov
@@ -44,7 +44,7 @@ jobs:
           MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
           OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
         run: |
-          forge coverage --nmc IntegrationTest --report lcov && lcov --extract lcov.info -o lcov.info 'src/*'
+          forge coverage --nmc 'Integration|Invariant|Fuzz' --report lcov && lcov --extract lcov.info -o lcov.info 'src/*'
         id: coverage
 
       - name: Report code coverage

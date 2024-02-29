@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { UnitBaseSetup, PrizePool, TwabController, ERC20, IERC20, IERC4626 } from "./UnitBaseSetup.t.sol";
 import { IVaultHooks, VaultHooks } from "../../../src/interfaces/IVaultHooks.sol";

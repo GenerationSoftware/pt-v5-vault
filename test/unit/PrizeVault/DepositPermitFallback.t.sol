@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
@@ -62,7 +62,7 @@ contract PrizeVaultDepositPermitFallbackTest is UnitBaseSetup {
         uint256 _amount = 1000e18;
         underlyingAsset.mint(alice, _amount);
 
-        (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
+        _signPermit(
             underlyingAsset,
             vault,
             _amount,

@@ -3,9 +3,10 @@ src = 'src'
 out = 'out'
 test = 'test'
 libs = ['lib']
-solc = "0.8.19"
+solc = "0.8.24"
 fs_permissions = [{ access = "read", path = "./broadcast" }]
-gas_reports = ["Vault", "VaultFactory"]
+gas_reports = ["PrizeVault", "PrizeVaultWrapper", "PrizeVaultFactory"]
+no_match_contract = "Integration"
 
 [fuzz]
 runs = 1000

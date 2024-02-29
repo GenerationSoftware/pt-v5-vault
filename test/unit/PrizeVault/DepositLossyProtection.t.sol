@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { IERC20, UnitBaseSetup, PrizeVault } from "./UnitBaseSetup.t.sol";
@@ -40,6 +40,42 @@ contract PrizeVaultDepositLossyProtection is UnitBaseSetup {
         underlyingAsset.burn(address(yieldVault), 1); // lost 1 asset in yield vault, new deposits will be lossy
 
         assertEq(vault.maxMint(alice), 0);
+    }
+
+    /* ============ convertToShares ============ */
+        
+    function testConvertToShares_ProportionalWhenLossy() external {
+        underlyingAsset.mint(alice, 1e18);
+
+        assertEq(vault.convertToShares(1e18), 1e18);
+
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.mint(1e18, alice);
+        vm.stopPrank();
+
+        underlyingAsset.mint(alice, 1e18);
+        underlyingAsset.burn(address(yieldVault), 1e18 / 2); // lost 50% of assets in yield vault
+
+        assertEq(vault.convertToShares(1e18), 1e18 * 2); // 1 asset is now worth 2 shares
+    }
+
+    /* ============ convertToAssets ============ */
+        
+    function testConvertToAssets_ProportionalWhenLossy() external {
+        underlyingAsset.mint(alice, 1e18);
+
+        assertEq(vault.convertToAssets(1e18), 1e18);
+
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.mint(1e18, alice);
+        vm.stopPrank();
+
+        underlyingAsset.mint(alice, 1e18);
+        underlyingAsset.burn(address(yieldVault), 1e18 / 2); // lost 50% of assets in yield vault
+
+        assertEq(vault.convertToAssets(1e18), 1e18 / 2); // 1 share is now worth 0.5 assets
     }
 
     /* ============ deposit ============ */

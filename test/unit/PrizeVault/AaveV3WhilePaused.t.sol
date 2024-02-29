@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import { IERC20, UnitBaseSetup, PrizeVault } from "./UnitBaseSetup.t.sol";
@@ -130,7 +130,7 @@ contract AaveV3WhilePaused is UnitBaseSetup {
         vm.selectFork(pausedFork);
         vm.warp(pausedTimestamp);
 
-        (bool success, bytes memory data) = address(0x794a61358D6845594F94dc1DB02A252b5b4814aD).call(abi.encodeWithSignature("getReserveData(address)", address(USDCe)));
+        (,bytes memory data) = address(0x794a61358D6845594F94dc1DB02A252b5b4814aD).call(abi.encodeWithSignature("getReserveData(address)", address(USDCe)));
         ReserveData memory reserveData = abi.decode(data, (ReserveData));
         assertEq(reserveData.configuration.data >> 60 & 1, 1); // assert asset is paused
     }
