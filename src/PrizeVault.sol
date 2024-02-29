@@ -13,7 +13,6 @@ import { TwabERC20 } from "./TwabERC20.sol";
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
-import { ObservationLib } from "pt-v5-twab-controller/libraries/ObservationLib.sol";
 
 /// @title  PoolTogether V5 Prize Vault
 /// @author G9 Software Inc.
