@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { BrokenToken } from "brokentoken/BrokenToken.sol";
 import { ERC20PermitMock } from "../../contracts/mock/ERC20PermitMock.sol";

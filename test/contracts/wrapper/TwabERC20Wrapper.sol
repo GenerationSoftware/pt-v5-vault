@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { TwabERC20 } from "../../../src/TwabERC20.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";

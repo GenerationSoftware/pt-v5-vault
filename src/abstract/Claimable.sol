@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";

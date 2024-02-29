@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 /// @notice Defines a hook implementation and instructions on which hooks to call.
 /// @param useBeforeClaimPrize If true, the vault will call the beforeClaimPrize hook on the implementation
