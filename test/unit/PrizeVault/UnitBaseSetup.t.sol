@@ -8,6 +8,7 @@ import { ERC20Mock } from "openzeppelin/mocks/ERC20Mock.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
+import { ReentrancyWrapper } from "../../contracts/utility/ReentrancyWrapper.sol";
 import { ERC20PermitMock } from "../../contracts/mock/ERC20PermitMock.sol";
 import { LiquidationPairMock } from "../../contracts/mock/LiquidationPairMock.sol";
 import { LiquidationRouterMock } from "../../contracts/mock/LiquidationRouterMock.sol";
@@ -54,6 +55,7 @@ contract UnitBaseSetup is Test, Permit {
     ERC20PermitMock public prizeToken;
     LiquidationRouterMock public liquidationRouter;
     LiquidationPairMock public liquidationPair;
+    ReentrancyWrapper public reentrantUnderlyingAsset;
 
     address public claimer;
     PrizePoolMock public prizePool;
@@ -80,7 +82,8 @@ contract UnitBaseSetup is Test, Permit {
         (alice, alicePrivateKey) = makeAddrAndKey("Alice");
         (bob, bobPrivateKey) = makeAddrAndKey("Bob");
 
-        underlyingAsset = setUpUnderlyingAsset();
+        underlyingAsset = ERC20PermitMock(address(new ReentrancyWrapper(payable(address(setUpUnderlyingAsset())))));
+        reentrantUnderlyingAsset = ReentrancyWrapper(payable(address(underlyingAsset)));
         prizeToken = new ERC20PermitMock("PoolTogether");
 
         twabController = new TwabController(1 hours, uint32(block.timestamp));

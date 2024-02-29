@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import "forge-std/console2.sol";
+
 import { IERC4626 } from "openzeppelin/interfaces/IERC4626.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
@@ -833,11 +835,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
         // assets are transferred and before the shares are minted, which is a valid state.
 
+
+        console2.log("safeTransferFrom", _caller);
         _asset.safeTransferFrom(
             _caller,
             address(this),
             _assets
         );
+        console2.log("DONE DONE!");
         uint256 _assetsWithDust = _asset.balanceOf(address(this)); // try to sweep previously accumulated dust into the deposit as well
         _asset.approve(address(yieldVault), _assetsWithDust);
 
