@@ -302,11 +302,17 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc IERC4626
-    function convertToShares(uint256 _assets) public pure returns (uint256) {
-        // Shares represent how much an account has deposited. This is unlike most vaults that treat
-        // shares as a direct proportional ownership of assets in the vault. This is because yield
-        // goes to the prize pool or yield fee instead of accruing on deposits.
-        return _assets;
+    function convertToShares(uint256 _assets) public view returns (uint256) {
+        uint256 totalDebt_ = totalDebt();
+        uint256 _totalAssets = totalAssets();
+        if (_totalAssets >= totalDebt_) {
+            return _assets;
+        } else {
+            // If the vault controls less assets than what has been deposited a share will be worth a
+            // proportional amount of the total assets. This can happen due to fees, slippage, or loss
+            // of funds in the underlying yield vault.
+            return _assets.mulDiv(totalDebt_, _totalAssets, Math.Rounding.Down);
+        }
     }
 
     /// @inheritdoc IERC4626
