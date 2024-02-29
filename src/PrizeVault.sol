@@ -606,6 +606,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @notice Transfers yield fee shares to the yield fee recipient
+    /// @param _shares The shares to mint to the yield fee recipient
     /// @dev Emits a `ClaimYieldFeeShares` event
     /// @dev Will revert if the caller is not the yield fee recipient or if zero shares are withdrawn
     function claimYieldFeeShares(uint256 _shares) external onlyYieldFeeRecipient {
