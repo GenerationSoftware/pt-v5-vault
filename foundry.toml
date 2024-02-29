@@ -5,7 +5,7 @@ test = 'test'
 libs = ['lib']
 solc = "0.8.24"
 fs_permissions = [{ access = "read", path = "./broadcast" }]
-gas_reports = ["PrizeVault", "PrizeVaultFactory"]
+gas_reports = ["PrizeVault", "PrizeVaultWrapper", "PrizeVaultFactory"]
 no_match_contract = "Integration"
 
 [fuzz]
