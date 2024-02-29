@@ -24,6 +24,7 @@ abstract contract HookManager {
     }
 
     /// @notice Sets the hooks for a winner.
+    /// @dev Emits a `SetHooks` event
     /// @param hooks The hooks to set
     function setHooks(VaultHooks calldata hooks) external {
         _hooks[msg.sender] = hooks;

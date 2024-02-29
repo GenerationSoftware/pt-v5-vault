@@ -547,6 +547,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @notice Deposit assets into the Vault and delegate to the sponsorship address.
+    /// @dev Emits a `Sponsor` event
     /// @param _assets Amount of assets to deposit
     /// @return Amount of shares minted to caller.
     function sponsor(uint256 _assets) external returns (uint256) {
@@ -605,6 +606,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @notice Transfers yield fee shares to the yield fee recipient
+    /// @dev Emits a `ClaimYieldFeeShares` event
     /// @dev Will revert if the caller is not the yield fee recipient or if zero shares are withdrawn
     function claimYieldFeeShares(uint256 _shares) external onlyYieldFeeRecipient {
         if (_shares == 0) revert MintZeroShares();
@@ -652,6 +654,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc ILiquidationSource
+    /// @dev Emits a `TransferYieldOut` event
     /// @dev Supports the liquidation of either assets or prize vault shares.
     function transferTokensOut(
         address,
@@ -734,6 +737,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @notice Set liquidationPair.
+    /// @dev Emits a `LiquidationPairSet` event
     /// @param _liquidationPair New liquidationPair address
     function setLiquidationPair(address _liquidationPair) external onlyOwner {
         if (address(_liquidationPair) == address(0)) revert LPZeroAddress();
@@ -938,6 +942,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @notice Set yield fee percentage.
     /// @dev Yield fee is defined on a scale from `0` to `MAX_YIELD_FEE`, inclusive.
+    /// @dev Emits a `YieldFeePercentageSet` event
     /// @param _yieldFeePercentage The new yield fee percentage to set
     function _setYieldFeePercentage(uint32 _yieldFeePercentage) internal {
         if (_yieldFeePercentage > MAX_YIELD_FEE) {
@@ -948,6 +953,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @notice Set yield fee recipient address.
+    /// @dev Emits a `YieldFeeRecipientSet` event
     /// @param _yieldFeeRecipient Address of the fee recipient
     function _setYieldFeeRecipient(address _yieldFeeRecipient) internal {
         yieldFeeRecipient = _yieldFeeRecipient;
