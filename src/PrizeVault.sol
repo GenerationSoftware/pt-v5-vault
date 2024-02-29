@@ -2,37 +2,38 @@
 pragma solidity ^0.8.19;
 
 import { IERC4626 } from "openzeppelin/interfaces/IERC4626.sol";
-import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import { SafeERC20, IERC20Permit } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import { ERC20, IERC20, IERC20Metadata } from "openzeppelin/token/ERC20/ERC20.sol";
 import { Math } from "openzeppelin/utils/math/Math.sol";
 import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
 import { Claimable } from "./abstract/Claimable.sol";
-import { TwabERC20, ERC20, IERC20, IERC20Metadata, IERC20Permit } from "./TwabERC20.sol";
+import { TwabERC20 } from "./TwabERC20.sol";
 
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
 import { ObservationLib } from "pt-v5-twab-controller/libraries/ObservationLib.sol";
 
-/**
- * @title  PoolTogether V5 Prize Vault
- * @author G9 Software Inc.
- * @notice This vault extends the ERC4626 standard that accepts deposits of an underlying token (ex: USDC) and
- *         deposits it to an underlying yield source while converting any accrued yield to prize tokens (ex: POOL) 
- *         and contributing them to the prize pool, giving the depositors a chance to win prizes. This vault always
- *         assumes a one-to-one ratio of underlying assets to receipt tokens when depositing or minting, but a
- *         depositor's ability to withdraw assets or redeem shares is dependent on underlying market conditions;
- *         as is the the available rate of exchange.
- *
- * TODO:   Add an explanation for dust collection and rounding error mitigation.
- *
- * @dev    Balances are stored in the TwabController contract.
- */
+/// @title  PoolTogether V5 Prize Vault
+/// @author G9 Software Inc.
+/// @notice This vault extends the ERC4626 standard that accepts deposits of an underlying token (ex: USDC) and
+///         deposits it to an underlying yield source while converting any accrued yield to prize tokens (ex: POOL) 
+///         and contributing them to the prize pool, giving the depositors a chance to win prizes. This vault always
+///         assumes a one-to-one ratio of underlying assets to receipt tokens when depositing or minting, but a
+///         depositor's ability to withdraw assets or redeem shares is dependent on underlying market conditions;
+///         as is the available rate of exchange.
+///
+/// TODO:   Add an explanation for dust collection and rounding error mitigation.
+///
+/// @dev    Balances are stored in the TwabController contract.
 contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
-    /* ============ Public Constants and Variables ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Public Constants and Variables
+    ////////////////////////////////////////////////////////////////////////////////
 
     /// @notice The yield fee decimal precision.
     uint32 public constant FEE_PRECISION = 1e9;
@@ -40,8 +41,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice The max yield fee that can be set.
     /// @dev Decimal precision is defined by `FEE_PRECISION`.
     /// @dev If the yield fee is set too high, liquidations won't occur on a regular basis. If a use case requires
-    ///      a yield fee higher than this max, a custom liquidation pair can be set to manipulate the yield as
-    ///      required.
+    /// a yield fee higher than this max, a custom liquidation pair can be set to manipulate the yield as required.
     uint32 public constant MAX_YIELD_FEE = 9e8;
 
     /// @notice The yield buffer that is reserved for covering rounding errors on withdrawals and deposits.
@@ -92,7 +92,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Address of the liquidation pair used to liquidate yield for prize token.
     address public liquidationPair;
 
-    /* ============ Private Variables ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Private Variables
+    ////////////////////////////////////////////////////////////////////////////////
 
     /// @notice Address of the underlying asset used by the Vault.
     IERC20 private immutable _asset;
@@ -100,46 +102,46 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Underlying asset decimals.
     uint8 private immutable _underlyingDecimals;
 
-    /* ============ Events ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Events
+    ////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * @notice Emitted when a new yield fee recipient has been set.
-     * @param yieldFeeRecipient Address of the new yield fee recipient
-     */
+    /// @notice Emitted when a new yield fee recipient has been set.
+    /// @param yieldFeeRecipient Address of the new yield fee recipient
     event YieldFeeRecipientSet(address indexed yieldFeeRecipient);
 
-    /**
-     * @notice Emitted when a new yield fee percentage has been set.
-     * @param yieldFeePercentage New yield fee percentage
-     */
+    /// @notice Emitted when a new yield fee percentage has been set.
+    /// @param yieldFeePercentage New yield fee percentage
     event YieldFeePercentageSet(uint256 yieldFeePercentage);
 
-    /**
-     * @notice Emitted when a user sponsors the Vault.
-     * @param caller Address that called the function
-     * @param assets Amount of assets deposited into the Vault
-     * @param shares Amount of shares minted to the caller address
-     */
+    /// @notice Emitted when a user sponsors the Vault.
+    /// @param caller Address that called the function
+    /// @param assets Amount of assets deposited into the Vault
+    /// @param shares Amount of shares minted to the caller address
     event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
-    /**
-     * @notice Emitted when yield is transferred out by the liquidation pair address.
-     * @param liquidationPair The liquidation pair address that initiated the transfer
-     * @param tokenOut The token that was transferred out
-     * @param recipient The recipient of the tokens
-     * @param amountOut The amount of tokens sent to the recipient
-     * @param yieldFee The amount of shares accrued on the yield fee balance
-     */
-    event TransferYieldOut(address indexed liquidationPair, address indexed tokenOut, address indexed recipient, uint256 amountOut, uint256 yieldFee);
+    /// @notice Emitted when yield is transferred out by the liquidation pair address.
+    /// @param liquidationPair The liquidation pair address that initiated the transfer
+    /// @param tokenOut The token that was transferred out
+    /// @param recipient The recipient of the tokens
+    /// @param amountOut The amount of tokens sent to the recipient
+    /// @param yieldFee The amount of shares accrued on the yield fee balance
+    event TransferYieldOut(
+        address indexed liquidationPair,
+        address indexed tokenOut,
+        address indexed recipient,
+        uint256 amountOut,
+        uint256 yieldFee
+    );
 
-    /**
-     * @notice Emitted when yield fee shares are claimed by the yield fee recipient.
-     * @param recipient Address receiving the fee shares
-     * @param shares Amount of shares claimed
-     */
+    /// @notice Emitted when yield fee shares are claimed by the yield fee recipient.
+    /// @param recipient Address receiving the fee shares
+    /// @param shares Amount of shares claimed
     event ClaimYieldFeeShares(address indexed recipient, uint256 shares);
 
-    /* ============ Errors ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Errors
+    ////////////////////////////////////////////////////////////////////////////////
 
     /// @notice Thrown when the Yield Vault is set to the zero address.
     error YieldVaultZeroAddress();
@@ -171,69 +173,53 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Thrown during the liquidation process when the liquidation amount out is zero.
     error LiquidationAmountOutZero();
 
-    /**
-     * @notice Thrown during the liquidation process when the caller is not the liquidation pair contract.
-     * @param caller The caller address
-     * @param liquidationPair The LP address
-     */
+    /// @notice Thrown during the liquidation process when the caller is not the liquidation pair contract.
+    /// @param caller The caller address
+    /// @param liquidationPair The LP address
     error CallerNotLP(address caller, address liquidationPair);
 
-    /**
-     * @notice Thrown if the caller is not the yield fee recipient when withdrawing yield fee shares.
-     * @param caller The caller address
-     * @param yieldFeeRecipient The yield fee recipient address
-     */
+    /// @notice Thrown if the caller is not the yield fee recipient when withdrawing yield fee shares.
+    /// @param caller The caller address
+    /// @param yieldFeeRecipient The yield fee recipient address
     error CallerNotYieldFeeRecipient(address caller, address yieldFeeRecipient);
 
-    /**
-     * @notice Thrown when the caller of a permit function is not the owner of the assets being permitted.
-     * @param caller The address of the caller
-     * @param owner The address of the owner
-     */
+    /// @notice Thrown when the caller of a permit function is not the owner of the assets being permitted.
+    /// @param caller The address of the caller
+    /// @param owner The address of the owner
     error PermitCallerNotOwner(address caller, address owner);
 
-    /**
-     * @notice Thrown when the yield fee percentage being set exceeds the max yield fee allowed.
-     * @param yieldFeePercentage The yield fee percentage in integer format
-     * @param maxYieldFeePercentage The max yield fee percentage in integer format
-     */
+    /// @notice Thrown when the yield fee percentage being set exceeds the max yield fee allowed.
+    /// @param yieldFeePercentage The yield fee percentage in integer format
+    /// @param maxYieldFeePercentage The max yield fee percentage in integer format
     error YieldFeePercentageExceedsMax(uint256 yieldFeePercentage, uint256 maxYieldFeePercentage);
 
-    /**
-     * @notice Thrown when the yield fee shares being withdrawn exceeds the available yieldFee Balance.
-     * @param shares The shares being withdrawn
-     * @param yieldFeeBalance The available yield fee shares
-     */
+    /// @notice Thrown when the yield fee shares being withdrawn exceeds the available yieldFee Balance.
+    /// @param shares The shares being withdrawn
+    /// @param yieldFeeBalance The available yield fee shares
     error SharesExceedsYieldFeeBalance(uint256 shares, uint256 yieldFeeBalance);
 
-    /**
-     * @notice Thrown during the liquidation process when the token in is not the prize token.
-     * @param tokenIn The provided tokenIn address
-     * @param prizeToken The prize token address
-     */
+    /// @notice Thrown during the liquidation process when the token in is not the prize token.
+    /// @param tokenIn The provided tokenIn address
+    /// @param prizeToken The prize token address
     error LiquidationTokenInNotPrizeToken(address tokenIn, address prizeToken);
 
-    /**
-     * @notice Thrown during the liquidation process when the token out is not supported.
-     * @param tokenOut The provided tokenOut address
-     */
+    /// @notice Thrown during the liquidation process when the token out is not supported.
+    /// @param tokenOut The provided tokenOut address
     error LiquidationTokenOutNotSupported(address tokenOut);
 
-    /**
-     * @notice Thrown during the liquidation process if the total to withdraw is greater than the available yield.
-     * @param totalToWithdraw The total yield to withdraw
-     * @param availableYield The available yield
-     */
+    /// @notice Thrown during the liquidation process if the total to withdraw is greater than the available yield.
+    /// @param totalToWithdraw The total yield to withdraw
+    /// @param availableYield The available yield
     error LiquidationExceedsAvailable(uint256 totalToWithdraw, uint256 availableYield);
 
-    /**
-     * @notice Thrown when a deposit results in a state where the total assets are less than the total share supply.
-     * @param totalAssets The total assets controlled by the vault
-     * @param totalSupply The total shares minted and internally accounted for by the vault
-     */
+    /// @notice Thrown when a deposit results in a state where the total assets are less than the total share supply.
+    /// @param totalAssets The total assets controlled by the vault
+    /// @param totalSupply The total shares minted and internally accounted for by the vault
     error LossyDeposit(uint256 totalAssets, uint256 totalSupply);
 
-    /* ============ Modifiers ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Modifiers
+    ////////////////////////////////////////////////////////////////////////////////
 
     /// @notice Requires the caller to be the liquidation pair.
     modifier onlyLiquidationPair() {
@@ -251,20 +237,20 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         _;
     }
 
-    /* ============ Constructor ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Constructor
+    ////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * @notice Vault constructor
-     * @param name_ Name of the ERC20 share minted by the vault
-     * @param symbol_ Symbol of the ERC20 share minted by the vault
-     * @param yieldVault_ Address of the underlying ERC4626 vault in which assets are deposited to generate yield
-     * @param prizePool_ Address of the PrizePool that computes prizes
-     * @param claimer_ Address of the claimer
-     * @param yieldFeeRecipient_ Address of the yield fee recipient
-     * @param yieldFeePercentage_ Yield fee percentage
-     * @param yieldBuffer_ Amount of yield to keep as a buffer
-     * @param owner_ Address that will gain ownership of this contract
-     */
+    /// @notice Vault constructor
+    /// @param name_ Name of the ERC20 share minted by the vault
+    /// @param symbol_ Symbol of the ERC20 share minted by the vault
+    /// @param yieldVault_ Address of the underlying ERC4626 vault in which assets are deposited to generate yield
+    /// @param prizePool_ Address of the PrizePool that computes prizes
+    /// @param claimer_ Address of the claimer
+    /// @param yieldFeeRecipient_ Address of the yield fee recipient
+    /// @param yieldFeePercentage_ Yield fee percentage
+    /// @param yieldBuffer_ Amount of yield to keep as a buffer
+    /// @param owner_ Address that will gain ownership of this contract
     constructor(
         string memory name_,
         string memory symbol_,
@@ -291,14 +277,18 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         _setYieldFeePercentage(yieldFeePercentage_);
     }
 
-    /* ============ ERC20 Overrides ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // ERC20 Overrides
+    ////////////////////////////////////////////////////////////////////////////////
 
     /// @inheritdoc IERC20Metadata
     function decimals() public view override(ERC20, IERC20Metadata) returns (uint8) {
         return _underlyingDecimals;
     }
 
-    /* ============ ERC4626 Implementation ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // ERC4626 Implementation
+    ////////////////////////////////////////////////////////////////////////////////
 
     /// @inheritdoc IERC4626
     function asset() external view returns (address) {
@@ -313,11 +303,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @inheritdoc IERC4626
     function convertToShares(uint256 _assets) public pure returns (uint256) {
-        /**
-         * Shares represent how much an account has deposited. This is unlike most vaults that treat
-         * shares as a direct proportional ownership of assets in the vault. This is because yield
-         * goes to the prize pool or yield fee instead of accruing on deposits.
-         */
+        // Shares represent how much an account has deposited. This is unlike most vaults that treat
+        // shares as a direct proportional ownership of assets in the vault. This is because yield
+        // goes to the prize pool or yield fee instead of accruing on deposits.
         return _assets;
     }
 
@@ -328,11 +316,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (_totalAssets >= totalDebt_) {
             return _shares;
         } else {
-            /**
-             * If the vault controls less assets than what has been deposited a share will be worth a
-             * proportional amount of the total assets. This can happen due to fees, slippage, or loss
-             * of funds in the underlying yield vault.
-             */
+            // If the vault controls less assets than what has been deposited a share will be worth a
+            // proportional amount of the total assets. This can happen due to fees, slippage, or loss
+            // of funds in the underlying yield vault.
             return _shares.mulDiv(_totalAssets, totalDebt_, Math.Rounding.Down);
         }
     }
@@ -474,20 +460,20 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _assets;
     }
 
-    /* ============ Additional Deposit Flows ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Additional Deposit Flows
+    ////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_owner`.
-     * @dev Can't be used to deposit on behalf of another user since `permit` does not accept a receiver parameter.
-     *      Meaning that anyone could reuse the signature and pass an arbitrary receiver to this function.
-     * @param _assets Amount of assets to approve and deposit
-     * @param _owner Address of the owner depositing `_assets` and signing the permit
-     * @param _deadline Timestamp after which the approval is no longer valid
-     * @param _v V part of the secp256k1 signature
-     * @param _r R part of the secp256k1 signature
-     * @param _s S part of the secp256k1 signature
-     * @return Amount of Vault shares minted to `_owner`.
-     */
+    /// @notice Approve underlying asset with permit, deposit into the Vault and mint Vault shares to `_owner`.
+    /// @dev Can't be used to deposit on behalf of another user since `permit` does not accept a receiver parameter,
+    /// meaning that anyone could reuse the signature and pass an arbitrary receiver to this function.
+    /// @param _assets Amount of assets to approve and deposit
+    /// @param _owner Address of the owner depositing `_assets` and signing the permit
+    /// @param _deadline Timestamp after which the approval is no longer valid
+    /// @param _v V part of the secp256k1 signature
+    /// @param _r R part of the secp256k1 signature
+    /// @param _s S part of the secp256k1 signature
+    /// @return Amount of Vault shares minted to `_owner`.
     function depositWithPermit(
         uint256 _assets,
         address _owner,
@@ -512,11 +498,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _shares;
     }
 
-    /**
-     * @notice Deposit assets into the Vault and delegate to the sponsorship address.
-     * @param _assets Amount of assets to deposit
-     * @return Amount of shares minted to caller.
-     */
+    /// @notice Deposit assets into the Vault and delegate to the sponsorship address.
+    /// @param _assets Amount of assets to deposit
+    /// @return Amount of shares minted to caller.
     function sponsor(uint256 _assets) external returns (uint256) {
         address _owner = msg.sender;
 
@@ -532,7 +516,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _shares;
     }
 
-    /* ============ Additional Accounting ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Additional Accounting
+    ////////////////////////////////////////////////////////////////////////////////
 
     /// @notice Returns the total assets that are owed to share holders and any other internal balances.
     /// @return The total asset debt of the vault
@@ -540,32 +526,28 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _totalDebt(totalSupply());
     }
 
-    /* ============ Yield Functions ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Yield Functions
+    ////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * @notice Total yield balance of the vault
-     * @dev Equal to total assets minus total debt
-     * @return The total yield balance
-     */
+    /// @notice Total yield balance of the vault
+    /// @dev Equal to total assets minus total debt
+    /// @return The total yield balance
     function totalYieldBalance() public view returns (uint256) {
         return _totalYieldBalance(totalAssets(), totalDebt());
     }
 
-    /**
-     * @notice Total available yield on the vault
-     * @dev Equal to total assets minus total allocation (total debt + yield buffer)
-     * @return The available yield balance
-     */
+    /// @notice Total available yield on the vault
+    /// @dev Equal to total assets minus total allocation (total debt + yield buffer)
+    /// @return The available yield balance
     function availableYieldBalance() public view returns (uint256) {
         return _availableYieldBalance(totalAssets(), totalDebt());
     }
 
-    /**
-     * @notice Total yield balance of the vault (including the yield buffer).
-     * @param _totalAssets The total assets controlled by the vault
-     * @param totalDebt_ The total asset debt owed
-     * @return The total yield balance
-     */
+    /// @notice Total yield balance of the vault (including the yield buffer).
+    /// @param _totalAssets The total assets controlled by the vault
+    /// @param totalDebt_ The total asset debt owed
+    /// @return The total yield balance
     function _totalYieldBalance(uint256 _totalAssets, uint256 totalDebt_) internal view returns (uint256) {
         if (totalDebt_ >= _totalAssets) {
             return 0;
@@ -576,13 +558,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         }
     }
 
-    /**
-     * @notice Available yield balance given the total assets and total share supply.
-     * @dev Subtracts the yield buffer from the total yield balance.
-     * @param _totalAssets The total assets controlled by the vault
-     * @param totalDebt_ The total asset debt owed
-     * @return The available yield balance
-     */
+    /// @notice Available yield balance given the total assets and total share supply.
+    /// @dev Subtracts the yield buffer from the total yield balance.
+    /// @param _totalAssets The total assets controlled by the vault
+    /// @param totalDebt_ The total asset debt owed
+    /// @return The available yield balance
     function _availableYieldBalance(uint256 _totalAssets, uint256 totalDebt_) internal view returns (uint256) {
         uint256 totalYieldBalance_ = _totalYieldBalance(_totalAssets, totalDebt_);
         uint256 _yieldBuffer = yieldBuffer;
@@ -595,10 +575,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         }
     }
 
-    /**
-     * @notice Current amount of assets available in the yield buffer
-     * @return The available assets in the yield buffer
-     */
+    /// @notice Current amount of assets available in the yield buffer
+    /// @return The available assets in the yield buffer
     function currentYieldBuffer() external view returns (uint256) {
         uint256 totalYieldBalance_ = _totalYieldBalance(totalAssets(), totalDebt());
         uint256 _yieldBuffer = yieldBuffer;
@@ -609,10 +587,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         }
     }
 
-    /**
-     * @notice Transfers yield fee shares to the yield fee recipient
-     * @dev Will revert if the caller is not the yield fee recipient or if zero shares are withdrawn
-     */
+    /// @notice Transfers yield fee shares to the yield fee recipient
+    /// @dev Will revert if the caller is not the yield fee recipient or if zero shares are withdrawn
     function claimYieldFeeShares(uint256 _shares) external onlyYieldFeeRecipient {
         if (_shares == 0) revert MintZeroShares();
 
@@ -626,7 +602,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         emit ClaimYieldFeeShares(msg.sender, _shares);
     }
 
-    /* ============ LiquidationSource Functions ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // LiquidationSource Functions
+    ////////////////////////////////////////////////////////////////////////////////
 
     /// @inheritdoc ILiquidationSource
     /// @dev Returns the liquid amount of `_tokenOut` minus any yield fees.
@@ -728,20 +706,18 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return (_tokenOut == address(_asset) || _tokenOut == address(this)) && _liquidationPair == liquidationPair;
     }
 
-    /* ============ Setter Functions ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Setter Functions
+    ////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * @notice Set claimer.
-     * @param _claimer Address of the claimer
-     */
+    /// @notice Set claimer.
+    /// @param _claimer Address of the claimer
     function setClaimer(address _claimer) external onlyOwner {
         _setClaimer(_claimer);
     }
 
-    /**
-     * @notice Set liquidationPair.
-     * @param _liquidationPair New liquidationPair address
-     */
+    /// @notice Set liquidationPair.
+    /// @param _liquidationPair New liquidationPair address
     function setLiquidationPair(address _liquidationPair) external onlyOwner {
         if (address(_liquidationPair) == address(0)) revert LPZeroAddress();
 
@@ -750,32 +726,28 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         emit LiquidationPairSet(address(this), address(_liquidationPair));
     }
 
-    /**
-     * @notice Set yield fee percentage.
-     * @dev Yield fee is defined on a scale from `0` to `FEE_PRECISION`, inclusive.
-     * @param _yieldFeePercentage The new yield fee percentage to set
-     */
+    /// @notice Set yield fee percentage.
+    /// @dev Yield fee is defined on a scale from `0` to `FEE_PRECISION`, inclusive.
+    /// @param _yieldFeePercentage The new yield fee percentage to set
     function setYieldFeePercentage(uint32 _yieldFeePercentage) external onlyOwner {
         _setYieldFeePercentage(_yieldFeePercentage);
     }
 
-    /**
-     * @notice Set fee recipient.
-     * @param _yieldFeeRecipient Address of the fee recipient
-     */
+    /// @notice Set fee recipient.
+    /// @param _yieldFeeRecipient Address of the fee recipient
     function setYieldFeeRecipient(address _yieldFeeRecipient) external onlyOwner {
         _setYieldFeeRecipient(_yieldFeeRecipient);
     }
 
-    /* ============ Internal Functions ============ */
+    ////////////////////////////////////////////////////////////////////////////////
+    // Internal Functions
+    ////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * @notice Fetch decimals of the underlying asset.
-     * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
-     * @param asset_ Address of the underlying asset
-     * @return True if the attempt was successful, false otherwise
-     * @return Number of token decimals
-     */
+    /// @notice Fetch decimals of the underlying asset.
+    /// @dev A return value of false indicates that the attempt failed in some way.
+    /// @param asset_ Address of the underlying asset
+    /// @return True if the attempt was successful, false otherwise
+    /// @return Number of token decimals
     function _tryGetAssetDecimals(IERC20 asset_) internal view returns (bool, uint8) {
         (bool success, bytes memory encodedDecimals) = address(asset_).staticcall(
             abi.encodeWithSelector(IERC20Metadata.decimals.selector)
@@ -789,39 +761,33 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return (false, 0);
     }
 
-    /**
-     * @notice Returns the total assets that are owed to share holders and any other internal balances.
-     * @dev The yield fee balance is included since it's cheaper to keep track of those shares
-     *      internally instead of doing an additional TWAB mint on every liquidation.
-     * @param _totalSupply The total share supply of the vault
-     * @return The total asset debt of the vault
-     */
+    /// @notice Returns the total assets that are owed to share holders and any other internal balances.
+    /// @dev The yield fee balance is included since it's cheaper to keep track of those shares
+    ///      internally instead of doing an additional TWAB mint on every liquidation.
+    /// @param _totalSupply The total share supply of the vault
+    /// @return The total asset debt of the vault
     function _totalDebt(uint256 _totalSupply) internal view returns (uint256) {
         return _totalSupply + yieldFeeBalance;
     }
 
-    /**
-     * @notice Returns the remaining supply that can be minted without exceeding the TwabController limits.
-     * @dev The TwabController limits the total supply for each vault to uint96
-     * @param _totalSupply The total share supply of the vault
-     * @return The remaining supply that can be minted without exceeding TWAB limits
-     */
+    /// @notice Returns the remaining supply that can be minted without exceeding the TwabController limits.
+    /// @dev The TwabController limits the total supply for each vault to uint96
+    /// @param _totalSupply The total share supply of the vault
+    /// @return The remaining supply that can be minted without exceeding TWAB limits
     function _twabSupplyLimit(uint256 _totalSupply) internal pure returns (uint256) {
         unchecked {
             return type(uint96).max - _totalSupply;
         }
     }
 
-    /**
-     * @notice Deposits assets to the yield vault and mints shares
-     * @param _caller The caller of the deposit
-     * @param _receiver The receiver of the deposit shares
-     * @param _assets Amount of assets to deposit
-     * @param _shares Amount of shares to mint
-     * @dev Emits a `Deposit` event.
-     * @dev Will revert if 0 shares are minted back to the receiver or if 0 assets are deposited.
-     * @dev Will revert if the deposit may result in the loss of funds.
-     */
+    /// @notice Deposits assets to the yield vault and mints shares
+    /// @param _caller The caller of the deposit
+    /// @param _receiver The receiver of the deposit shares
+    /// @param _assets Amount of assets to deposit
+    /// @param _shares Amount of shares to mint
+    /// @dev Emits a `Deposit` event.
+    /// @dev Will revert if 0 shares are minted back to the receiver or if 0 assets are deposited.
+    /// @dev Will revert if the deposit may result in the loss of funds.
     function _depositAndMint(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal {
         if (_shares == 0) revert MintZeroShares();
         if (_assets == 0) revert DepositZeroAssets();
@@ -838,13 +804,17 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             address(this),
             _assets
         );
-        uint256 _assetsWithDust = _asset.balanceOf(address(this)); // try to sweep previously accumulated dust into the deposit as well
+
+        // sweep previously accumulated dust into the yield vault along with the deposit
+        uint256 _assetsWithDust = _asset.balanceOf(address(this));
         _asset.approve(address(yieldVault), _assetsWithDust);
 
-        uint256 _yieldVaultShares = yieldVault.previewDeposit(_assetsWithDust); // should include any fees charged against the deposit, so the following mint call should not fail
+        // should include any fees charged against the deposit, so the following mint call should not fail
+        uint256 _yieldVaultShares = yieldVault.previewDeposit(_assetsWithDust);
         uint256 _assetsUsed = yieldVault.mint(_yieldVaultShares, address(this));
         if (_assetsUsed != _assetsWithDust) {
-            _asset.approve(address(yieldVault), 0); // set back to zero for weird tokens like USDT (and for gas refund)
+            // set back to zero for weird tokens like USDT
+            _asset.approve(address(yieldVault), 0);
         }
 
         _mint(_receiver, _shares);
@@ -854,16 +824,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         emit Deposit(_caller, _receiver, _assets, _shares);
     }
 
-    /**
-     * @notice Burns shares and withdraws assets from the underlying yield vault.
-     * @param _caller Address of the caller
-     * @param _receiver Address of the receiver of the assets
-     * @param _owner Owner of the shares
-     * @param _shares Shares to burn
-     * @param _assets Assets to withdraw
-     * @dev Emits a `Withdraw` event.
-     * @dev Will revert if 0 assets are withdrawn or if 0 shares are burned
-     */
+    /// @notice Burns shares and withdraws assets from the underlying yield vault.
+    /// @param _caller Address of the caller
+    /// @param _receiver Address of the receiver of the assets
+    /// @param _owner Owner of the shares
+    /// @param _shares Shares to burn
+    /// @param _assets Assets to withdraw
+    /// @dev Emits a `Withdraw` event.
+    /// @dev Will revert if 0 assets are withdrawn or if 0 shares are burned
     function _burnAndWithdraw(
         address _caller,
         address _receiver,
@@ -889,26 +857,22 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
-    /**
-     * @notice Returns the max assets that can be withdrawn from the yield vault through this vault's
-     * `_withdraw` function.
-     * @dev This should be used over `yieldVault.maxWithdraw` when considering withdrawal limits since
-     * this function takes into account the yield vault redemption limits, which is necessary since the
-     * `_withdraw` function uses `yieldVault.redeem` instead of `yieldVault.withdraw`. Since we convert
-     * the max redeemable shares to assets rounding down, the `yieldVault.previewWithdraw` call in the
-     * `_withdraw` function is guaranteed to return less than or equal shares to the max yield vault 
-     * redemption.
-     * @return The max assets that can be withdrawn from the yield vault.
-     */
+    /// @notice Returns the max assets that can be withdrawn from the yield vault through this vault's
+    /// `_withdraw` function.
+    /// @dev This should be used over `yieldVault.maxWithdraw` when considering withdrawal limits since
+    /// this function takes into account the yield vault redemption limits, which is necessary since the
+    /// `_withdraw` function uses `yieldVault.redeem` instead of `yieldVault.withdraw`. Since we convert
+    /// the max redeemable shares to assets rounding down, the `yieldVault.previewWithdraw` call in the
+    /// `_withdraw` function is guaranteed to return less than or equal shares to the max yield vault 
+    /// redemption.
+    /// @return The max assets that can be withdrawn from the yield vault.
     function _maxYieldVaultWithdraw() internal view returns (uint256) {
         return yieldVault.convertToAssets(yieldVault.maxRedeem(address(this)));
     }
 
-    /**
-     * @notice Withdraws assets to the receiver while accounting for rounding errors.
-     * @param _receiver The receiver of the assets
-     * @param _assets The assets to withdraw
-     */
+    /// @notice Withdraws assets to the receiver while accounting for rounding errors.
+    /// @param _receiver The receiver of the assets
+    /// @param _assets The assets to withdraw
     function _withdraw(address _receiver, uint256 _assets) internal {
         // The vault accumulates dust from rounding errors over time, so if we can fulfill the withdrawal from the
         // latent balance, we don't need to redeem any yield vault shares.
@@ -922,11 +886,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         }
     }
 
-    /**
-     * @notice Set yield fee percentage.
-     * @dev Yield fee is defined on a scale from `0` to `MAX_YIELD_FEE`, inclusive.
-     * @param _yieldFeePercentage The new yield fee percentage to set
-     */
+    /// @notice Set yield fee percentage.
+    /// @dev Yield fee is defined on a scale from `0` to `MAX_YIELD_FEE`, inclusive.
+    /// @param _yieldFeePercentage The new yield fee percentage to set
     function _setYieldFeePercentage(uint32 _yieldFeePercentage) internal {
         if (_yieldFeePercentage > MAX_YIELD_FEE) {
             revert YieldFeePercentageExceedsMax(_yieldFeePercentage, MAX_YIELD_FEE);
@@ -935,10 +897,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         emit YieldFeePercentageSet(_yieldFeePercentage);
     }
 
-    /**
-     * @notice Set yield fee recipient address.
-     * @param _yieldFeeRecipient Address of the fee recipient
-     */
+    /// @notice Set yield fee recipient address.
+    /// @param _yieldFeeRecipient Address of the fee recipient
     function _setYieldFeeRecipient(address _yieldFeeRecipient) internal {
         yieldFeeRecipient = _yieldFeeRecipient;
         emit YieldFeeRecipientSet(_yieldFeeRecipient);
