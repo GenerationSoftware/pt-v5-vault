@@ -17,16 +17,52 @@ import { ObservationLib } from "pt-v5-twab-controller/libraries/ObservationLib.s
 
 /// @title  PoolTogether V5 Prize Vault
 /// @author G9 Software Inc.
-/// @notice This vault extends the ERC4626 standard that accepts deposits of an underlying token (ex: USDC) and
-///         deposits it to an underlying yield source while converting any accrued yield to prize tokens (ex: POOL) 
-///         and contributing them to the prize pool, giving the depositors a chance to win prizes. This vault always
-///         assumes a one-to-one ratio of underlying assets to receipt tokens when depositing or minting, but a
-///         depositor's ability to withdraw assets or redeem shares is dependent on underlying market conditions;
-///         as is the available rate of exchange.
+/// @notice The prize vault takes deposits of an asset and earns yield with the deposits through an underlying yield
+///         vault. The yield is then expected to be liquidated and contributed to the prize pool as prize tokens. The
+///         depositors of the prize vault will then be eligible to win prizes from the pool. If a prize is won, The 
+///         permitted claimer contract for the prize vault will claim the prize on behalf of the winner. Depositors
+///         can also set custom hooks that are called directly before and after their prize is claimed.
+/// @dev    Share balances are stored in the TwabController contract.
+/// @dev    Depositors should always expect to be able to withdraw their full deposit amount and no more as long as
+///         global withdrawal limits meet or exceed their balance. However, if the underlying yield source loses
+///         assets, depositors will only be able to withdraw a proportional amount of remaining assets based on their
+///         share balance and the total debt balance.
+/// @dev    The prize vault is designed to embody the "no loss" spirit of PoolTogether, down to the last wei. Most 
+///         ERC4626 yield vaults incur small, necessary rounding errors on deposit and withdrawal to ensure the
+///         internal accounting cannot be taken advantage of. The prize vault employs two strategies in an attempt
+///         to cover these rounding errors with yield to ensure that depositors can withdraw every last wei of their
+///         initial deposit:
 ///
-/// TODO:   Add an explanation for dust collection and rounding error mitigation.
+///             1. The "dust collection strategy":
 ///
-/// @dev    Balances are stored in the TwabController contract.
+///                Rounding errors are directly related to the exchange rate of the underlying yield vault; the more
+///                assets a single yield vault share is worth, the more severe the rounding errors can become. For
+///                example, if the exchange rate is 100 assets for 1 yield vault share and we assume 0 decimal
+///                precision; if alice deposits 199 assets, the yield vault will round down on the conversion and mint
+///                alice 1 share, essentially donating the remaining 99 assets to the yield vault. This behavior can
+///                open pathways for exploits in the prize vault since a bad actor could repeatedly make deposits and
+///                withdrawals that result in large rounding errors and since the prize vault covers rounding errors
+///                with yield, the attacker could withdraw without loss while essentially donating the yield back to
+///                the yield vault.
+///
+///                To mitigate this issue, the prize vault calculates the amount of yield vault shares that would be
+///                minted during a deposit, but mints those shares directly instead, ensuring that only the exact
+///                amount of assets needed are sent to the yield vault while keeping the remainder as a latent balance
+///                in the prize vault until it can be used in the next deposit or withdraw. An inverse strategy is also
+///                used when withdrawing assets from the yield vault. This reduces the possible rounding errors to just
+///                1 wei per deposit or withdraw.
+///
+///             2. The "yield buffer":
+///
+///                Since the prize vault can still incur minimal rounding errors from the yield vault, a yield buffer
+///                is required to ensure that there is always enough yield reserved to cover the rounding errors on 
+///                deposits and withdrawals. This buffer should never run dry during normal operating conditions and
+///                expected yield rates. If the yield buffer is ever depleted, new deposits will be prevented and the
+///                prize vault will enter a lossy withdrawal state where depositors will incur the rounding errors on
+///                withdraw.
+///
+/// @dev    The prize vault does not support underlying yield vaults that take a fee on deposit or withdraw.
+///
 contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownable {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -296,7 +332,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc IERC4626
-    /// @dev TODO: add reasoning for inclusion of latent balance
+    /// @dev The latent asset balance is included in the total asset count to account for the "dust collection
+    /// strategy".
     function totalAssets() public view returns (uint256) {
         return yieldVault.convertToAssets(yieldVault.balanceOf(address(this))) + _asset.balanceOf(address(this));
     }
@@ -332,7 +369,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc IERC4626
     /// @dev Considers the uint96 limit on total share supply in the TwabController
     /// @dev Returns zero if any deposit would result in a loss of assets
-    /// @dev TODO: add reasoning for exclusion of latent balance
+    /// @dev Any latent balance of assets in the prize vault will be swept in with the deposit as a part of
+    /// the "dust collection strategy". This means that the max deposit must account for the latent balance
+    /// by subtracting it from the max deposit available otherwise.
     function maxDeposit(address) public view returns (uint256) {
         uint256 _totalSupply = totalSupply();
         uint256 totalDebt_ = _totalDebt(_totalSupply);
@@ -354,13 +393,15 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc IERC4626
-    /// @dev Returns the same value as `maxDeposit` since shares and assets are 1:1 on mint.
+    /// @dev Returns the same value as `maxDeposit` since shares and assets are 1:1 on mint
+    /// @dev Returns zero if any deposit would result in a loss of assets
     function maxMint(address _owner) public view returns (uint256) {
         return maxDeposit(_owner);
     }
 
     /// @inheritdoc IERC4626
-    /// @dev TODO: add reasoning for inclusion of latent balance
+    /// @dev The prize vault maintains a latent balance of assets as part of the "dust collection strategy".
+    /// This latent balance are accounted for in the max withdraw limits.
     function maxWithdraw(address _owner) public view returns (uint256) {
         uint256 _maxWithdraw = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
 
@@ -370,7 +411,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc IERC4626
-    /// @dev TODO: add reasoning for inclusion of latent balance
+    /// @dev The prize vault maintains a latent balance of assets as part of the "dust collection strategy".
+    /// This latent balance are accounted for in the max redeem limits.
     function maxRedeem(address _owner) public view returns (uint256) {
         uint256 _maxWithdraw = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
         uint256 _ownerShares = balanceOf(_owner);
@@ -591,7 +633,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             // Liquidation of vault shares is capped to the TWAB supply limit.
             _maxAmountOut = _twabSupplyLimit(_totalSupply);
         } else if (_tokenOut == address(_asset)) {
-            // Liquidation of yield assets is capped at the max withdraw.
+            // Liquidation of yield assets is capped at the max yield vault withdraw plus any latent balance.
             _maxAmountOut = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
         } else {
             return 0;
@@ -811,15 +853,15 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             _assets
         );
 
-        // sweep previously accumulated dust into the yield vault along with the deposit
+        // Previously accumulated dust is swept into the yield vault along with the deposit.
         uint256 _assetsWithDust = _asset.balanceOf(address(this));
         _asset.approve(address(yieldVault), _assetsWithDust);
 
-        // should include any fees charged against the deposit, so the following mint call should not fail
+        // The shares are calculated and then minted directly to mitigate rounding error loss.
         uint256 _yieldVaultShares = yieldVault.previewDeposit(_assetsWithDust);
         uint256 _assetsUsed = yieldVault.mint(_yieldVaultShares, address(this));
         if (_assetsUsed != _assetsWithDust) {
-            // set back to zero for weird tokens like USDT
+            // If some latent balance remains, the approval is set back to zero for weird tokens like USDT.
             _asset.approve(address(yieldVault), 0);
         }
 
@@ -884,8 +926,10 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // latent balance, we don't need to redeem any yield vault shares.
         uint256 _latentAssets = _asset.balanceOf(address(this));
         if (_assets > _latentAssets) {
-            uint256 _yieldVaultShares = yieldVault.previewWithdraw(_assets - _latentAssets); // should include any fees and round up, so the following redeem call should return enough assets
-            yieldVault.redeem(_yieldVaultShares, address(this), address(this)); // send assets to this contract so any leftover dust can be redeposited later
+            // The latent balance is subtracted from the withdrawal so we don't withdraw more than we need.
+            uint256 _yieldVaultShares = yieldVault.previewWithdraw(_assets - _latentAssets);
+            // Assets are sent to this contract so any leftover dust can be redeposited later.
+            yieldVault.redeem(_yieldVaultShares, address(this), address(this));
         }
         if (_receiver != address(this)) {
             _asset.transfer(_receiver, _assets);
