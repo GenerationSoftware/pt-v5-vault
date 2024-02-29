@@ -62,7 +62,7 @@ contract PrizeVaultDepositPermitFallbackTest is UnitBaseSetup {
         uint256 _amount = 1000e18;
         underlyingAsset.mint(alice, _amount);
 
-        (uint8 _v, bytes32 _r, bytes32 _s) = _signPermit(
+        _signPermit(
             underlyingAsset,
             vault,
             _amount,
