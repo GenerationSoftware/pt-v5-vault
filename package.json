@@ -13,14 +13,17 @@
   "scripts": {
     "clean": "forge clean",
     "compile": "forge compile",
-    "coverage": "forge coverage --report lcov && lcov --extract lcov.info -o lcov.info 'src/*' && genhtml lcov.info -o coverage",
+    "coverage": "forge coverage --no-match-contract 'Integration|Invariant|Fuzz' --report lcov && lcov --extract lcov.info -o lcov.info 'src/*' && genhtml lcov.info -o coverage",
     "format": "prettier --config .prettierrc --write \"**/*.{json,md,sol,yml}\"",
     "format:file": "prettier --config .prettierrc --write",
     "hint": "solhint --config \"./.solhint.json\" \"{src,test}/**/*.sol\"",
     "lint-staged": "lint-staged",
     "prepack": "npm run clean && npm run compile",
     "prepare": "husky install",
-    "test": "forge test"
+    "test": "forge test --nmc 'Integration|Invariant|Fuzz'",
+    "fuzz": "forge test --mc 'Fuzz' --nmc '-'",
+    "invariant": "forge test --mc 'Invariant' --nmc '-'",
+    "integration": "forge test  --mc 'Integration' --nmc '-'"
   },
   "devDependencies": {
     "husky": "8.0.3",
