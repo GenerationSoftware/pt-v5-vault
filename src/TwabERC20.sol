@@ -39,6 +39,7 @@ contract TwabERC20 is ERC20, ERC20Permit {
     /// @notice TwabERC20 Constructor
     /// @param name_ The name of the token
     /// @param symbol_ The token symbol
+    /// @param twabController_ The TWAB controller that will be used to store token balances
     constructor(
         string memory name_,
         string memory symbol_,
