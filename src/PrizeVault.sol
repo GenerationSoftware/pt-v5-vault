@@ -202,9 +202,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Thrown when the Liquidation Pair being set is the zero address.
     error LPZeroAddress();
 
-    /// @notice Thrown when `sweep` is called but no underlying assets are currently held by the Vault.
-    error SweepZeroAssets();
-
     /// @notice Thrown during the liquidation process when the liquidation amount out is zero.
     error LiquidationAmountOutZero();
 
