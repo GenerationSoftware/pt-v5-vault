@@ -934,7 +934,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             yieldVault.redeem(_yieldVaultShares, address(this), address(this));
         }
         if (_receiver != address(this)) {
-            _asset.transfer(_receiver, _assets);
+            _asset.safeTransfer(_receiver, _assets);
         }
     }
 

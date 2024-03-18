@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 
@@ -11,6 +12,7 @@ import { PrizeVault } from "./PrizeVault.sol";
 /// @author PoolTogether Inc. & G9 Software Inc.
 /// @notice Factory contract for deploying new prize vaults using a standard underlying ERC4626 yield vault.
 contract PrizeVaultFactory {
+    using SafeERC20 for IERC20;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Events
@@ -115,7 +117,7 @@ contract PrizeVaultFactory {
 
         // A donation to fill the yield buffer is made to ensure that early depositors have
         // rounding errors covered in the time before yield is actually generated.
-        IERC20(_vault.asset()).transferFrom(msg.sender, address(_vault), YIELD_BUFFER);
+        IERC20(_vault.asset()).safeTransferFrom(msg.sender, address(_vault), YIELD_BUFFER);
 
         allVaults.push(_vault);
         deployedVaults[address(_vault)] = true;
