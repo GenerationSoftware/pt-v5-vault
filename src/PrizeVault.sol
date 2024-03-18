@@ -857,15 +857,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
         // Previously accumulated dust is swept into the yield vault along with the deposit.
         uint256 _assetsWithDust = _asset.balanceOf(address(this));
-        _asset.approve(address(yieldVault), _assetsWithDust);
+        _asset.forceApprove(address(yieldVault), _assetsWithDust);
 
         // The shares are calculated and then minted directly to mitigate rounding error loss.
         uint256 _yieldVaultShares = yieldVault.previewDeposit(_assetsWithDust);
         uint256 _assetsUsed = yieldVault.mint(_yieldVaultShares, address(this));
-        if (_assetsUsed != _assetsWithDust) {
-            // If some latent balance remains, the approval is set back to zero for weird tokens like USDT.
-            _asset.approve(address(yieldVault), 0);
-        }
 
         _mint(_receiver, _shares);
 
