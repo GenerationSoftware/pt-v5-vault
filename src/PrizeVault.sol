@@ -371,7 +371,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Any latent balance of assets in the prize vault will be swept in with the deposit as a part of
     /// the "dust collection strategy". This means that the max deposit must account for the latent balance
     /// by subtracting it from the max deposit available otherwise.
-    function maxDeposit(address) public view returns (uint256) {
+    function maxDeposit(address /* receiver */) public view returns (uint256) {
         uint256 _totalSupply = totalSupply();
         uint256 totalDebt_ = _totalDebt(_totalSupply);
         if (totalAssets() < totalDebt_) return 0;
@@ -655,7 +655,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Emits a `TransferYieldOut` event
     /// @dev Supports the liquidation of either assets or prize vault shares.
     function transferTokensOut(
-        address,
+        address /* sender */,
         address _receiver,
         address _tokenOut,
         uint256 _amountOut
@@ -701,7 +701,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     function verifyTokensIn(
         address _tokenIn,
         uint256 _amountIn,
-        bytes calldata
+        bytes calldata /* transferTokensOutData */
     ) external onlyLiquidationPair {
         address _prizeToken = address(prizePool.prizeToken());
         if (_tokenIn != _prizeToken) {
@@ -712,7 +712,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc ILiquidationSource
-    function targetOf(address) external view returns (address) {
+    function targetOf(address /* tokenIn */) external view returns (address) {
         return address(prizePool);
     }
 
