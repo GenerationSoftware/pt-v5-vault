@@ -79,7 +79,6 @@ contract PrizeVaultFactory {
 
     /// @notice Deploy a new vault
     /// @dev Emits a `NewPrizeVault` event with the vault details.
-    /// @dev `claimer` can be set to address zero if none is available yet.
     /// @dev The caller MUST approve this factory to spend underlying assets equal to `YIELD_BUFFER` so the yield
     /// buffer can be filled on deployment. This value is unrecoverable and is expected to be insignificant.
     /// @param _name Name of the ERC20 share minted by the vault
