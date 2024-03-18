@@ -371,6 +371,17 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vm.stopPrank();
 
         assertEq(vault.balanceOf(bob), yieldFeeBalance / 3);
+
+        // test a claim of the rest of the fees:        
+        vm.startPrank(bob);
+        vm.expectEmit();
+        emit Transfer(address(0), bob, (2 * yieldFeeBalance) / 3);
+        vm.expectEmit();
+        emit ClaimYieldFeeShares(bob, (2 * yieldFeeBalance) / 3);
+        vault.claimYieldFeeShares((2 * yieldFeeBalance) / 3);
+        vm.stopPrank();
+
+        assertEq(vault.balanceOf(bob), yieldFeeBalance);
     }
 
 }

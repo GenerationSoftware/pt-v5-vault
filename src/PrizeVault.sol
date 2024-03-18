@@ -610,11 +610,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Will revert if the caller is not the yield fee recipient or if zero shares are withdrawn
     function claimYieldFeeShares(uint256 _shares) external onlyYieldFeeRecipient {
         if (_shares == 0) revert MintZeroShares();
+        if (_shares > yieldFeeBalance) revert SharesExceedsYieldFeeBalance(_shares, yieldFeeBalance);
 
-        uint256 _yieldFeeBalance = yieldFeeBalance;
-        if (_shares > _yieldFeeBalance) revert SharesExceedsYieldFeeBalance(_shares, _yieldFeeBalance);
-
-        yieldFeeBalance -= _yieldFeeBalance;
+        yieldFeeBalance -= _shares;
 
         _mint(msg.sender, _shares);
 
