@@ -47,6 +47,12 @@ contract PrizeVaultInvariant is Test {
         assertLe(liquidBalance, availableYieldBalance);
     }
 
+    function invariantYieldFeeBalanceAlwaysClaimable() external useCurrentTime {
+        uint256 supplyLimit = type(uint96).max - vaultHarness.vault().totalSupply();
+        uint256 yieldFeeBalance = vaultHarness.vault().yieldFeeBalance();
+        assertLe(yieldFeeBalance, supplyLimit);
+    }
+
     function invariantAllAssetsAccountedFor() external useCurrentTime {
         PrizeVault vault = vaultHarness.vault();
         uint256 totalAssets = vault.totalAssets();
