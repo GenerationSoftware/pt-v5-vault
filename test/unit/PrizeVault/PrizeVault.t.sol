@@ -142,7 +142,7 @@ contract PrizeVaultTest is UnitBaseSetup {
         vault.deposit(1e18, alice);
         vm.stopPrank();
 
-        assertEq(vault.totalAssets(), 1e18);
+        assertEq(vault.totalPreciseAssets(), 1e18);
         assertEq(vault.totalSupply(), 1e18);
         assertEq(vault.totalDebt(), 1e18);
 
@@ -154,7 +154,7 @@ contract PrizeVaultTest is UnitBaseSetup {
         uint256 yieldFee = (1e18 - vault.yieldBuffer()) / (2 * 10); // 10% yield fee + 90% amountOut = 100%
         vault.transferTokensOut(address(0), bob, address(underlyingAsset), amountOut);
 
-        assertEq(vault.totalAssets(), 1e18 + 1e18 - amountOut); // existing balance + yield - amountOut
+        assertEq(vault.totalPreciseAssets(), 1e18 + 1e18 - amountOut); // existing balance + yield - amountOut
         assertEq(vault.totalSupply(), 1e18); // no change in supply since liquidation was for assets
         assertEq(vault.totalDebt(), 1e18 + yieldFee); // debt increased since we reserved shares for the yield fee
 
@@ -201,6 +201,57 @@ contract PrizeVaultTest is UnitBaseSetup {
         );
     }
 
+    /* ============ tryGetTotalPreciseAssets ============ */
+
+    function testTryGetTotalPreciseAssets() public {
+        {
+            (bool success, uint256 totalAssets) = vault.tryGetTotalPreciseAssets();
+            assertEq(success, true);
+            assertEq(totalAssets, 0);
+        }
+
+        // deposit some assets
+        underlyingAsset.mint(alice, 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+
+        {
+            (bool success, uint256 totalAssets) = vault.tryGetTotalPreciseAssets();
+            assertEq(success, true);
+            assertEq(totalAssets, 1e18);
+        }
+    }
+
+    function testTryGetTotalPreciseAssets_FailsIfPreviewRedeemFails() public {
+        vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.previewRedeem.selector, 0), "force previewRedeem fail");
+        (bool success, uint256 totalAssets) = vault.tryGetTotalPreciseAssets();
+        assertEq(success, false);
+        assertEq(totalAssets, 0);
+    }
+
+    /* ============ totalAssets ============ */
+
+    function testTotalAssets() public {
+        {
+            uint256 _totalAssets = vault.totalAssets();
+            assertEq(_totalAssets, 0);
+        }
+
+        // deposit some assets
+        underlyingAsset.mint(alice, 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+
+        {
+            uint256 _totalAssets = vault.totalAssets();
+            assertEq(_totalAssets, 1e18);
+        }
+    }
+
     /* ============ maxDeposit / maxMint ============ */
 
     function testMaxDeposit_SubtractsLatentBalance() public {
@@ -234,6 +285,13 @@ contract PrizeVaultTest is UnitBaseSetup {
         assertEq(vault.maxDeposit(address(this)), uint256(type(uint96).max) - deposited); // remaining deposit room
     }
 
+    function testMaxDeposit_ReturnsZeroIfTotalPreciseAssetsFails() public {
+        assertGt(vault.maxDeposit(address(this)), 0);
+
+        vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.previewRedeem.selector, 0), "force previewRedeem fail");
+        assertEq(vault.maxDeposit(address(this)), 0);
+    }
+
     /* ============ maxWithdraw ============ */
 
     /// @dev all withdraw/redeem flows in prize vault go through the yield vault redeem, so the prize vault max must be limited appropriately
@@ -256,6 +314,20 @@ contract PrizeVaultTest is UnitBaseSetup {
         // check for 0 maxWithdraw
         vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)), abi.encode(0));
         assertEq(vault.maxWithdraw(address(this)), 0);
+    }
+
+    function testMaxWithdraw_ReturnsZeroIfTotalPreciseAssetsFails() public {
+        // deposit some assets
+        underlyingAsset.mint(alice, 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+        
+        assertGt(vault.maxWithdraw(alice), 0);
+
+        vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.previewRedeem.selector, yieldVault.balanceOf(address(vault))), "force previewRedeem fail");
+        assertEq(vault.maxWithdraw(alice), 0);
     }
 
     /* ============ maxRedeem ============ */
@@ -317,6 +389,22 @@ contract PrizeVaultTest is UnitBaseSetup {
         assertEq(vault.maxRedeem(address(this)), deposited / 2);
     }
 
+    function testMaxRedeem_ReturnsZeroIfTotalPreciseAssetsFails() public {
+        // deposit some assets
+        underlyingAsset.mint(alice, 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+        
+        assertGt(vault.maxRedeem(alice), 0);
+
+        // mock a maxRedeem for the yield vault so that we get the desired branch on vault.maxRedeem()
+        vm.mockCall(address(yieldVault), abi.encodeWithSelector(IERC4626.maxRedeem.selector, address(vault)), abi.encode(yieldVault.balanceOf(address(vault)) / 2));
+        vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.previewRedeem.selector, yieldVault.balanceOf(address(vault))), "force previewRedeem fail");
+        assertEq(vault.maxRedeem(alice), 0);
+    }
+
     /* ============ previewWithdraw ============ */
 
     function testPreviewWithdraw() public {
@@ -346,7 +434,7 @@ contract PrizeVaultTest is UnitBaseSetup {
     }
 
     function testPreviewWithdraw_ZeroTotalAssets() public {
-        assertEq(vault.totalAssets(), 0);
+        assertEq(vault.totalPreciseAssets(), 0);
         vm.expectRevert(abi.encodeWithSelector(PrizeVault.ZeroTotalAssets.selector));
         vault.previewWithdraw(1);
     }

@@ -15,10 +15,10 @@ contract LossyPrizeVaultInvariant is Test {
     }
 
     function invariantDisableDepositsOnLoss() external {
-        uint256 totalAssets = lossyVaultHarness.vault().totalAssets();
+        uint256 totalPreciseAssets = lossyVaultHarness.vault().totalPreciseAssets();
         uint256 totalDebt = lossyVaultHarness.vault().totalDebt();
         uint256 totalSupply = lossyVaultHarness.vault().totalSupply();
-        if (totalDebt > totalAssets || type(uint96).max - totalSupply == 0) {
+        if (totalDebt > totalPreciseAssets || type(uint96).max - totalSupply == 0) {
             assertEq(lossyVaultHarness.vault().maxDeposit(address(this)), 0);
         } else {
             assertGt(lossyVaultHarness.vault().maxDeposit(address(this)), 0);
@@ -26,9 +26,9 @@ contract LossyPrizeVaultInvariant is Test {
     }
 
     function invariantNoYieldWhenDebtExceedsAssets() external {
-        uint256 totalAssets = lossyVaultHarness.vault().totalAssets();
+        uint256 totalPreciseAssets = lossyVaultHarness.vault().totalPreciseAssets();
         uint256 totalDebt = lossyVaultHarness.vault().totalDebt();
-        if (totalDebt >= totalAssets) {
+        if (totalDebt >= totalPreciseAssets) {
             assertEq(lossyVaultHarness.vault().liquidatableBalanceOf(address(lossyVaultHarness.underlyingAsset())), 0);
             assertEq(lossyVaultHarness.vault().liquidatableBalanceOf(address(lossyVaultHarness.vault())), 0);
             assertEq(lossyVaultHarness.vault().availableYieldBalance(), 0);
@@ -42,22 +42,22 @@ contract LossyPrizeVaultInvariant is Test {
     }
 
     function invariantAllAssetsAccountedFor() external {
-        uint256 totalAssets = lossyVaultHarness.vault().totalAssets();
+        uint256 totalPreciseAssets = lossyVaultHarness.vault().totalPreciseAssets();
         uint256 totalDebt = lossyVaultHarness.vault().totalDebt();
-        if (totalDebt >= totalAssets) {
+        if (totalDebt >= totalPreciseAssets) {
             // 1 wei rounding error since the convertToAssets function rounds down which means up to 1 asset may be lost on total conversion
-            assertApproxEqAbs(totalAssets, lossyVaultHarness.vault().convertToAssets(totalDebt), 1);
+            assertApproxEqAbs(totalPreciseAssets, lossyVaultHarness.vault().convertToAssets(totalDebt), 1);
         } else {
             // When assets cover debts, we have essentially the same test as the the sister test in `PrizeVaultInvariant.sol`
             // The debt is converted to assets using `convertToAssets` to test that it will always be 1:1 when the vault has ample collateral.
             uint256 currentYieldBuffer = lossyVaultHarness.vault().currentYieldBuffer();
             uint256 availableYieldBalance = lossyVaultHarness.vault().availableYieldBalance();
             uint256 totalAccounted = lossyVaultHarness.vault().convertToAssets(totalDebt) + currentYieldBuffer + availableYieldBalance;
-            assertEq(totalAssets, totalAccounted);
+            assertEq(totalPreciseAssets, totalAccounted);
 
             // totalYieldBalance = currentYieldBuffer + availableYieldBalance
             uint256 totalAccounted2 = totalDebt + lossyVaultHarness.vault().totalYieldBalance();
-            assertEq(totalAssets, totalAccounted2);
+            assertEq(totalPreciseAssets, totalAccounted2);
         }
     }
 }

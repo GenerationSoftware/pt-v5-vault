@@ -159,7 +159,7 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
             abi.encodeWithSelector(PrizeVault.liquidatableBalanceOf.selector, _underlying_)
         );
 
-        uint256 totalAssets = prizeVault.totalAssets();
+        uint256 totalAssets = prizeVault.totalPreciseAssets();
         uint256 totalDebt = prizeVault.totalDebt();
 
         if (totalAssets < totalDebt + yieldBuffer) {

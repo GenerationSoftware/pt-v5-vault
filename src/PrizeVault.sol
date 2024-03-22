@@ -355,47 +355,35 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc IERC4626
     /// @dev The latent asset balance is included in the total asset count to account for the "dust collection
     /// strategy".
+    /// @dev This function uses `convertToAssets` to ensure it does not revert, but may result in some
+    /// approximation depending on the yield vault implementation.
     function totalAssets() public view returns (uint256) {
         return yieldVault.convertToAssets(yieldVault.balanceOf(address(this))) + _asset.balanceOf(address(this));
     }
 
     /// @inheritdoc IERC4626
-    function convertToShares(uint256 _assets) public view returns (uint256) {
-        uint256 totalDebt_ = totalDebt();
-        uint256 _totalAssets = totalAssets();
-        if (_totalAssets >= totalDebt_) {
-            return _assets;
-        } else {
-            // If the vault controls less assets than what has been deposited a share will be worth a
-            // proportional amount of the total assets. This can happen due to fees, slippage, or loss
-            // of funds in the underlying yield vault.
-            return _assets.mulDiv(totalDebt_, _totalAssets, Math.Rounding.Down);
-        }
+    /// @dev This function uses approximate total assets and should not be used for onchain conversions.
+    function convertToShares(uint256 _assets) external view returns (uint256) {
+        return _convertToShares(_assets, totalAssets(), totalDebt(), Math.Rounding.Down);
     }
 
     /// @inheritdoc IERC4626
-    function convertToAssets(uint256 _shares) public view returns (uint256) {
-        uint256 totalDebt_ = totalDebt();
-        uint256 _totalAssets = totalAssets();
-        if (_totalAssets >= totalDebt_) {
-            return _shares;
-        } else {
-            // If the vault controls less assets than what has been deposited a share will be worth a
-            // proportional amount of the total assets. This can happen due to fees, slippage, or loss
-            // of funds in the underlying yield vault.
-            return _shares.mulDiv(_totalAssets, totalDebt_, Math.Rounding.Down);
-        }
+    /// @dev This function uses approximate total assets and should not be used for onchain conversions.
+    function convertToAssets(uint256 _shares) external view returns (uint256) {
+        return _convertToAssets(_shares, totalAssets(), totalDebt(), Math.Rounding.Down);
     }
 
     /// @inheritdoc IERC4626
     /// @dev Considers the TWAB mint limit
     /// @dev Returns zero if any deposit would result in a loss of assets
+    /// @dev Returns zero if total assets cannot be determined
     /// @dev Any latent balance of assets in the prize vault will be swept in with the deposit as a part of
     /// the "dust collection strategy". This means that the max deposit must account for the latent balance
     /// by subtracting it from the max deposit available otherwise.
     function maxDeposit(address /* receiver */) public view returns (uint256) {
         uint256 _totalDebt = totalDebt();
-        if (totalAssets() < _totalDebt) return 0;
+        (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
+        if (!_success || _totalAssets < _totalDebt) return 0;
 
         uint256 _latentBalance = _asset.balanceOf(address(this));
         uint256 _maxYieldVaultDeposit = yieldVault.maxDeposit(address(this));
@@ -422,17 +410,22 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc IERC4626
     /// @dev The prize vault maintains a latent balance of assets as part of the "dust collection strategy".
     /// This latent balance are accounted for in the max withdraw limits.
+    /// @dev Returns zero if total assets cannot be determined
     function maxWithdraw(address _owner) public view returns (uint256) {
+        (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
+        if (!_success) return 0;
+        
         uint256 _maxWithdraw = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
 
         // the owner may receive less than 1 asset per share, so we must convert their balance here
-        uint256 _ownerAssets = convertToAssets(balanceOf(_owner));
+        uint256 _ownerAssets = _convertToAssets(balanceOf(_owner), _totalAssets, totalDebt(), Math.Rounding.Down);
         return _ownerAssets < _maxWithdraw ? _ownerAssets : _maxWithdraw;
     }
 
     /// @inheritdoc IERC4626
     /// @dev The prize vault maintains a latent balance of assets as part of the "dust collection strategy".
     /// This latent balance are accounted for in the max redeem limits.
+    /// @dev Returns zero if total assets cannot be determined
     function maxRedeem(address _owner) public view returns (uint256) {
         uint256 _maxWithdraw = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
         uint256 _ownerShares = balanceOf(_owner);
@@ -441,18 +434,15 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // withdraw to shares unless the owner has more shares than the max withdraw and is redeeming
         // at a loss (when 1 share is worth less than 1 asset).
         if (_ownerShares > _maxWithdraw) {
-            uint256 _totalAssets = totalAssets();
-            uint256 totalDebt_ = totalDebt();
-            if (_totalAssets >= totalDebt_) {
-                return _maxWithdraw;
-            } else {
-                // Convert to shares while rounding up. Since 1 asset is guaranteed to be worth more than
-                // 1 share and any upwards rounding will not exceed 1 share, we can be sure that when the
-                // shares are converted back to assets (rounding down) the resulting asset value won't
-                // exceed `_maxWithdraw`.
-                uint256 _maxScaledRedeem = _maxWithdraw.mulDiv(totalDebt_, _totalAssets, Math.Rounding.Up);
-                return _maxScaledRedeem >= _ownerShares ? _ownerShares : _maxScaledRedeem;
-            }
+            (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
+            if (!_success) return 0;
+
+            // Convert to shares while rounding up. Since 1 asset is guaranteed to be worth more than
+            // 1 share and any upwards rounding will not exceed 1 share, we can be sure that when the
+            // shares are converted back to assets (rounding down) the resulting asset value won't
+            // exceed `_maxWithdraw`.
+            uint256 _maxScaledRedeem = _convertToShares(_maxWithdraw, _totalAssets, totalDebt(), Math.Rounding.Up);
+            return _maxScaledRedeem >= _ownerShares ? _ownerShares : _maxScaledRedeem;
         } else {
             return _ownerShares;
         }
@@ -473,23 +463,17 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc IERC4626
     /// @dev Reverts if `totalAssets` in the vault is zero
     function previewWithdraw(uint256 _assets) public view returns (uint256) {
-        uint256 _totalAssets = totalAssets();
+        uint256 _totalAssets = totalPreciseAssets();
 
         // No withdrawals can occur if the vault controls no assets.
         if (_totalAssets == 0) revert ZeroTotalAssets();
 
-        uint256 totalDebt_ = totalDebt();
-        if (_totalAssets >= totalDebt_) {
-            return _assets;
-        } else {
-            // Follows the inverse conversion of `convertToAssets`
-            return _assets.mulDiv(totalDebt_, _totalAssets, Math.Rounding.Up);
-        }
+        return _convertToShares(_assets, _totalAssets, totalDebt(), Math.Rounding.Up);
     }
 
     /// @inheritdoc IERC4626
     function previewRedeem(uint256 _shares) public view returns (uint256) {
-        return convertToAssets(_shares);
+        return _convertToAssets(_shares, totalPreciseAssets(), totalDebt(), Math.Rounding.Down);
     }
 
     /// @inheritdoc IERC4626
@@ -636,6 +620,17 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return totalSupply() + yieldFeeBalance;
     }
 
+    /// @notice Calculates the amount of assets the vault controls based on current onchain conditions.
+    /// @dev The latent asset balance is included in the total asset count to account for the "dust collection
+    /// strategy".
+    /// @dev This function should be favored over `totalAssets` for state-changing functions since it uses
+    /// `previewRedeem` over `convertToAssets`.
+    /// @dev May revert for reasons that would cause `yieldVault.previewRedeem` to revert.
+    /// @return The total assets controlled by the vault based on current onchain conditions
+    function totalPreciseAssets() public view returns (uint256) {
+        return yieldVault.previewRedeem(yieldVault.balanceOf(address(this))) + _asset.balanceOf(address(this));
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     // Yield Functions
     ////////////////////////////////////////////////////////////////////////////////
@@ -644,20 +639,20 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Equal to total assets minus total debt
     /// @return The total yield balance
     function totalYieldBalance() public view returns (uint256) {
-        return _totalYieldBalance(totalAssets(), totalDebt());
+        return _totalYieldBalance(totalPreciseAssets(), totalDebt());
     }
 
     /// @notice Total available yield on the vault
     /// @dev Equal to total assets minus total allocation (total debt + yield buffer)
     /// @return The available yield balance
     function availableYieldBalance() public view returns (uint256) {
-        return _availableYieldBalance(totalAssets(), totalDebt());
+        return _availableYieldBalance(totalPreciseAssets(), totalDebt());
     }
 
     /// @notice Current amount of assets available in the yield buffer
     /// @return The available assets in the yield buffer
     function currentYieldBuffer() external view returns (uint256) {
-        uint256 totalYieldBalance_ = _totalYieldBalance(totalAssets(), totalDebt());
+        uint256 totalYieldBalance_ = _totalYieldBalance(totalPreciseAssets(), totalDebt());
         uint256 _yieldBuffer = yieldBuffer;
         if (totalYieldBalance_ >= _yieldBuffer) {
             return _yieldBuffer;
@@ -703,7 +698,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
         // The liquid yield is limited by the max that can be minted or withdrawn, depending on
         // `_tokenOut`.
-        uint256 _availableYield = _availableYieldBalance(totalAssets(), _totalDebt);
+        uint256 _availableYield = _availableYieldBalance(totalPreciseAssets(), _totalDebt);
         uint256 _liquidYield = _availableYield >= _maxAmountOut ? _maxAmountOut : _availableYield;
 
         // The final balance is computed by taking the liquid yield and multiplying it by
@@ -724,7 +719,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (_amountOut == 0) revert LiquidationAmountOutZero();
 
         uint256 _totalDebtBefore = totalDebt();
-        uint256 _availableYield = _availableYieldBalance(totalAssets(), _totalDebtBefore);
+        uint256 _availableYield = _availableYieldBalance(totalPreciseAssets(), _totalDebtBefore);
         uint32 _yieldFeePercentage = yieldFeePercentage;
 
         // Determine the proportional yield fee based on the amount being liquidated:
@@ -844,6 +839,65 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return (false, 0);
     }
 
+    /// @notice Calculates the amount of assets the vault controls based on current onchain conditions.
+    /// @dev Follows the same calculation as `totalPreciseAssets`, but catches `previewRedeem` failures
+    /// and returns whether or not the call was successful.
+    /// @return _success Returns true if totalAssets was successfully calculated and false otherwise
+    /// @return _totalAssets The total assets controlled by the vault based on current onchain conditions
+    function _tryGetTotalPreciseAssets() internal view returns (bool _success, uint256 _totalAssets) {
+        try yieldVault.previewRedeem(yieldVault.balanceOf(address(this))) returns (uint256 _yieldVaultAssets) {
+            _success = true;
+            _totalAssets = _yieldVaultAssets + _asset.balanceOf(address(this));
+        } catch {
+            _success = false;
+            _totalAssets = 0;
+        }
+    }
+
+    /// @notice Converts assets to shares with the given vault state and rounding direction.
+    /// @param _assets The assets to convert
+    /// @param _totalAssets The total assets that the vault controls
+    /// @param _totalDebt The total debt the vault owes
+    /// @param _rounding The rounding direction for the conversion
+    /// @return The resulting share balance
+    function _convertToShares(
+        uint256 _assets,
+        uint256 _totalAssets,
+        uint256 _totalDebt,
+        Math.Rounding _rounding
+    ) internal pure returns (uint256) {
+        if (_totalAssets >= _totalDebt) {
+            return _assets;
+        } else {
+            // If the vault controls less assets than what has been deposited a share will be worth a
+            // proportional amount of the total assets. This can happen due to fees, slippage, or loss
+            // of funds in the underlying yield vault.
+            return _assets.mulDiv(_totalDebt, _totalAssets, _rounding);
+        }
+    }
+
+    /// @notice Converts shares to assets with the given vault state and rounding direction.
+    /// @param _shares The shares to convert
+    /// @param _totalAssets The total assets that the vault controls
+    /// @param _totalDebt The total debt the vault owes
+    /// @param _rounding The rounding direction for the conversion
+    /// @return The resulting asset balance
+    function _convertToAssets(
+        uint256 _shares,
+        uint256 _totalAssets,
+        uint256 _totalDebt,
+        Math.Rounding _rounding
+    ) internal pure returns (uint256) {
+        if (_totalAssets >= _totalDebt) {
+            return _shares;
+        } else {
+            // If the vault controls less assets than what has been deposited a share will be worth a
+            // proportional amount of the total assets. This can happen due to fees, slippage, or loss
+            // of funds in the underlying yield vault.
+            return _shares.mulDiv(_totalAssets, _totalDebt, _rounding);
+        }
+    }
+
     /// @notice Returns the shares that can be minted without exceeding the TwabController supply limit.
     /// @dev The TwabController limits the total supply for each vault.
     /// @param _existingShares The current allocated prize vault shares (internal and external)
@@ -933,8 +987,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // Enforce the mint limit and protect against lossy deposits.
         uint256 _totalDebtBeforeMint = totalDebt();
         _enforceMintLimit(_totalDebtBeforeMint, _shares);
-        if (totalAssets() < _totalDebtBeforeMint + _shares) {
-            revert LossyDeposit(totalAssets(), _totalDebtBeforeMint + _shares);
+        if (totalPreciseAssets() < _totalDebtBeforeMint + _shares) {
+            revert LossyDeposit(totalPreciseAssets(), _totalDebtBeforeMint + _shares);
         }
 
         _mint(_receiver, _shares);

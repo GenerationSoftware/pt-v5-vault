@@ -250,9 +250,9 @@ contract AaveV3WhilePaused is UnitBaseSetup {
     // liquidating shares doesn't require the assets to be withdrawn from aave, so this will still work when paused.
     function testLiquidateSharesSucceeds() external {
         // accrue yield by letting time pass
-        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 totalAssetsBefore = vault.totalPreciseAssets();
         vm.warp(block.timestamp + 60 * 60 * 24);
-        uint256 totalAssetsAfter = vault.totalAssets();
+        uint256 totalAssetsAfter = vault.totalPreciseAssets();
         assertGt(totalAssetsAfter, totalAssetsBefore);
 
         // check share liquidation
@@ -270,9 +270,9 @@ contract AaveV3WhilePaused is UnitBaseSetup {
     // liquidating assets requires that the assets are able to be withdrawn, which is not the case when paused.
     function testLiquidatableAssetsZero() external {
         // accrue yield by letting time pass
-        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 totalAssetsBefore = vault.totalPreciseAssets();
         vm.warp(block.timestamp + 60 * 60 * 24);
-        uint256 totalAssetsAfter = vault.totalAssets();
+        uint256 totalAssetsAfter = vault.totalPreciseAssets();
         assertGt(totalAssetsAfter, totalAssetsBefore);
 
         // check asset liquidation

@@ -18,14 +18,14 @@ contract PrizeVaultWithdrawalSlippageTest is UnitBaseSetup {
         vm.stopPrank();
 
         assertEq(vault.balanceOf(alice), 100);
-        assertEq(vault.totalAssets(), 100);
+        assertEq(vault.totalPreciseAssets(), 100);
 
         // yield vault loses 50% of assets
         vm.startPrank(address(yieldVault));
         underlyingAsset.burn(address(yieldVault), 50);
         vm.stopPrank();
 
-        assertEq(vault.totalAssets(), 50);
+        assertEq(vault.totalPreciseAssets(), 50);
 
         // alice should be able to withdraw up to 50 assets for 100 shares
         assertEq(vault.maxWithdraw(alice), 50);
@@ -65,14 +65,14 @@ contract PrizeVaultWithdrawalSlippageTest is UnitBaseSetup {
         vm.stopPrank();
 
         assertEq(vault.balanceOf(alice), 100);
-        assertEq(vault.totalAssets(), 100);
+        assertEq(vault.totalPreciseAssets(), 100);
 
         // yield vault loses 50% of assets
         vm.startPrank(address(yieldVault));
         underlyingAsset.burn(address(yieldVault), 50);
         vm.stopPrank();
 
-        assertEq(vault.totalAssets(), 50);
+        assertEq(vault.totalPreciseAssets(), 50);
 
         // alice should be able to redeem up to 100 shares for 50 assets
         assertEq(vault.maxWithdraw(alice), 50);

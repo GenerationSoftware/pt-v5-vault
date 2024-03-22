@@ -21,6 +21,10 @@ contract PrizeVaultWrapper is PrizeVault {
         return _tryGetAssetDecimals(asset_);
     }
 
+    function tryGetTotalPreciseAssets() public view returns (bool, uint256) {
+        return _tryGetTotalPreciseAssets();
+    }
+
     function depositAndMint(address _caller, address _receiver, uint256 _assets, uint256 _shares) public {
         _depositAndMint(_caller, _receiver, _assets, _shares);
     }

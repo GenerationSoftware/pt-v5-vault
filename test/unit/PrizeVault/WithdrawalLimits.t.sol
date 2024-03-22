@@ -50,7 +50,7 @@ contract PrizeVaultWithdrawalLimitsTest is UnitBaseSetup {
         vm.stopPrank();
 
         assertEq(vault.balanceOf(alice), 100);
-        assertEq(vault.totalAssets(), 100);
+        assertEq(vault.totalPreciseAssets(), 100);
         assertEq(yieldVault.balanceOf(address(vault)), 10);
 
         // set max withdraw on yield vault to 95 assets and max redeem to 9 shares
@@ -74,7 +74,7 @@ contract PrizeVaultWithdrawalLimitsTest is UnitBaseSetup {
         _yieldVaultMaxSetter.setMaxWithdraw(5);
         _yieldVaultMaxSetter.setMaxRedeem(0);
 
-        assertEq(vault.totalAssets(), 10);
+        assertEq(vault.totalPreciseAssets(), 10);
         assertEq(vault.totalSupply(), 10);
         assertEq(yieldVault.balanceOf(address(vault)), 1);
         assertEq(vault.maxWithdraw(alice), 0); // no yv shares can be redeemed, so no pv assets can be withdrawn
