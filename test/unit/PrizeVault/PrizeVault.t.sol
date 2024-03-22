@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { UnitBaseSetup, PrizePool, TwabController, ERC20, IERC20, IERC4626 } from "./UnitBaseSetup.t.sol";
+import { UnitBaseSetup, PrizePool, TwabController, ERC20, IERC20, IERC4626, YieldVault } from "./UnitBaseSetup.t.sol";
 import { IVaultHooks, VaultHooks } from "../../../src/interfaces/IVaultHooks.sol";
 import { ERC20BrokenDecimalMock } from "../../contracts/mock/ERC20BrokenDecimalMock.sol";
 
@@ -178,6 +178,27 @@ contract PrizeVaultTest is UnitBaseSetup {
         (bool success, uint8 decimals) = vault.tryGetAssetDecimals(brokenDecimalToken);
         assertEq(success, false);
         assertEq(decimals, 0);
+    }
+
+    function testConstructorFailsWhenDecimalFails() public {
+        IERC20 brokenDecimalToken = new ERC20BrokenDecimalMock();
+        YieldVault brokenDecimalYieldVault = new YieldVault(
+            address(brokenDecimalToken),
+            "Test Yield Vault",
+            "yvTest"
+        );
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.FailedToGetAssetDecimals.selector, address(brokenDecimalToken)));
+        new PrizeVault(
+            "PoolTogether Decimal Fail",
+            "pDecFail",
+            brokenDecimalYieldVault,
+            PrizePool(address(prizePool)),
+            address(this),
+            address(this),
+            YIELD_FEE_PERCENTAGE,
+            1e6,
+            address(this)
+        );
     }
 
     /* ============ maxDeposit / maxMint ============ */
