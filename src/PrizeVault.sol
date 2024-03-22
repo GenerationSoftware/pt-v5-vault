@@ -256,6 +256,16 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @param excess The amount in excess over the limit
     error MintLimitExceeded(uint256 excess);
 
+    /// @notice Thrown when a withdraw call burns more shares than the max share limit provided.
+    /// @param shares The shares burned by the withdrawal
+    /// @param maxShares The max share limit provided
+    error MaxSharesExceeded(uint256 shares, uint256 maxShares);
+
+    /// @notice Thrown when a redeem call returns less assets than the min threshold provided.
+    /// @param assets The assets provided by the redemption
+    /// @param minAssets The min asset threshold requested
+    error MinAssetsNotReached(uint256 assets, uint256 minAssets);
+
     ////////////////////////////////////////////////////////////////////////////////
     // Modifiers
     ////////////////////////////////////////////////////////////////////////////////
@@ -565,6 +575,47 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         emit Sponsor(_owner, _assets, _shares);
 
         return _shares;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Additional Withdrawal Flows
+    ////////////////////////////////////////////////////////////////////////////////
+
+    /// @notice Alternate flow for `IERC4626.withdraw` that reverts if the max share limit is exceeded.
+    /// @param _assets See `IERC4626.withdraw`
+    /// @param _receiver See `IERC4626.withdraw`
+    /// @param _owner See `IERC4626.withdraw`
+    /// @param _maxShares The max shares that can be burned for the withdrawal to succeed.
+    /// @return The amount of shares burned for the withdrawal
+    function withdraw(
+        uint256 _assets,
+        address _receiver,
+        address _owner,
+        uint256 _maxShares
+    ) external returns (uint256) {
+        uint256 _shares = previewWithdraw(_assets);
+        if (_shares > _maxShares) revert MaxSharesExceeded(_shares, _maxShares);
+        _burnAndWithdraw(msg.sender, _receiver, _owner, _shares, _assets);
+        return _shares;
+    }
+
+    /// @notice Alternate flow for `IERC4626.redeem` that reverts if the assets returned does not reach the
+    /// minimum asset threshold.
+    /// @param _shares See `IERC4626.redeem`
+    /// @param _receiver See `IERC4626.redeem`
+    /// @param _owner See `IERC4626.redeem`
+    /// @param _minAssets The minimum assets that can be returned for the redemption to succeed
+    /// @return The amount of assets returned for the redemption
+    function redeem(
+        uint256 _shares,
+        address _receiver,
+        address _owner,
+        uint256 _minAssets
+    ) external returns (uint256) {
+        uint256 _assets = previewRedeem(_shares);
+        if (_assets < _minAssets) revert MinAssetsNotReached(_assets, _minAssets);
+        _burnAndWithdraw(msg.sender, _receiver, _owner, _shares, _assets);
+        return _assets;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
