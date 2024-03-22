@@ -35,6 +35,12 @@ contract LossyPrizeVaultInvariant is Test {
         }
     }
 
+    function invariantYieldFeeBalanceAlwaysClaimable() external {
+        uint256 supplyLimit = type(uint96).max - lossyVaultHarness.vault().totalSupply();
+        uint256 yieldFeeBalance = lossyVaultHarness.vault().yieldFeeBalance();
+        assertLe(yieldFeeBalance, supplyLimit);
+    }
+
     function invariantAllAssetsAccountedFor() external {
         uint256 totalAssets = lossyVaultHarness.vault().totalAssets();
         uint256 totalDebt = lossyVaultHarness.vault().totalDebt();

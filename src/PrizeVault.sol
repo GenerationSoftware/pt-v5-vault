@@ -14,6 +14,9 @@ import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSour
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
 import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
 
+/// @dev The TWAB supply limit is the max number of shares that can be minted in the TWAB controller.
+uint256 constant TWAB_SUPPLY_LIMIT = type(uint96).max;
+
 /// @title  PoolTogether V5 Prize Vault
 /// @author G9 Software Inc.
 /// @notice The prize vault takes deposits of an asset and earns yield with the deposits through an underlying yield
@@ -249,6 +252,10 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @param totalSupply The total shares minted and internally accounted for by the vault
     error LossyDeposit(uint256 totalAssets, uint256 totalSupply);
 
+    /// @notice Thrown when the mint limit is exceeded after increasing an external or internal share balance.
+    /// @param excess The amount in excess over the limit
+    error MintLimitExceeded(uint256 excess);
+
     /// @notice Thrown when a withdraw call burns more shares than the max share limit provided.
     /// @param shares The shares burned by the withdrawal
     /// @param maxShares The max share limit provided
@@ -373,28 +380,27 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @inheritdoc IERC4626
-    /// @dev Considers the uint96 limit on total share supply in the TwabController
+    /// @dev Considers the TWAB mint limit
     /// @dev Returns zero if any deposit would result in a loss of assets
     /// @dev Any latent balance of assets in the prize vault will be swept in with the deposit as a part of
     /// the "dust collection strategy". This means that the max deposit must account for the latent balance
     /// by subtracting it from the max deposit available otherwise.
     function maxDeposit(address /* receiver */) public view returns (uint256) {
-        uint256 _totalSupply = totalSupply();
-        uint256 totalDebt_ = _totalDebt(_totalSupply);
-        if (totalAssets() < totalDebt_) return 0;
+        uint256 _totalDebt = totalDebt();
+        if (totalAssets() < _totalDebt) return 0;
 
-        // the vault will never mint more than 1 share per asset, so no need to convert supply limit to assets
-        uint256 twabSupplyLimit_ = _twabSupplyLimit(_totalSupply);
-        uint256 _maxDeposit;
         uint256 _latentBalance = _asset.balanceOf(address(this));
         uint256 _maxYieldVaultDeposit = yieldVault.maxDeposit(address(this));
         if (_latentBalance >= _maxYieldVaultDeposit) {
             return 0;
         } else {
+            // the vault will never mint more than 1 share per asset, so no need to convert mint limit to assets
+            uint256 _depositLimit = _mintLimit(_totalDebt);
+            uint256 _maxDeposit;
             unchecked {
                 _maxDeposit = _maxYieldVaultDeposit - _latentBalance;
             }
-            return twabSupplyLimit_ < _maxDeposit ? twabSupplyLimit_ : _maxDeposit;
+            return _depositLimit < _maxDeposit ? _depositLimit : _maxDeposit;
         }
     }
 
@@ -619,7 +625,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Returns the total assets that are owed to share holders and any other internal balances.
     /// @return The total asset debt of the vault
     function totalDebt() public view returns (uint256) {
-        return _totalDebt(totalSupply());
+        return totalSupply() + yieldFeeBalance;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -675,11 +681,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Returns the liquid amount of `_tokenOut` minus any yield fees.
     /// @dev Supports the liquidation of either assets or prize vault shares.
     function liquidatableBalanceOf(address _tokenOut) public view returns (uint256) {
-        uint256 _totalSupply = totalSupply();
+        uint256 _totalDebt = totalDebt();
         uint256 _maxAmountOut;
         if (_tokenOut == address(this)) {
-            // Liquidation of vault shares is capped to the TWAB supply limit.
-            _maxAmountOut = _twabSupplyLimit(_totalSupply);
+            // Liquidation of vault shares is capped to the mint limit.
+            _maxAmountOut = _mintLimit(_totalDebt);
         } else if (_tokenOut == address(_asset)) {
             // Liquidation of yield assets is capped at the max yield vault withdraw plus any latent balance.
             _maxAmountOut = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
@@ -687,16 +693,15 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             return 0;
         }
 
-        // The liquid yield is computed by taking the available yield balance and multiplying it
-        // by (1 - yieldFeePercentage), rounding down, to ensure that enough yield is left for the
-        // yield fee.
-        uint256 _liquidYield = 
-            _availableYieldBalance(totalAssets(), _totalDebt(_totalSupply))
-            .mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
-
         // The liquid yield is limited by the max that can be minted or withdrawn, depending on
         // `_tokenOut`.
-        return _liquidYield >= _maxAmountOut ? _maxAmountOut : _liquidYield;
+        uint256 _availableYield = _availableYieldBalance(totalAssets(), _totalDebt);
+        uint256 _liquidYield = _availableYield >= _maxAmountOut ? _maxAmountOut : _availableYield;
+
+        // The final balance is computed by taking the liquid yield and multiplying it by
+        // (1 - yieldFeePercentage), rounding down, to ensure that enough yield is left for
+        // the yield fee.
+        return _liquidYield.mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
     }
 
     /// @inheritdoc ILiquidationSource
@@ -710,7 +715,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     ) public virtual onlyLiquidationPair returns (bytes memory) {
         if (_amountOut == 0) revert LiquidationAmountOutZero();
 
-        uint256 _availableYield = availableYieldBalance();
+        uint256 _totalDebtBefore = totalDebt();
+        uint256 _availableYield = _availableYieldBalance(totalAssets(), _totalDebtBefore);
         uint32 _yieldFeePercentage = yieldFeePercentage;
 
         // Determine the proportional yield fee based on the amount being liquidated:
@@ -728,13 +734,15 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
         // Increase yield fee balance:
         if (_yieldFee > 0) {
-            yieldFeeBalance += _yieldFee;
+            yieldFeeBalance = yieldFeeBalance + _yieldFee;
         }
 
         // Mint or withdraw amountOut to `_receiver`:
         if (_tokenOut == address(_asset)) {
-            _withdraw(_receiver, _amountOut);            
+            _enforceMintLimit(_totalDebtBefore, _yieldFee);
+            _withdraw(_receiver, _amountOut);
         } else if (_tokenOut == address(this)) {
+            _enforceMintLimit(_totalDebtBefore, _amountOut + _yieldFee);
             _mint(_receiver, _amountOut);
         } else {
             revert LiquidationTokenOutNotSupported(_tokenOut);
@@ -828,22 +836,25 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return (false, 0);
     }
 
-    /// @notice Returns the total assets that are owed to share holders and any other internal balances.
-    /// @dev The yield fee balance is included since it's cheaper to keep track of those shares
-    ///      internally instead of doing an additional TWAB mint on every liquidation.
-    /// @param _totalSupply The total share supply of the vault
-    /// @return The total asset debt of the vault
-    function _totalDebt(uint256 _totalSupply) internal view returns (uint256) {
-        return _totalSupply + yieldFeeBalance;
+    /// @notice Returns the shares that can be minted without exceeding the TwabController supply limit.
+    /// @dev The TwabController limits the total supply for each vault.
+    /// @param _existingShares The current allocated prize vault shares (internal and external)
+    /// @return The remaining shares that can be minted without exceeding TWAB limits
+    function _mintLimit(uint256 _existingShares) internal pure returns (uint256) {
+        return TWAB_SUPPLY_LIMIT - _existingShares;
     }
 
-    /// @notice Returns the remaining supply that can be minted without exceeding the TwabController limits.
-    /// @dev The TwabController limits the total supply for each vault to uint96
-    /// @param _totalSupply The total share supply of the vault
-    /// @return The remaining supply that can be minted without exceeding TWAB limits
-    function _twabSupplyLimit(uint256 _totalSupply) internal pure returns (uint256) {
-        unchecked {
-            return type(uint96).max - _totalSupply;
+    /// @notice Verifies that the mint limit can support the new share balance.
+    /// @dev Reverts if the mint limit is exceeded.
+    /// @dev This MUST be called anytime there is a positive increase in the net total shares.
+    /// @param _existingShares The total existing prize vault shares (internal and external)
+    /// @param _newShares The new shares
+    function _enforceMintLimit(uint256 _existingShares, uint256 _newShares) internal pure {
+        uint256 _limit = _mintLimit(_existingShares);
+        if (_newShares > _limit) {
+            unchecked {
+                revert MintLimitExceeded(_newShares - _limit);
+            }
         }
     }
 
@@ -911,9 +922,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         uint256 _yieldVaultShares = yieldVault.previewDeposit(_assetsWithDust);
         uint256 _assetsUsed = yieldVault.mint(_yieldVaultShares, address(this));
 
-        _mint(_receiver, _shares);
+        // Enforce the mint limit and protect against lossy deposits.
+        uint256 _totalDebtBeforeMint = totalDebt();
+        _enforceMintLimit(_totalDebtBeforeMint, _shares);
+        if (totalAssets() < _totalDebtBeforeMint + _shares) {
+            revert LossyDeposit(totalAssets(), _totalDebtBeforeMint + _shares);
+        }
 
-        if (totalAssets() < totalDebt()) revert LossyDeposit(totalAssets(), totalDebt());
+        _mint(_receiver, _shares);
 
         emit Deposit(_caller, _receiver, _assets, _shares);
     }

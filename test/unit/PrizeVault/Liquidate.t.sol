@@ -92,6 +92,37 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         assertEq(vault.liquidatableBalanceOf(address(vault)), supplyCapLeft); // less than available yield since shares are capped at uint96 max
     }
 
+    function testLiquidatableBalanceOf_respectsMaxShareMintWithFee() public {
+        vault.setYieldFeePercentage(1e8); // 10%
+        vault.setYieldFeeRecipient(address(this));
+        vault.setLiquidationPair(address(this));
+
+        uint256 supplyCapLeft = 100;
+
+        // make a large deposit to use most of the shares:
+        underlyingAsset.mint(address(alice), type(uint96).max);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), type(uint96).max - supplyCapLeft);
+        vault.deposit(type(uint96).max - supplyCapLeft, alice);
+        vm.stopPrank();
+
+        underlyingAsset.mint(address(vault), 1e18);
+        uint256 availableYield = vault.availableYieldBalance();
+        assertApproxEqAbs(availableYield, 1e18 - vault.yieldBuffer(), 1);
+
+        assertLt(supplyCapLeft, availableYield);
+
+        uint256 amountOut = (supplyCapLeft * 9) / 10;
+        assertEq(vault.liquidatableBalanceOf(address(vault)), amountOut);
+        vault.transferTokensOut(address(0), address(this), address(vault), amountOut);
+
+        assertEq(vault.liquidatableBalanceOf(address(vault)), 0);
+        assertEq(vault.yieldFeeBalance(), supplyCapLeft - amountOut);
+
+        // ensure the yield fee can be minted
+        vault.claimYieldFeeShares(supplyCapLeft - amountOut);
+    }
+
     /* ============ transferTokensOut ============ */
 
     function testTransferTokensOut_noFee() public {
@@ -242,6 +273,34 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         assertGt(amountOut, 0);
         vm.expectRevert(abi.encodeWithSelector(PrizeVault.LiquidationExceedsAvailable.selector, amountOut + 1, amountOut));
         vault.transferTokensOut(address(0), bob, address(vault), amountOut + 1);
+    }
+
+    function testTransferTokensOut_YieldFeeExceedsSupplyCap() public {
+        vault.setYieldFeePercentage(1e8); // 10%
+        vault.setYieldFeeRecipient(bob);
+        vault.setLiquidationPair(address(this));
+
+        uint256 supplyCapLeft = 100;
+
+        // make a large deposit to use most of the shares:
+        underlyingAsset.mint(address(alice), type(uint96).max);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), type(uint96).max - supplyCapLeft);
+        vault.deposit(type(uint96).max - supplyCapLeft, alice);
+        vm.stopPrank();
+
+        underlyingAsset.mint(address(vault), 1e18);
+        uint256 availableYield = vault.availableYieldBalance();
+        assertApproxEqAbs(availableYield, 1e18 - vault.yieldBuffer(), 1);
+
+        assertLt(supplyCapLeft, availableYield);
+        assertEq((supplyCapLeft * 9) / 10, vault.liquidatableBalanceOf(address(vault)));
+
+        uint256 amountOut = supplyCapLeft; // 10 assets too much
+        // (even though there is available yield, the supply cap will be exceeded by the yield fee)
+
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.MintLimitExceeded.selector, 11)); // yield fee is 11
+        vault.transferTokensOut(address(0), address(this), address(vault), amountOut);
     }
 
     /* ============ verifyTokensIn ============ */
