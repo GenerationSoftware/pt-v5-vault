@@ -299,7 +299,7 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         uint256 amountOut = supplyCapLeft; // 10 assets too much
         // (even though there is available yield, the supply cap will be exceeded by the yield fee)
 
-        vm.expectRevert(abi.encodeWithSelector(PrizeVault.SupplyLimitExceeded.selector, 11)); // yield fee is 11
+        vm.expectRevert(abi.encodeWithSelector(PrizeVault.MintLimitExceeded.selector, 11)); // yield fee is 11
         vault.transferTokensOut(address(0), address(this), address(vault), amountOut);
     }
 
