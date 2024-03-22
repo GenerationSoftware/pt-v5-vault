@@ -259,6 +259,10 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @param minAssets The min asset threshold requested
     error MinAssetsNotReached(uint256 assets, uint256 minAssets);
 
+    /// @notice Thrown when the underlying asset does not specify it's number of decimals.
+    /// @param asset The underlying asset that was checked
+    error FailedToGetAssetDecimals(address asset);
+
     ////////////////////////////////////////////////////////////////////////////////
     // Modifiers
     ////////////////////////////////////////////////////////////////////////////////
@@ -309,7 +313,11 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
         IERC20 asset_ = IERC20(yieldVault_.asset());
         (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(asset_);
-        _underlyingDecimals = success ? assetDecimals : 18;
+        if (success) {
+            _underlyingDecimals = assetDecimals;
+        } else {
+            revert FailedToGetAssetDecimals(address(asset_));
+        }
         _asset = asset_;
 
         yieldVault = yieldVault_;
