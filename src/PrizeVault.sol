@@ -376,7 +376,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// the "dust collection strategy". This means that the max deposit must account for the latent balance
     /// by subtracting it from the max deposit available otherwise.
     function maxDeposit(address /* receiver */) public view returns (uint256) {
-        uint256 _totalDebt = totalSupply() + yieldFeeBalance;
+        uint256 _totalDebt = totalDebt();
         if (totalAssets() < _totalDebt) return 0;
 
         uint256 _latentBalance = _asset.balanceOf(address(this));
@@ -630,7 +630,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Returns the liquid amount of `_tokenOut` minus any yield fees.
     /// @dev Supports the liquidation of either assets or prize vault shares.
     function liquidatableBalanceOf(address _tokenOut) public view returns (uint256) {
-        uint256 _totalDebt = totalSupply() + yieldFeeBalance;
+        uint256 _totalDebt = totalDebt();
         uint256 _maxAmountOut;
         if (_tokenOut == address(this)) {
             // Liquidation of vault shares is capped to the mint limit.
@@ -664,7 +664,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     ) public virtual onlyLiquidationPair returns (bytes memory) {
         if (_amountOut == 0) revert LiquidationAmountOutZero();
 
-        uint256 _availableYield = availableYieldBalance();
+        uint256 _totalDebtBefore = totalDebt();
+        uint256 _availableYield = _availableYieldBalance(totalAssets(), _totalDebtBefore);
         uint32 _yieldFeePercentage = yieldFeePercentage;
 
         // Determine the proportional yield fee based on the amount being liquidated:
@@ -681,21 +682,20 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         }
 
         // Increase yield fee balance:
-        uint256 _newYieldFeeBalance = yieldFeeBalance + _yieldFee;
         if (_yieldFee > 0) {
-            yieldFeeBalance = _newYieldFeeBalance;
+            yieldFeeBalance = yieldFeeBalance + _yieldFee;
         }
 
         // Mint or withdraw amountOut to `_receiver`:
         if (_tokenOut == address(_asset)) {
-            _withdraw(_receiver, _amountOut);            
+            _enforceMintLimit(_totalDebtBefore, _yieldFee);
+            _withdraw(_receiver, _amountOut);
         } else if (_tokenOut == address(this)) {
+            _enforceMintLimit(_totalDebtBefore, _amountOut + _yieldFee);
             _mint(_receiver, _amountOut);
         } else {
             revert LiquidationTokenOutNotSupported(_tokenOut);
         }
-
-        _enforceMintLimit(totalSupply(), _newYieldFeeBalance);
 
         emit TransferYieldOut(msg.sender, _tokenOut, _receiver, _amountOut, _yieldFee);
 
@@ -872,7 +872,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         uint256 _assetsUsed = yieldVault.mint(_yieldVaultShares, address(this));
 
         // Enforce the mint limit and protect against lossy deposits.
-        uint256 _totalDebtBeforeMint = totalSupply() + yieldFeeBalance;
+        uint256 _totalDebtBeforeMint = totalDebt();
         _enforceMintLimit(_totalDebtBeforeMint, _shares);
         if (totalAssets() < _totalDebtBeforeMint + _shares) {
             revert LossyDeposit(totalAssets(), _totalDebtBeforeMint + _shares);
