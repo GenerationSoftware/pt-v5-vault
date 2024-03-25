@@ -427,6 +427,9 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// This latent balance are accounted for in the max redeem limits.
     /// @dev Returns zero if total assets cannot be determined
     function maxRedeem(address _owner) public view returns (uint256) {
+        (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
+        if (!_success) return 0;
+
         uint256 _maxWithdraw = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
         uint256 _ownerShares = balanceOf(_owner);
 
@@ -434,8 +437,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // withdraw to shares unless the owner has more shares than the max withdraw and is redeeming
         // at a loss (when 1 share is worth less than 1 asset).
         if (_ownerShares > _maxWithdraw) {
-            (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
-            if (!_success) return 0;
 
             // Convert to shares while rounding up. Since 1 asset is guaranteed to be worth more than
             // 1 share and any upwards rounding will not exceed 1 share, we can be sure that when the
@@ -1037,9 +1038,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// the max redeemable shares to assets rounding down, the `yieldVault.previewWithdraw` call in the
     /// `_withdraw` function is guaranteed to return less than or equal shares to the max yield vault 
     /// redemption.
+    /// @dev Returns zero if `yieldVault.previewRedeem` reverts.
     /// @return The max assets that can be withdrawn from the yield vault.
     function _maxYieldVaultWithdraw() internal view returns (uint256) {
-        return yieldVault.convertToAssets(yieldVault.maxRedeem(address(this)));
+        try yieldVault.previewRedeem(yieldVault.maxRedeem(address(this))) returns (uint256 _maxAssets) {
+            return _maxAssets;
+        } catch {
+            return 0;
+        }
     }
 
     /// @notice Withdraws assets to the receiver while accounting for rounding errors.
