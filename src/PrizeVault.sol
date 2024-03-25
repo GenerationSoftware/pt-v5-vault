@@ -840,14 +840,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @notice Calculates the amount of assets the vault controls based on current onchain conditions.
-    /// @dev Follows the same calculation as `totalPreciseAssets`, but catches `previewRedeem` failures
-    /// and returns whether or not the call was successful.
+    /// @dev Calls `totalPreciseAssets` externally so it can catch `previewRedeem` failures and return
+    /// whether or not the call was successful.
     /// @return _success Returns true if totalAssets was successfully calculated and false otherwise
     /// @return _totalAssets The total assets controlled by the vault based on current onchain conditions
     function _tryGetTotalPreciseAssets() internal view returns (bool _success, uint256 _totalAssets) {
-        try yieldVault.previewRedeem(yieldVault.balanceOf(address(this))) returns (uint256 _yieldVaultAssets) {
+        try this.totalPreciseAssets() returns (uint256 _totalPreciseAssets) {
             _success = true;
-            _totalAssets = _yieldVaultAssets + _asset.balanceOf(address(this));
+            _totalAssets = _totalPreciseAssets;
         } catch {
             _success = false;
             _totalAssets = 0;
