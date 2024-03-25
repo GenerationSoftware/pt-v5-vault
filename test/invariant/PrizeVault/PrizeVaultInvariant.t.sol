@@ -22,7 +22,7 @@ contract PrizeVaultInvariant is Test {
     }
 
     function invariantAssetsCoverDebt() external useCurrentTime {
-        uint256 totalAssets = vaultHarness.vault().totalAssets();
+        uint256 totalAssets = vaultHarness.vault().totalPreciseAssets();
         uint256 totalDebt = vaultHarness.vault().totalDebt();
         assertGe(totalAssets, totalDebt);
     }
@@ -55,7 +55,7 @@ contract PrizeVaultInvariant is Test {
 
     function invariantAllAssetsAccountedFor() external useCurrentTime {
         PrizeVault vault = vaultHarness.vault();
-        uint256 totalAssets = vault.totalAssets();
+        uint256 totalAssets = vault.totalPreciseAssets();
         uint256 totalDebt = vault.totalDebt();
         uint256 currentYieldBuffer = vault.currentYieldBuffer();
         uint256 availableYieldBalance = vault.availableYieldBalance();

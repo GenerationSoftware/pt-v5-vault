@@ -164,9 +164,9 @@ abstract contract BaseIntegration is Test, Permit {
 
     /// @dev Each integration test must override the `_accrueYield` internal function for this to work.
     function accrueYield() public returns (uint256) {
-        uint256 assetsBefore = prizeVault.totalAssets();
+        uint256 assetsBefore = prizeVault.totalPreciseAssets();
         _accrueYield();
-        uint256 assetsAfter = prizeVault.totalAssets();
+        uint256 assetsAfter = prizeVault.totalPreciseAssets();
         if (yieldVault.balanceOf(address(prizeVault)) > 0) {
             // if the prize vault has any yield vault shares, check to ensure yield has accrued
             require(assetsAfter > assetsBefore, "yield did not accrue");
@@ -185,9 +185,9 @@ abstract contract BaseIntegration is Test, Permit {
     /// @dev Each integration test must override the `_simulateLoss` internal function for this to work.
     /// @return The loss the prize vault has incurred as a result of yield vault loss (if any)
     function simulateLoss() public returns (uint256) {
-        uint256 assetsBefore = prizeVault.totalAssets();
+        uint256 assetsBefore = prizeVault.totalPreciseAssets();
         _simulateLoss();
-        uint256 assetsAfter = prizeVault.totalAssets();
+        uint256 assetsAfter = prizeVault.totalPreciseAssets();
         if (yieldVault.balanceOf(address(prizeVault)) > 0) {
             // if the prize vault has any yield vault shares, check to ensure some loss has occurred
             require(assetsAfter < assetsBefore, "loss not simulated");
@@ -248,7 +248,7 @@ abstract contract BaseIntegration is Test, Permit {
         uint256 amount = 10 ** assetDecimals;
         dealAssets(alice, amount);
 
-        uint256 totalAssetsBefore = prizeVault.totalAssets();
+        uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
         uint256 totalSupplyBefore = prizeVault.totalSupply();
 
         startPrank(alice);
@@ -256,7 +256,7 @@ abstract contract BaseIntegration is Test, Permit {
         prizeVault.deposit(amount, alice);
         stopPrank();
 
-        uint256 totalAssetsAfter = prizeVault.totalAssets();
+        uint256 totalAssetsAfter = prizeVault.totalPreciseAssets();
         uint256 totalSupplyAfter = prizeVault.totalSupply();
 
         assertEq(prizeVault.balanceOf(alice), amount, "shares minted");
@@ -275,7 +275,7 @@ abstract contract BaseIntegration is Test, Permit {
             uint256 amount = (10 ** assetDecimals) * (i + 1);
             dealAssets(depositors[i], amount);
 
-            uint256 totalAssetsBefore = prizeVault.totalAssets();
+            uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
             uint256 totalSupplyBefore = prizeVault.totalSupply();
 
             startPrank(depositors[i]);
@@ -283,7 +283,7 @@ abstract contract BaseIntegration is Test, Permit {
             prizeVault.deposit(amount, depositors[i]);
             stopPrank();
 
-            uint256 totalAssetsAfter = prizeVault.totalAssets();
+            uint256 totalAssetsAfter = prizeVault.totalPreciseAssets();
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), amount, "shares minted");
@@ -302,7 +302,7 @@ abstract contract BaseIntegration is Test, Permit {
             uint256 amount = (10 ** assetDecimals) * (i + 1);
             dealAssets(depositors[i], amount);
 
-            uint256 totalAssetsBefore = prizeVault.totalAssets();
+            uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
             uint256 totalSupplyBefore = prizeVault.totalSupply();
 
             startPrank(depositors[i]);
@@ -310,7 +310,7 @@ abstract contract BaseIntegration is Test, Permit {
             prizeVault.deposit(amount, depositors[i]);
             stopPrank();
 
-            uint256 totalAssetsAfter = prizeVault.totalAssets();
+            uint256 totalAssetsAfter = prizeVault.totalPreciseAssets();
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), amount, "shares minted");
@@ -334,7 +334,7 @@ abstract contract BaseIntegration is Test, Permit {
         uint256 amount = 10 ** assetDecimals;
         dealAssets(alice, amount);
 
-        uint256 totalAssetsBefore = prizeVault.totalAssets();
+        uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
         uint256 totalSupplyBefore = prizeVault.totalSupply();
 
         startPrank(alice);
@@ -343,7 +343,7 @@ abstract contract BaseIntegration is Test, Permit {
         prizeVault.withdraw(amount, alice, alice);
         stopPrank();
 
-        uint256 totalAssetsAfter = prizeVault.totalAssets();
+        uint256 totalAssetsAfter = prizeVault.totalPreciseAssets();
         uint256 totalSupplyAfter = prizeVault.totalSupply();
 
         assertEq(prizeVault.balanceOf(alice), 0, "burns all user shares on full withdraw");
@@ -357,7 +357,7 @@ abstract contract BaseIntegration is Test, Permit {
         uint256 amount = 10 ** assetDecimals;
         dealAssets(alice, amount);
 
-        uint256 totalAssetsBefore = prizeVault.totalAssets();
+        uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
         uint256 totalSupplyBefore = prizeVault.totalSupply();
 
         startPrank(alice);
@@ -367,7 +367,7 @@ abstract contract BaseIntegration is Test, Permit {
         prizeVault.withdraw(amount, alice, alice);
         stopPrank();
 
-        uint256 totalAssetsAfter = prizeVault.totalAssets();
+        uint256 totalAssetsAfter = prizeVault.totalPreciseAssets();
         uint256 totalSupplyAfter = prizeVault.totalSupply();
 
         assertEq(prizeVault.balanceOf(alice), 0, "burns all user shares on full withdraw");
@@ -397,14 +397,14 @@ abstract contract BaseIntegration is Test, Permit {
         // withdraw
         for (uint256 i = 0; i < depositors.length; i++) {
             uint256 amount = (10 ** assetDecimals) * (i + 1);
-            uint256 totalAssetsBefore = prizeVault.totalAssets();
+            uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
             uint256 totalSupplyBefore = prizeVault.totalSupply();
 
             startPrank(depositors[i]);
             prizeVault.withdraw(amount, depositors[i], depositors[i]);
             stopPrank();
 
-            uint256 totalAssetsAfter = prizeVault.totalAssets();
+            uint256 totalAssetsAfter = prizeVault.totalPreciseAssets();
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), 0, "burned all user's shares on withdraw");
@@ -436,12 +436,12 @@ abstract contract BaseIntegration is Test, Permit {
         simulateLoss();
 
         // ensure prize vault is in lossy state
-        assertLt(prizeVault.totalAssets(), prizeVault.totalDebt());
+        assertLt(prizeVault.totalPreciseAssets(), prizeVault.totalDebt());
 
         // verify all users can withdraw a proportional amount of assets
         for (uint256 i = 0; i < depositors.length; i++) {
             uint256 shares = prizeVault.balanceOf(depositors[i]);
-            uint256 totalAssetsBefore = prizeVault.totalAssets();
+            uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
             uint256 totalSupplyBefore = prizeVault.totalSupply();
             uint256 totalDebtBefore = prizeVault.totalDebt();
             uint256 expectedAssets = (shares * totalAssetsBefore) / totalDebtBefore;
@@ -450,7 +450,7 @@ abstract contract BaseIntegration is Test, Permit {
             uint256 assets = prizeVault.redeem(shares, depositors[i], depositors[i]);
             stopPrank();
 
-            uint256 totalAssetsAfter = prizeVault.totalAssets();
+            uint256 totalAssetsAfter = prizeVault.totalPreciseAssets();
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(assets, expectedAssets, "assets received proportional to shares / totalDebt");
