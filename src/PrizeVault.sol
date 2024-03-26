@@ -403,7 +403,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc IERC4626
     /// @dev Returns the same value as `maxDeposit` since shares and assets are 1:1 on mint
     /// @dev Returns zero if any deposit would result in a loss of assets
-    function maxMint(address _owner) public view returns (uint256) {
+    function maxMint(address _owner) external view returns (uint256) {
         return maxDeposit(_owner);
     }
 
@@ -411,7 +411,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev The prize vault maintains a latent balance of assets as part of the "dust collection strategy".
     /// This latent balance are accounted for in the max withdraw limits.
     /// @dev Returns zero if total assets cannot be determined
-    function maxWithdraw(address _owner) public view returns (uint256) {
+    function maxWithdraw(address _owner) external view returns (uint256) {
         (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
         if (!_success) return 0;
         
@@ -426,7 +426,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev The prize vault maintains a latent balance of assets as part of the "dust collection strategy".
     /// This latent balance are accounted for in the max redeem limits.
     /// @dev Returns zero if total assets cannot be determined
-    function maxRedeem(address _owner) public view returns (uint256) {
+    function maxRedeem(address _owner) external view returns (uint256) {
         (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
         if (!_success) return 0;
 
@@ -639,14 +639,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Total yield balance of the vault
     /// @dev Equal to total assets minus total debt
     /// @return The total yield balance
-    function totalYieldBalance() public view returns (uint256) {
+    function totalYieldBalance() external view returns (uint256) {
         return _totalYieldBalance(totalPreciseAssets(), totalDebt());
     }
 
     /// @notice Total available yield on the vault
     /// @dev Equal to total assets minus total allocation (total debt + yield buffer)
     /// @return The available yield balance
-    function availableYieldBalance() public view returns (uint256) {
+    function availableYieldBalance() external view returns (uint256) {
         return _availableYieldBalance(totalPreciseAssets(), totalDebt());
     }
 
@@ -684,7 +684,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @inheritdoc ILiquidationSource
     /// @dev Returns the liquid amount of `_tokenOut` minus any yield fees.
     /// @dev Supports the liquidation of either assets or prize vault shares.
-    function liquidatableBalanceOf(address _tokenOut) public view returns (uint256) {
+    function liquidatableBalanceOf(address _tokenOut) external view returns (uint256) {
         uint256 _totalDebt = totalDebt();
         uint256 _maxAmountOut;
         if (_tokenOut == address(this)) {
@@ -716,7 +716,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         address _receiver,
         address _tokenOut,
         uint256 _amountOut
-    ) public virtual onlyLiquidationPair returns (bytes memory) {
+    ) external virtual onlyLiquidationPair returns (bytes memory) {
         if (_amountOut == 0) revert LiquidationAmountOutZero();
 
         uint256 _totalDebtBefore = totalDebt();
