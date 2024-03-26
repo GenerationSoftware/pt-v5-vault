@@ -983,7 +983,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
         // The shares are calculated and then minted directly to mitigate rounding error loss.
         uint256 _yieldVaultShares = yieldVault.previewDeposit(_assetsWithDust);
-        uint256 _assetsUsed = yieldVault.mint(_yieldVaultShares, address(this));
+        yieldVault.mint(_yieldVaultShares, address(this));
 
         // Enforce the mint limit and protect against lossy deposits.
         uint256 _totalDebtBeforeMint = totalDebt();
