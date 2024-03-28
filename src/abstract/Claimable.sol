@@ -80,10 +80,11 @@ abstract contract Claimable is HookManager, IClaimable {
         uint96 _reward,
         address _rewardRecipient
     ) external onlyClaimer returns (uint256) {
-        address recipient;
+        address _prizeRecipient;
+        bytes memory _hookData;
 
         if (_hooks[_winner].useBeforeClaimPrize) {
-            recipient = _hooks[_winner].implementation.beforeClaimPrize{ gas: HOOK_GAS }(
+            (_prizeRecipient, _hookData) = _hooks[_winner].implementation.beforeClaimPrize{ gas: HOOK_GAS }(
                 _winner,
                 _tier,
                 _prizeIndex,
@@ -91,16 +92,16 @@ abstract contract Claimable is HookManager, IClaimable {
                 _rewardRecipient
             );
         } else {
-            recipient = _winner;
+            _prizeRecipient = _winner;
         }
 
-        if (recipient == address(0)) revert ClaimRecipientZeroAddress();
+        if (_prizeRecipient == address(0)) revert ClaimRecipientZeroAddress();
 
-        uint256 prizeTotal = prizePool.claimPrize(
+        uint256 _prizeTotal = prizePool.claimPrize(
             _winner,
             _tier,
             _prizeIndex,
-            recipient,
+            _prizeRecipient,
             _reward,
             _rewardRecipient
         );
@@ -110,12 +111,13 @@ abstract contract Claimable is HookManager, IClaimable {
                 _winner,
                 _tier,
                 _prizeIndex,
-                prizeTotal,
-                recipient
+                _prizeTotal - _reward,
+                _prizeRecipient,
+                _hookData
             );
         }
 
-        return prizeTotal;
+        return _prizeTotal;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
