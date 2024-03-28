@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import { UnitBaseSetup, PrizePool, TwabController, ERC20, IERC20, IERC4626, YieldVault } from "./UnitBaseSetup.t.sol";
-import { IVaultHooks, VaultHooks } from "../../../src/interfaces/IVaultHooks.sol";
+import { IPrizeHooks, PrizeHooks } from "../../../src/interfaces/IPrizeHooks.sol";
 import { ERC20BrokenDecimalMock } from "../../contracts/mock/ERC20BrokenDecimalMock.sol";
 
 import "../../../src/PrizeVault.sol";

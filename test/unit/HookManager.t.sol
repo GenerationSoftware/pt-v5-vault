@@ -3,13 +3,13 @@ pragma solidity ^0.8.24;
 
 import { Test } from "forge-std/Test.sol";
 
-import { HookManagerWrapper, HookManager, VaultHooks } from "../contracts/wrapper/HookManagerWrapper.sol";
-import { IVaultHooks } from "../../src/interfaces/IVaultHooks.sol";
+import { HookManagerWrapper, HookManager, PrizeHooks } from "../contracts/wrapper/HookManagerWrapper.sol";
+import { IPrizeHooks } from "../../src/interfaces/IPrizeHooks.sol";
 
 contract HookManagerTest is Test {
 
     // Events:
-    event SetHooks(address indexed account, VaultHooks hooks);
+    event SetHooks(address indexed account, PrizeHooks hooks);
 
     HookManagerWrapper hookManager;
 
@@ -26,8 +26,8 @@ contract HookManagerTest is Test {
     /* ============ setHooks ============ */
 
     function testSetHooks() public {
-        VaultHooks memory beforeHooks = hookManager.getHooks(alice);
-        VaultHooks memory newHooks = VaultHooks(true, true, IVaultHooks(address(this)));
+        PrizeHooks memory beforeHooks = hookManager.getHooks(alice);
+        PrizeHooks memory newHooks = PrizeHooks(true, true, IPrizeHooks(address(this)));
         assertNotEq(hashHooks(beforeHooks), hashHooks(newHooks));
 
         vm.startPrank(alice);
@@ -38,7 +38,7 @@ contract HookManagerTest is Test {
         
         vm.stopPrank();
 
-        VaultHooks memory actualHooks = hookManager.getHooks(alice);
+        PrizeHooks memory actualHooks = hookManager.getHooks(alice);
 
         assertEq(hashHooks(newHooks), hashHooks(actualHooks));
     }
@@ -46,14 +46,14 @@ contract HookManagerTest is Test {
     /* ============ getHooks ============ */
 
     function testGetHooks_Empty() public {
-        VaultHooks memory hooks = hookManager.getHooks(alice);
-        VaultHooks memory emptyHooks = VaultHooks(false, false, IVaultHooks(address(0)));
+        PrizeHooks memory hooks = hookManager.getHooks(alice);
+        PrizeHooks memory emptyHooks = PrizeHooks(false, false, IPrizeHooks(address(0)));
         assertEq(hashHooks(hooks), hashHooks(emptyHooks));
     }
 
     /* ============ helpers ============ */
 
-    function hashHooks(VaultHooks memory hooks) public pure returns (bytes32) {
+    function hashHooks(PrizeHooks memory hooks) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(
             hooks.useBeforeClaimPrize,
             hooks.useAfterClaimPrize,

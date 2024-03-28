@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import { Test, Vm } from "forge-std/Test.sol";
 
 import { ClaimableWrapper, Claimable, PrizePool } from "../contracts/wrapper/ClaimableWrapper.sol";
-import { IVaultHooks, VaultHooks } from "../../src/interfaces/IVaultHooks.sol";
+import { IPrizeHooks, PrizeHooks } from "../../src/interfaces/IPrizeHooks.sol";
 
-contract ClaimableTest is Test, IVaultHooks {
+contract ClaimableTest is Test, IPrizeHooks {
 
     // Expected Events:
     event ClaimerSet(address indexed claimer);
@@ -24,11 +24,12 @@ contract ClaimableTest is Test, IVaultHooks {
         uint8 tier,
         uint32 prizeIndex,
         uint256 prize,
-        address recipient
+        address prizeRecipient,
+        bytes data
     );
 
     ClaimableWrapper claimable;
-    IVaultHooks hooks;
+    IPrizeHooks hooks;
 
     PrizePool prizePool;
 
@@ -97,7 +98,7 @@ contract ClaimableTest is Test, IVaultHooks {
     /* ============ claimPrize ============ */
 
     function testClaimPrize_noHooksCalledByDefault() public {
-        VaultHooks memory aliceHooks = claimable.getHooks(alice);
+        PrizeHooks memory aliceHooks = claimable.getHooks(alice);
         assertEq(aliceHooks.useBeforeClaimPrize, false);
         assertEq(aliceHooks.useAfterClaimPrize, false);
 
@@ -112,7 +113,7 @@ contract ClaimableTest is Test, IVaultHooks {
     }
 
     function testClaimPrize_beforeClaimPrizeHook() public {
-        VaultHooks memory beforeHookOnly = VaultHooks(true, false, hooks);
+        PrizeHooks memory beforeHookOnly = PrizeHooks(true, false, hooks);
 
         vm.startPrank(alice);
         claimable.setHooks(beforeHookOnly);
@@ -131,7 +132,7 @@ contract ClaimableTest is Test, IVaultHooks {
     }
 
     function testClaimPrize_afterClaimPrizeHook() public {
-        VaultHooks memory afterHookOnly = VaultHooks(false, true, hooks);
+        PrizeHooks memory afterHookOnly = PrizeHooks(false, true, hooks);
 
         vm.startPrank(alice);
         claimable.setHooks(afterHookOnly);
@@ -140,7 +141,7 @@ contract ClaimableTest is Test, IVaultHooks {
         mockClaimPrize(alice, 1, 2, alice, 1e17, bob);
 
         vm.expectEmit();
-        emit AfterClaimPrizeCalled(alice, 1, 2, 1e18, alice);
+        emit AfterClaimPrizeCalled(alice, 1, 2, 9e17, alice, "");
 
         vm.recordLogs();
         claimable.claimPrize(alice, 1, 2, 1e17, bob);
@@ -150,7 +151,7 @@ contract ClaimableTest is Test, IVaultHooks {
     }
 
     function testClaimPrize_bothHooks() public {
-        VaultHooks memory bothHooks = VaultHooks(true, true, hooks);
+        PrizeHooks memory bothHooks = PrizeHooks(true, true, hooks);
 
         vm.startPrank(alice);
         claimable.setHooks(bothHooks);
@@ -161,7 +162,7 @@ contract ClaimableTest is Test, IVaultHooks {
         vm.expectEmit();
         emit BeforeClaimPrizeCalled(alice, 1, 2, 1e17, bob);
         vm.expectEmit();
-        emit AfterClaimPrizeCalled(alice, 1, 2, 1e18, prizeRedirectionAddress);
+        emit AfterClaimPrizeCalled(alice, 1, 2, 9e17, prizeRedirectionAddress, "hook data");
 
         vm.recordLogs();
         claimable.claimPrize(alice, 1, 2, 1e17, bob);
@@ -171,7 +172,7 @@ contract ClaimableTest is Test, IVaultHooks {
     }
 
     function testClaimPrize_ClaimRecipientZeroAddress() public {
-        VaultHooks memory beforeHookOnly = VaultHooks(true, false, hooks);
+        PrizeHooks memory beforeHookOnly = PrizeHooks(true, false, hooks);
 
         vm.startPrank(alice);
         claimable.setHooks(beforeHookOnly);
@@ -205,7 +206,7 @@ contract ClaimableTest is Test, IVaultHooks {
     }
 
     function testClaimPrize_beforeClaimPrizeHookTooMuchGas() public {
-        VaultHooks memory beforeHookOnly = VaultHooks(true, false, hooks);
+        PrizeHooks memory beforeHookOnly = PrizeHooks(true, false, hooks);
 
         vm.startPrank(alice);
         claimable.setHooks(beforeHookOnly);
@@ -220,7 +221,7 @@ contract ClaimableTest is Test, IVaultHooks {
     }
 
     function testClaimPrize_afterClaimPrizeHookTooMuchGas() public {
-        VaultHooks memory afterHookOnly = VaultHooks(true, false, hooks);
+        PrizeHooks memory afterHookOnly = PrizeHooks(true, false, hooks);
 
         vm.startPrank(alice);
         claimable.setHooks(afterHookOnly);
@@ -235,7 +236,7 @@ contract ClaimableTest is Test, IVaultHooks {
     }
 
     function testClaimPrize_bothHooksTooMuchGasAfter() public {
-        VaultHooks memory bothHooks = VaultHooks(true, true, hooks);
+        PrizeHooks memory bothHooks = PrizeHooks(true, true, hooks);
 
         vm.startPrank(alice);
         claimable.setHooks(bothHooks);
@@ -249,7 +250,7 @@ contract ClaimableTest is Test, IVaultHooks {
         claimable.claimPrize(alice, 1, 2, 1e17, bob);
     }
 
-    /* ============ IVaultHooks Implementation ============ */
+    /* ============ IPrizeHooks Implementation ============ */
 
     function beforeClaimPrize(
         address winner,
@@ -257,7 +258,7 @@ contract ClaimableTest is Test, IVaultHooks {
         uint32 prizeIndex,
         uint96 reward,
         address rewardRecipient
-    ) external returns (address) {
+    ) external returns (address, bytes memory) {
         if (useTooMuchGasBefore) {
             for (uint i = 0; i < 1000; i++) {
                 someBytes = keccak256(abi.encode(someBytes));
@@ -270,7 +271,7 @@ contract ClaimableTest is Test, IVaultHooks {
             reward,
             rewardRecipient
         );
-        return prizeRedirectionAddress;
+        return (prizeRedirectionAddress, "hook data");
     }
 
     function afterClaimPrize(
@@ -278,7 +279,8 @@ contract ClaimableTest is Test, IVaultHooks {
         uint8 tier,
         uint32 prizeIndex,
         uint256 prize,
-        address recipient
+        address prizeRecipient,
+        bytes memory data
     ) external {
         if (useTooMuchGasAfter) {
             for (uint i = 0; i < 1000; i++) {
@@ -290,7 +292,8 @@ contract ClaimableTest is Test, IVaultHooks {
             tier,
             prizeIndex,
             prize,
-            recipient
+            prizeRecipient,
+            data
         );
     }
 
