@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import { Test } from "forge-std/Test.sol";
+import { console2 } from "forge-std/console2.sol";
+
 import { IERC20, IERC4626 } from "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
@@ -66,6 +68,12 @@ abstract contract BaseIntegration is Test, Permit {
 
     /// @dev Defined in 1e18 precision. (2e18 would be 2 ETH per USD)
     uint256 approxEthUsdExchangeRate = uint256(1e18) / uint256(3000); // approx 1 ETH for $3000
+
+    /// @dev Override to true if vault is not expected to have yield
+    bool ignoreYield = false;
+
+    /// @dev Override to true if vault cannot feasibly lose assets
+    bool ignoreLoss = false;
 
     /* ============ setup ============ */
 
@@ -182,6 +190,14 @@ abstract contract BaseIntegration is Test, Permit {
         return assetsAfter - assetsBefore;
     }
 
+    function checkIgnoreYield() internal returns (bool) {
+        if (ignoreYield) {
+            console2.log("skipping test since yield is ignored...");
+            return true;
+        }
+        return false;
+    }
+
     /// @dev Each integration test must override the `_simulateLoss` internal function for this to work.
     /// @return The loss the prize vault has incurred as a result of yield vault loss (if any)
     function simulateLoss() public returns (uint256) {
@@ -202,6 +218,14 @@ abstract contract BaseIntegration is Test, Permit {
             }
         }
         return assetsBefore - assetsAfter;
+    }
+
+    function checkIgnoreLoss() internal returns (bool) {
+        if (ignoreLoss) {
+            console2.log("skipping test since loss is ignored...");
+            return true;
+        }
+        return false;
     }
 
     /* ============ Integration Test Scenarios ============ */
@@ -294,6 +318,8 @@ abstract contract BaseIntegration is Test, Permit {
 
     /// @notice test multi-user deposit w/yield accrual in between
     function testMultiDepositWithYieldAccrual() public {
+        if (checkIgnoreYield()) return;
+
         address[] memory depositors = new address[](2);
         depositors[0] = alice;
         depositors[1] = bob;
@@ -354,6 +380,8 @@ abstract contract BaseIntegration is Test, Permit {
 
     /// @notice test withdraw with yield accrual
     function testWithdrawWithYieldAccrual() public {
+        if (checkIgnoreYield()) return;
+
         uint256 amount = 10 ** assetDecimals;
         dealAssets(alice, amount);
 
@@ -416,6 +444,8 @@ abstract contract BaseIntegration is Test, Permit {
 
     /// @notice test all users withdraw during lossy state
     function testWithdrawAllUsersWhileLossy() public {
+        if (checkIgnoreLoss()) return;
+
         address[] memory depositors = new address[](3);
         depositors[0] = alice;
         depositors[1] = bob;
@@ -463,6 +493,8 @@ abstract contract BaseIntegration is Test, Permit {
 
     /// @notice test liquidation of assets
     function testAssetLiquidation() public {
+        if (checkIgnoreYield()) return;
+
         // Deposit
         uint256 amount = 1000 * (10 ** assetDecimals);
         dealAssets(alice, amount);
@@ -488,6 +520,8 @@ abstract contract BaseIntegration is Test, Permit {
 
     /// @notice test liquidatable balance of when lossy
     function testNoLiquidationWhenLossy() public {
+        if (checkIgnoreYield() || checkIgnoreLoss()) return;
+
         // Deposit
         uint256 amount = 1000 * (10 ** assetDecimals);
         dealAssets(alice, amount);
