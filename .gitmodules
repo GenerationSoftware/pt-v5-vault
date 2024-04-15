@@ -31,3 +31,6 @@
 	path = lib/pt-v5-claimable-interface
 	url = https://github.com/GenerationSoftware/pt-v5-claimable-interface
 	branch = main
+[submodule "lib/pt-v5-staking-vault"]
+	path = lib/pt-v5-staking-vault
+	url = https://github.com/GenerationSoftware/pt-v5-staking-vault

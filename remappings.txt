@@ -10,3 +10,4 @@ pt-v5-liquidator-interfaces/=lib/pt-v5-liquidator-interfaces/src/interfaces/
 pt-v5-twab-controller=lib/pt-v5-twab-controller/src/
 pt-v5-prize-pool/=lib/pt-v5-prize-pool/src/
 pt-v5-claimable-interface/=lib/pt-v5-claimable-interface/src/
+pt-v5-staking-vault/=lib/pt-v5-staking-vault/src/
