@@ -270,6 +270,8 @@ abstract contract BaseIntegration is Test, Permit {
     /// @notice test deposit
     function testDeposit() public {
         uint256 amount = 10 ** assetDecimals;
+        uint256 maxAmount = maxDeal() / 2;
+        if (amount > maxAmount) amount = maxAmount;
         dealAssets(alice, amount);
 
         uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
@@ -297,6 +299,8 @@ abstract contract BaseIntegration is Test, Permit {
 
         for (uint256 i = 0; i < depositors.length; i++) {
             uint256 amount = (10 ** assetDecimals) * (i + 1);
+            uint256 maxAmount = maxDeal() / 2;
+            if (amount > maxAmount) amount = maxAmount;
             dealAssets(depositors[i], amount);
 
             uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
@@ -326,6 +330,8 @@ abstract contract BaseIntegration is Test, Permit {
 
         for (uint256 i = 0; i < depositors.length; i++) {
             uint256 amount = (10 ** assetDecimals) * (i + 1);
+            uint256 maxAmount = maxDeal() / 2;
+            if (amount > maxAmount) amount = maxAmount;
             dealAssets(depositors[i], amount);
 
             uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
@@ -358,6 +364,8 @@ abstract contract BaseIntegration is Test, Permit {
     /// @dev also tests for any active deposit / withdraw fees
     function testWithdraw() public {
         uint256 amount = 10 ** assetDecimals;
+        uint256 maxAmount = maxDeal() / 2;
+        if (amount > maxAmount) amount = maxAmount;
         dealAssets(alice, amount);
 
         uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
@@ -383,6 +391,8 @@ abstract contract BaseIntegration is Test, Permit {
         if (checkIgnoreYield()) return;
 
         uint256 amount = 10 ** assetDecimals;
+        uint256 maxAmount = maxDeal() / 2;
+        if (amount > maxAmount) amount = maxAmount;
         dealAssets(alice, amount);
 
         uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
@@ -411,9 +421,14 @@ abstract contract BaseIntegration is Test, Permit {
         depositors[1] = bob;
         depositors[2] = address(this);
 
+        uint256[] memory amounts = new uint256[](3);
+
         // deposit
         for (uint256 i = 0; i < depositors.length; i++) {
             uint256 amount = (10 ** assetDecimals) * (i + 1);
+            uint256 maxAmount = maxDeal() / 2;
+            if (amount > maxAmount) amount = maxAmount;
+            amounts[i] = amount;
             dealAssets(depositors[i], amount);
 
             startPrank(depositors[i]);
@@ -424,21 +439,20 @@ abstract contract BaseIntegration is Test, Permit {
 
         // withdraw
         for (uint256 i = 0; i < depositors.length; i++) {
-            uint256 amount = (10 ** assetDecimals) * (i + 1);
             uint256 totalAssetsBefore = prizeVault.totalPreciseAssets();
             uint256 totalSupplyBefore = prizeVault.totalSupply();
 
             startPrank(depositors[i]);
-            prizeVault.withdraw(amount, depositors[i], depositors[i]);
+            prizeVault.withdraw(amounts[i], depositors[i], depositors[i]);
             stopPrank();
 
             uint256 totalAssetsAfter = prizeVault.totalPreciseAssets();
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), 0, "burned all user's shares on withdraw");
-            assertEq(underlyingAsset.balanceOf(depositors[i]), amount, "withdrew full asset amount for user");
-            assertApproxEqAbs(totalAssetsBefore, totalAssetsAfter + amount, 1, "assets accounted for with no more than 1 wei rounding error");
-            assertEq(totalSupplyBefore - amount, totalSupplyAfter, "total supply decreased by amount");
+            assertEq(underlyingAsset.balanceOf(depositors[i]), amounts[i], "withdrew full asset amount for user");
+            assertApproxEqAbs(totalAssetsBefore, totalAssetsAfter + amounts[i], 1, "assets accounted for with no more than 1 wei rounding error");
+            assertEq(totalSupplyBefore - amounts[i], totalSupplyAfter, "total supply decreased by amount");
         }
     }
 
@@ -454,6 +468,8 @@ abstract contract BaseIntegration is Test, Permit {
         // deposit
         for (uint256 i = 0; i < depositors.length; i++) {
             uint256 amount = (10 ** assetDecimals) * (i + 1);
+            uint256 maxAmount = maxDeal() / 2;
+            if (amount > maxAmount) amount = maxAmount;
             dealAssets(depositors[i], amount);
 
             startPrank(depositors[i]);
@@ -497,6 +513,8 @@ abstract contract BaseIntegration is Test, Permit {
 
         // Deposit
         uint256 amount = 1000 * (10 ** assetDecimals);
+        uint256 maxAmount = maxDeal() / 2;
+        if (amount > maxAmount) amount = maxAmount;
         dealAssets(alice, amount);
 
         startPrank(alice);
@@ -524,6 +542,8 @@ abstract contract BaseIntegration is Test, Permit {
 
         // Deposit
         uint256 amount = 1000 * (10 ** assetDecimals);
+        uint256 maxAmount = maxDeal() / 2;
+        if (amount > maxAmount) amount = maxAmount;
         dealAssets(alice, amount);
 
         startPrank(alice);
