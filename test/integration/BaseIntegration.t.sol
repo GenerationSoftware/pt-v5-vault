@@ -75,6 +75,11 @@ abstract contract BaseIntegration is Test, Permit {
     /// @dev Override to true if vault cannot feasibly lose assets
     bool ignoreLoss = false;
 
+    /// @dev Some yield vaults have predictable precision loss (such as Sonne which reduces precision of assets with their exchange rate).
+    /// This optional variable can be set if this precision loss is acknowledged and appropriate countermeasures will be taken (ex. deploying
+    /// a PrizeVault with a higher yield buffer to match the reduced precision).
+    uint8 assetPrecisionLoss = 0;
+
     /* ============ setup ============ */
 
     function setUpUnderlyingAsset() public virtual returns (IERC20 asset, uint8 decimals, uint256 approxAssetUsdExchangeRate);
@@ -105,6 +110,9 @@ abstract contract BaseIntegration is Test, Permit {
         prizePool = new PrizePoolMock(prizeToken, twabController);
 
         claimer = address(0xe291d9169F0316272482dD82bF297BB0a11D267f);
+
+        // adjust yield buffer based-on mitigated precision loss
+        yieldBuffer = 1e5 * (10 ** assetPrecisionLoss);
 
         prizeVault = new PrizeVaultWrapper(
             vaultName,
@@ -242,7 +250,7 @@ abstract contract BaseIntegration is Test, Permit {
     function testAssetPrecisionMeetsMinimum() public {
         if (yieldBuffer > 0) {
             uint256 minimumPPD = 1e6; // USDC is the benchmark (6 decimals represent $1 of value)
-            uint256 assetPPD = (1e18 * (10 ** assetDecimals)) / approxAssetUsdExchangeRate;
+            uint256 assetPPD = (1e18 * (10 ** (assetDecimals - assetPrecisionLoss))) / approxAssetUsdExchangeRate;
             assertGe(assetPPD, minimumPPD, "asset PPD > minimum PPD");
         }
     }
@@ -257,7 +265,7 @@ abstract contract BaseIntegration is Test, Permit {
     function testAssetRoundingErrorManipulationCost() public {
         uint256 costToManipulateInEth = lowGasPriceEstimate * lowGasEstimateForStateChange;
         uint256 costToManipulateInUsd = (costToManipulateInEth * 1e18) / approxEthUsdExchangeRate;
-        uint256 costOfRoundingErrorInUsd = 1e18 / approxAssetUsdExchangeRate;
+        uint256 costOfRoundingErrorInUsd = ((10 ** assetPrecisionLoss) * 1e18) / approxAssetUsdExchangeRate;
         // 10x threshold is set so an attacker would have to spend at least 10x the loss they can cause on the prize vault.
         uint256 multiplierThreshold = 10;
         assertLt(costOfRoundingErrorInUsd * multiplierThreshold, costToManipulateInUsd, "attacker can cheaply cause rounding errors");
@@ -286,7 +294,12 @@ abstract contract BaseIntegration is Test, Permit {
         uint256 totalSupplyAfter = prizeVault.totalSupply();
 
         assertEq(prizeVault.balanceOf(alice), amount, "shares minted");
-        assertApproxEqAbs(totalAssetsBefore + amount, totalAssetsAfter, 1, "assets accounted for with possible rounding error");
+        assertApproxEqAbs(
+            totalAssetsBefore + amount,
+            totalAssetsAfter,
+            10 ** assetPrecisionLoss,
+            "assets accounted for with possible rounding error"
+        );
         assertEq(totalSupplyBefore + amount, totalSupplyAfter, "supply increased by amount");
     }
 
@@ -315,7 +328,12 @@ abstract contract BaseIntegration is Test, Permit {
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), amount, "shares minted");
-            assertApproxEqAbs(totalAssetsBefore + amount, totalAssetsAfter, 1, "assets accounted for with possible rounding error");
+            assertApproxEqAbs(
+                totalAssetsBefore + amount,
+                totalAssetsAfter,
+                10 ** assetPrecisionLoss,
+                "assets accounted for with possible rounding error"
+            );
             assertEq(totalSupplyBefore + amount, totalSupplyAfter, "supply increased by amount");
         }
     }
@@ -346,7 +364,12 @@ abstract contract BaseIntegration is Test, Permit {
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), amount, "shares minted");
-            assertApproxEqAbs(totalAssetsBefore + amount, totalAssetsAfter, 1, "assets accounted for with possible rounding error");
+            assertApproxEqAbs(
+                totalAssetsBefore + amount,
+                totalAssetsAfter,
+                10 ** assetPrecisionLoss,
+                "assets accounted for with possible rounding error"
+            );
             assertEq(totalSupplyBefore + amount, totalSupplyAfter, "supply increased by amount");
 
             if (i == 0) {
@@ -382,7 +405,12 @@ abstract contract BaseIntegration is Test, Permit {
 
         assertEq(prizeVault.balanceOf(alice), 0, "burns all user shares on full withdraw");
         assertEq(underlyingAsset.balanceOf(alice), amount, "withdraws full amount of assets");
-        assertApproxEqAbs(totalAssetsBefore, totalAssetsAfter, 2, "no assets missing except for possible rounding error"); // 1 possible rounding error for deposit, 1 for withdraw
+        assertApproxEqAbs(
+            totalAssetsBefore,
+            totalAssetsAfter,
+            2 * 10 ** assetPrecisionLoss,
+            "no assets missing except for possible rounding error"
+        ); // 1 possible rounding error for deposit, 1 for withdraw
         assertEq(totalSupplyBefore, totalSupplyAfter, "supply same as before");
     }
 
@@ -410,7 +438,12 @@ abstract contract BaseIntegration is Test, Permit {
 
         assertEq(prizeVault.balanceOf(alice), 0, "burns all user shares on full withdraw");
         assertEq(underlyingAsset.balanceOf(alice), amount, "withdraws full amount of assets");
-        assertApproxEqAbs(totalAssetsBefore + yield, totalAssetsAfter, 2, "no assets missing except for possible rounding error"); // 1 possible rounding error for deposit, 1 for withdraw
+        assertApproxEqAbs(
+            totalAssetsBefore + yield,
+            totalAssetsAfter,
+            2 * 10 ** assetPrecisionLoss,
+            "no assets missing except for possible rounding error"
+        ); // 1 possible rounding error for deposit, 1 for withdraw
         assertEq(totalSupplyBefore, totalSupplyAfter, "supply same as before");
     }
 
@@ -451,7 +484,12 @@ abstract contract BaseIntegration is Test, Permit {
 
             assertEq(prizeVault.balanceOf(depositors[i]), 0, "burned all user's shares on withdraw");
             assertEq(underlyingAsset.balanceOf(depositors[i]), amounts[i], "withdrew full asset amount for user");
-            assertApproxEqAbs(totalAssetsBefore, totalAssetsAfter + amounts[i], 1, "assets accounted for with no more than 1 wei rounding error");
+            assertApproxEqAbs(
+                totalAssetsBefore,
+                totalAssetsAfter + amounts[i],
+                10 ** assetPrecisionLoss,
+                "assets accounted for with no more than 1 wei rounding error"
+            );
             assertEq(totalSupplyBefore - amounts[i], totalSupplyAfter, "total supply decreased by amount");
         }
     }
@@ -502,7 +540,12 @@ abstract contract BaseIntegration is Test, Permit {
             assertEq(assets, expectedAssets, "assets received proportional to shares / totalDebt");
             assertEq(prizeVault.balanceOf(depositors[i]), 0, "burned all user's shares on withdraw");
             assertEq(underlyingAsset.balanceOf(depositors[i]), assets, "withdrew assets for user");
-            assertApproxEqAbs(totalAssetsBefore, totalAssetsAfter + assets, 1, "assets accounted for with no more than 1 wei rounding error");
+            assertApproxEqAbs(
+                totalAssetsBefore,
+                totalAssetsAfter + assets,
+                10 ** assetPrecisionLoss,
+                "assets accounted for with no more than 1 wei rounding error"
+            );
             assertEq(totalSupplyBefore - shares, totalSupplyAfter, "total supply decreased by shares");
         }
     }
@@ -525,15 +568,20 @@ abstract contract BaseIntegration is Test, Permit {
         // Yield Accrual
         uint256 approxYield = accrueYield();
         uint256 availableYield = prizeVault.availableYieldBalance();
-        assertApproxEqAbs(approxYield, availableYield, 1, "approx yield equals available yield balance");
+        assertApproxEqAbs(
+            approxYield,
+            availableYield,
+            10 ** assetPrecisionLoss,
+            "approx yield equals available yield balance"
+        );
         uint256 availableAssets = prizeVault.liquidatableBalanceOf(address(underlyingAsset));
         assertGt(availableAssets, 0, "assets are available for liquidation");
         
         // Liquidate
         prizeVault.transferTokensOut(address(0), bob, address(underlyingAsset), availableAssets);
         assertEq(underlyingAsset.balanceOf(bob), availableAssets, "liquidator is transferred expected assets");
-        assertApproxEqAbs(prizeVault.availableYieldBalance(), availableYield - availableAssets, 1, "available yield decreased (w / 1 wei rounding error)");
-        assertApproxEqAbs(prizeVault.liquidatableBalanceOf(address(underlyingAsset)), 0, 1, "no more assets can be liquidated (w/ 1 wei rounding error)");
+        assertApproxEqAbs(prizeVault.availableYieldBalance(), availableYield - availableAssets, 10 ** assetPrecisionLoss, "available yield decreased (w / 1 wei rounding error)");
+        assertApproxEqAbs(prizeVault.liquidatableBalanceOf(address(underlyingAsset)), 0, 10 ** assetPrecisionLoss, "no more assets can be liquidated (w/ 1 wei rounding error)");
     }
 
     /// @notice test liquidatable balance of when lossy
@@ -554,7 +602,12 @@ abstract contract BaseIntegration is Test, Permit {
         // Yield Accrual
         uint256 approxYield = accrueYield();
         uint256 availableYield = prizeVault.availableYieldBalance();
-        assertApproxEqAbs(approxYield, availableYield, 1, "approx yield equals available yield balance");
+        assertApproxEqAbs(
+            approxYield,
+            availableYield,
+            10 ** assetPrecisionLoss,
+            "approx yield equals available yield balance"
+        );
         uint256 availableAssets = prizeVault.liquidatableBalanceOf(address(underlyingAsset));
         assertGt(availableAssets, 0, "assets are available for liquidation");
         uint256 availableShares = prizeVault.liquidatableBalanceOf(address(prizeVault));

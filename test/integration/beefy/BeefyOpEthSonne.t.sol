@@ -3,24 +3,24 @@ pragma solidity ^0.8.24;
 
 import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
-contract BeefyOpOpSonneIntegrationTest is BaseIntegration {
+contract BeefyOpEthSonneIntegrationTest is BaseIntegration {
     uint256 fork;
     uint256 forkBlock = 119158577;
     uint256 forkBlockTimestamp = 1713915931;
 
     address internal _beefyWrapper = address(0x182be93E1C0C4d305fe43bD093292F21fd679797);
 
-    address internal _asset = address(0x4200000000000000000000000000000000000042);
-    address internal _assetWhale = address(0x2A82Ae142b2e62Cb7D10b55E323ACB1Cab663a26);
+    address internal _asset = address(0x4200000000000000000000000000000000000006);
+    address internal _assetWhale = address(0x86Bb63148d17d445Ed5398ef26Aa05Bf76dD5b59);
     address internal _yieldVault;
-    address internal _mooVault = address(0x06D95ef15b41270818Ecb0B0f4E80c71F30F8CB1);
-    address internal _mooYieldSource = address(0xFaAe61f3a47b817DC043D8D62e93F6949775352B);
-    address internal _sonneYieldToken = address(0x8cD6b19A07d754bF36AdEEE79EDF4F2134a8F571);
+    address internal _mooVault = address(0x3f63e9Db070ADe3e833EF8972Ac5E9810367a49c);
+    address internal _mooYieldSource = address(0x49457E3a17Ab48B314339CD350DD092438f7E029);
+    address internal _sonneYieldToken = address(0xf7B5965f5C117Eb1B5450187c9DcFccc3C317e8E);
 
     /* ============ setup ============ */
 
     function setUpUnderlyingAsset() public virtual override returns (IERC20 asset, uint8 decimals, uint256 approxAssetUsdExchangeRate) {
-        return (IERC20(_asset), 18, 2.4e18);
+        return (IERC20(_asset), 18, 3300e18);
     }
 
     function setUpYieldVault() public virtual override returns (IERC4626) {
@@ -38,7 +38,7 @@ contract BeefyOpOpSonneIntegrationTest is BaseIntegration {
 
     function beforeSetup() public virtual override {
         lowGasPriceEstimate = 0.05 gwei; // just L2 gas, we ignore L1 costs for a super low estimate
-        assetPrecisionLoss = 9; // loses 9 decimals of precision due to Sonne conversion rates
+        assetPrecisionLoss = 9; // loses 9 decimals of precision due to Sonne conversion rate
     }
 
     function afterSetup() public virtual override { }
