@@ -78,22 +78,8 @@ contract PrizeVaultFactoryTest is Test {
         asset.mint(address(this), yieldBuffer);
         asset.approve(address(vaultFactory), yieldBuffer);
 
-        address _computedAddress = vaultFactory.computeDeploymentAddress(
-            address(this),
-            abi.encode(
-                name,
-                symbol,
-                yieldVault,
-                PrizePool(address(prizePool)),
-                claimer,
-                address(this),
-                yieldFeePercentage,
-                yieldBuffer,
-                owner
-            )
-        );
-        vm.expectEmit();
-        emit NewPrizeVault(PrizeVault(_computedAddress), yieldVault, PrizePool(address(prizePool)), name, symbol);
+        vm.expectEmit(false, true, true, true); // we don't know the vault address in advance
+        emit NewPrizeVault(PrizeVault(_vault), yieldVault, PrizePool(address(prizePool)), name, symbol);
 
         _vault = vaultFactory.deployVault(
             name,
@@ -127,20 +113,6 @@ contract PrizeVaultFactoryTest is Test {
     function testDeployVault_secondDeployShouldHaveDiffAddress() public {
         asset.mint(address(this), yieldBuffer);
         asset.approve(address(vaultFactory), yieldBuffer);
-        address _computedAddress1 = vaultFactory.computeDeploymentAddress(
-            address(this),
-            abi.encode(
-                name,
-                symbol,
-                yieldVault,
-                PrizePool(address(prizePool)),
-                claimer,
-                address(this),
-                yieldFeePercentage,
-                yieldBuffer,
-                owner
-            )
-        );
         PrizeVault _vault1 = PrizeVault(
             vaultFactory.deployVault(
                 name,
@@ -154,24 +126,9 @@ contract PrizeVaultFactoryTest is Test {
                 owner
             )
         );
-        assertEq(address(_vault1), _computedAddress1);
 
         asset.mint(address(this), yieldBuffer);
         asset.approve(address(vaultFactory), yieldBuffer);
-        address _computedAddress2 = vaultFactory.computeDeploymentAddress(
-            address(this),
-            abi.encode(
-                name,
-                symbol,
-                yieldVault,
-                PrizePool(address(prizePool)),
-                claimer,
-                address(this),
-                yieldFeePercentage,
-                yieldBuffer,
-                owner
-            )
-        );
         PrizeVault _vault2 = PrizeVault(
             vaultFactory.deployVault(
                 name,
@@ -185,7 +142,6 @@ contract PrizeVaultFactoryTest is Test {
                 owner
             )
         );
-        assertEq(address(_vault2), _computedAddress2);
 
         assertNotEq(address(_vault1), address(_vault2));
     }

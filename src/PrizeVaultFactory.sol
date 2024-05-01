@@ -139,27 +139,4 @@ contract PrizeVaultFactory {
     function totalVaults() external view returns (uint256) {
         return allVaults.length;
     }
-
-    /// @notice Computes the next deployment address for the vault given the deployment params.
-    /// @param _deployer The caller of the `deployVault` function
-    /// @param _params The abi encoded params that will be passed to the `deployVault` function
-    /// @return The computed deployment address
-    function computeDeploymentAddress(
-        address _deployer,
-        bytes memory _params
-    ) external view returns (address) {
-        bytes memory bytecode = abi.encodePacked(
-            type(PrizeVault).creationCode,
-            _params
-        );
-        bytes32 _create2Hash = keccak256(
-            abi.encodePacked(
-                bytes1(0xff),
-                address(this),
-                keccak256(abi.encode(_deployer, deployerNonces[_deployer])),
-                keccak256(bytecode)
-            )
-        );
-        return address(uint160(uint(_create2Hash)));
-    }
 }
