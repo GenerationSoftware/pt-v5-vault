@@ -36,34 +36,6 @@ contract PrizeVaultFactory {
     // Variables
     ////////////////////////////////////////////////////////////////////////////////
 
-    /// @notice The yield buffer to use for vault deployments.
-    /// @dev The yield buffer is expected to be of insignificant value and is used to cover rounding
-    /// errors on deposits and withdrawals. Yield is expected to accrue faster than the yield buffer
-    /// can be reasonably depleted.
-    ///
-    /// The yield buffer should be set as high as possible while still being considered
-    /// insignificant for the lowest precision per dollar asset that is expected to be supported.
-    /// 
-    /// Precision per dollar (PPD) can be calculated by: (10 ^ DECIMALS) / ($ value of 1 asset).
-    /// For example, USDC has a PPD of (10 ^ 6) / ($1) = 10e6 p/$.
-    /// 
-    /// As a rule of thumb, assets with lower PPD than USDC should not be assumed to be compatible since
-    /// the potential loss of a single unit rounding error is likely too high to be made up by yield at 
-    /// a reasonable rate. Actual results may vary based on expected gas costs, asset fluctuation, and
-    /// yield accrual rates.
-    ///
-    /// The yield buffer of vaults deployed by this factory is 1e5. This means that if you deploy a 
-    /// vault with USDC as the underlying asset, you will have to approve this factory to spend 1e5
-    /// USDC ($0.10) to be sent to the prize vault during deployment. This value will cover the first
-    /// 100k rounding errors on deposits and withdraws to the vault and is not recoverable by the 
-    /// deployer.
-    ///
-    /// If the yield buffer is depleted on a vault, the vault will prevent any further 
-    /// deposits if it would result in a rounding error and any rounding errors incurred by withdrawals
-    /// will not be covered by yield. The yield buffer will be replenished automatically as yield accrues
-    /// on deposits.
-    uint256 public constant YIELD_BUFFER = 1e5;
-
     /// @notice List of all vaults deployed by this factory.
     PrizeVault[] public allVaults;
 
@@ -81,6 +53,32 @@ contract PrizeVaultFactory {
     /// @dev Emits a `NewPrizeVault` event with the vault details.
     /// @dev The caller MUST approve this factory to spend underlying assets equal to `YIELD_BUFFER` so the yield
     /// buffer can be filled on deployment. This value is unrecoverable and is expected to be insignificant.
+    /// @dev The yield buffer is expected to be of insignificant value and is used to cover rounding
+    /// errors on deposits and withdrawals. Yield is expected to accrue faster than the yield buffer
+    /// can be reasonably depleted.
+    ///
+    /// The yield buffer should be set as high as possible while still being considered
+    /// insignificant for the lowest precision per dollar asset that is expected to be supported.
+    /// 
+    /// Precision per dollar (PPD) can be calculated by: (10 ^ DECIMALS) / ($ value of 1 asset).
+    /// For example, USDC has a PPD of (10 ^ 6) / ($1) = 10e6 p/$.
+    /// 
+    /// As a rule of thumb, assets with lower PPD than USDC should not be assumed to be compatible since
+    /// the potential loss of a single unit rounding error is likely too high to be made up by yield at 
+    /// a reasonable rate. Actual results may vary based on expected gas costs, asset fluctuation, and
+    /// yield accrual rates.
+    ///
+    /// This factory will transfer an amount of assets equal to the yield buffer from the deployer to the
+    /// prize vault on deployment to cover the initial buffer. For example, if you are deploying a USDC
+    /// vault and the yield buffer is set to 1e5, you will have to approve this factory to spend 1e5
+    /// USDC ($0.10) to be sent to the prize vault during deployment. Assuming there is no additional 
+    /// precision loss in the yield vault, a 1e5 yield buffer will cover the first 100k rounding errors on
+    /// deposits and withdraws and is not recoverable by the deployer.
+    ///
+    /// If the yield buffer is depleted on a vault, the vault will prevent any further 
+    /// deposits if it would result in a rounding error and any rounding errors incurred by withdrawals
+    /// will not be covered by yield. The yield buffer will be replenished automatically as yield accrues
+    /// on deposits.
     /// @param _name Name of the ERC20 share minted by the vault
     /// @param _symbol Symbol of the ERC20 share minted by the vault
     /// @param _yieldVault Address of the ERC4626 vault in which assets are deposited to generate yield
@@ -88,6 +86,7 @@ contract PrizeVaultFactory {
     /// @param _claimer Address of the claimer
     /// @param _yieldFeeRecipient Address of the yield fee recipient
     /// @param _yieldFeePercentage Yield fee percentage
+    /// @param _yieldBuffer The size of the prize vault yield buffer
     /// @param _owner Address that will gain ownership of this contract
     /// @return PrizeVault The newly deployed PrizeVault
     function deployVault(
@@ -98,6 +97,7 @@ contract PrizeVaultFactory {
       address _claimer,
       address _yieldFeeRecipient,
       uint32 _yieldFeePercentage,
+      uint256 _yieldBuffer,
       address _owner
     ) external returns (PrizeVault) {
         PrizeVault _vault = new PrizeVault{
@@ -110,13 +110,15 @@ contract PrizeVaultFactory {
             _claimer,
             _yieldFeeRecipient,
             _yieldFeePercentage,
-            YIELD_BUFFER,
+            _yieldBuffer,
             _owner
         );
 
         // A donation to fill the yield buffer is made to ensure that early depositors have
         // rounding errors covered in the time before yield is actually generated.
-        IERC20(_vault.asset()).safeTransferFrom(msg.sender, address(_vault), YIELD_BUFFER);
+        if (_yieldBuffer > 0) {
+            IERC20(_vault.asset()).safeTransferFrom(msg.sender, address(_vault), _yieldBuffer);
+        }
 
         allVaults.push(_vault);
         deployedVaults[address(_vault)] = true;
@@ -136,5 +138,28 @@ contract PrizeVaultFactory {
     /// @return uint256 Number of vaults deployed by this factory.
     function totalVaults() external view returns (uint256) {
         return allVaults.length;
+    }
+
+    /// @notice Computes the next deployment address for the vault given the deployment params.
+    /// @param _deployer The caller of the `deployVault` function
+    /// @param _params The abi encoded params that will be passed to the `deployVault` function
+    /// @return The computed deployment address
+    function computeDeploymentAddress(
+        address _deployer,
+        bytes memory _params
+    ) external view returns (address) {
+        bytes memory bytecode = abi.encodePacked(
+            type(PrizeVault).creationCode,
+            _params
+        );
+        bytes32 _create2Hash = keccak256(
+            abi.encodePacked(
+                bytes1(0xff),
+                address(this),
+                keccak256(abi.encode(_deployer, deployerNonces[_deployer])),
+                keccak256(bytecode)
+            )
+        );
+        return address(uint160(uint(_create2Hash)));
     }
 }
