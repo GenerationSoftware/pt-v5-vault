@@ -55,7 +55,7 @@ contract PrizeVaultFactoryTest is Test {
         prizePool = new PrizePoolMock(prizeToken, twabController);
 
         yieldFeePercentage = 0;
-        yieldBuffer = vaultFactory.YIELD_BUFFER();
+        yieldBuffer = 1e5;
 
         name = "PoolTogether Test Vault";
         symbol = "pTest";
@@ -78,8 +78,7 @@ contract PrizeVaultFactoryTest is Test {
         asset.mint(address(this), yieldBuffer);
         asset.approve(address(vaultFactory), yieldBuffer);
 
-        // We don't know the vault address in advance, so we don't check topic 1
-        vm.expectEmit(false, true, true, true);
+        vm.expectEmit(false, true, true, true); // we don't know the vault address in advance
         emit NewPrizeVault(PrizeVault(_vault), yieldVault, PrizePool(address(prizePool)), name, symbol);
 
         _vault = vaultFactory.deployVault(
@@ -90,6 +89,7 @@ contract PrizeVaultFactoryTest is Test {
             claimer,
             address(this),
             yieldFeePercentage,
+            yieldBuffer,
             owner
         );
 
@@ -122,6 +122,7 @@ contract PrizeVaultFactoryTest is Test {
                 claimer,
                 address(this),
                 yieldFeePercentage,
+                yieldBuffer,
                 owner
             )
         );
@@ -137,6 +138,7 @@ contract PrizeVaultFactoryTest is Test {
                 claimer,
                 address(this),
                 yieldFeePercentage,
+                yieldBuffer,
                 owner
             )
         );
@@ -157,7 +159,43 @@ contract PrizeVaultFactoryTest is Test {
             claimer,
             address(this),
             yieldFeePercentage,
+            yieldBuffer,
             owner
         );
+    }
+
+    function testDeployVault_differentYieldBuffer() public {
+        uint256 differentYieldBuffer = 1;
+
+        asset.mint(address(this), differentYieldBuffer);
+        asset.approve(address(vaultFactory), differentYieldBuffer);
+
+        PrizeVault _vault = vaultFactory.deployVault(
+            name,
+            symbol,
+            yieldVault,
+            PrizePool(address(prizePool)),
+            claimer,
+            address(this),
+            yieldFeePercentage,
+            differentYieldBuffer,
+            owner
+        );
+        assertEq(_vault.yieldBuffer(), differentYieldBuffer);
+    }
+
+    function testDeployVault_allowsZeroYieldBuffer() public {
+        PrizeVault _vault = vaultFactory.deployVault(
+            name,
+            symbol,
+            yieldVault,
+            PrizePool(address(prizePool)),
+            claimer,
+            address(this),
+            yieldFeePercentage,
+            0,
+            owner
+        );
+        assertEq(_vault.yieldBuffer(), 0);
     }
 }
