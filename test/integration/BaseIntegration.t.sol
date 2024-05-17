@@ -242,6 +242,11 @@ abstract contract BaseIntegration is Test, Permit {
     /// Basic Asset Tests
     //////////////////////////////////////////////////////////
 
+    /// @notice Checks that the yield vault asset matches the underlying.
+    function testYieldVaultAssetMatchesUnderlying() public {
+        assertEq(yieldVault.asset(), address(underlyingAsset));
+    }
+
     /// @dev Tests if the asset meets a minimum precision per dollar (PPD). If the asset
     /// is below this PPD, then it is possible that the yield buffer will not be able to sustain
     /// the rounding errors that will accrue on deposits and withdrawals.
