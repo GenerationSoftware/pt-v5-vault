@@ -256,7 +256,7 @@ abstract contract BaseIntegration is Test, Permit {
         if (yieldBuffer > 0) {
             uint256 minimumPPD = 1e6; // USDC is the benchmark (6 decimals represent $1 of value)
             uint256 assetPPD = (1e18 * (10 ** (assetDecimals - assetPrecisionLoss))) / approxAssetUsdExchangeRate;
-            assertGe(assetPPD, minimumPPD, "asset PPD > minimum PPD");
+            assertGe(assetPPD, minimumPPD, "(WARNING) asset PPD > recommended PPD");
         }
     }
 
@@ -369,12 +369,16 @@ abstract contract BaseIntegration is Test, Permit {
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), amount, "shares minted");
-            assertApproxEqAbs(
-                totalAssetsBefore + amount,
-                totalAssetsAfter,
-                10 ** assetPrecisionLoss,
-                "assets accounted for with possible rounding error"
-            );
+            if (totalAssetsAfter < totalAssetsBefore + amount) {
+                // only need to verify this range if the assets after deposit are less than the assets before
+                // (some yield sources trigger yield accruals on deposit)
+                assertApproxEqAbs(
+                    totalAssetsBefore + amount,
+                    totalAssetsAfter,
+                    10 ** assetPrecisionLoss,
+                    "assets accounted for with possible rounding error"
+                );
+            }
             assertEq(totalSupplyBefore + amount, totalSupplyAfter, "supply increased by amount");
 
             if (i == 0) {
