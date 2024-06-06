@@ -5,6 +5,7 @@ forge-std/=lib/forge-std/src/
 brokentoken/=lib/brokentoken/src/
 openzeppelin/=lib/openzeppelin-contracts/contracts/
 owner-manager-contracts/=lib/owner-manager-contracts/contracts/
+yield-daddy/=lib/yield-daddy/src/
 
 pt-v5-liquidator-interfaces/=lib/pt-v5-liquidator-interfaces/src/interfaces/
 pt-v5-twab-controller=lib/pt-v5-twab-controller/src/
