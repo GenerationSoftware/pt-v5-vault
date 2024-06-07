@@ -80,6 +80,11 @@ abstract contract BaseIntegration is Test, Permit {
     /// a PrizeVault with a higher yield buffer to match the reduced precision).
     uint8 assetPrecisionLoss = 0;
 
+    /// @dev Some assets have rounding errors on transfer that are not covered by the yield buffer since it is not a result of vault exchange rates,
+    /// but rather the asset balance itself. (Ex. stETH on mainnet has 1-2 wei rounding errors on transfer). This should only be overridden if the asset
+    /// being tested has this behavior and has been verified to be predictable and otherwise harmless.
+    uint256 roundingErrorOnTransfer = 0;
+
     /* ============ setup ============ */
 
     function setUpUnderlyingAsset() public virtual returns (IERC20 asset, uint8 decimals, uint256 approxAssetUsdExchangeRate);
@@ -413,7 +418,7 @@ abstract contract BaseIntegration is Test, Permit {
         uint256 totalSupplyAfter = prizeVault.totalSupply();
 
         assertEq(prizeVault.balanceOf(alice), 0, "burns all user shares on full withdraw");
-        assertEq(underlyingAsset.balanceOf(alice), amount, "withdraws full amount of assets");
+        assertApproxEqAbs(underlyingAsset.balanceOf(alice), amount, roundingErrorOnTransfer, "withdraws full amount of assets");
         assertApproxEqAbs(
             totalAssetsBefore,
             totalAssetsAfter,
@@ -446,7 +451,7 @@ abstract contract BaseIntegration is Test, Permit {
         uint256 totalSupplyAfter = prizeVault.totalSupply();
 
         assertEq(prizeVault.balanceOf(alice), 0, "burns all user shares on full withdraw");
-        assertEq(underlyingAsset.balanceOf(alice), amount, "withdraws full amount of assets");
+        assertApproxEqAbs(underlyingAsset.balanceOf(alice), amount, roundingErrorOnTransfer, "withdraws full amount of assets");
         assertApproxEqAbs(
             totalAssetsBefore + yield,
             totalAssetsAfter,
@@ -492,7 +497,7 @@ abstract contract BaseIntegration is Test, Permit {
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), 0, "burned all user's shares on withdraw");
-            assertEq(underlyingAsset.balanceOf(depositors[i]), amounts[i], "withdrew full asset amount for user");
+            assertApproxEqAbs(underlyingAsset.balanceOf(depositors[i]), amounts[i], roundingErrorOnTransfer, "withdrew full asset amount for user");
             assertApproxEqAbs(
                 totalAssetsBefore,
                 totalAssetsAfter + amounts[i],
@@ -548,7 +553,7 @@ abstract contract BaseIntegration is Test, Permit {
 
             assertEq(assets, expectedAssets, "assets received proportional to shares / totalDebt");
             assertEq(prizeVault.balanceOf(depositors[i]), 0, "burned all user's shares on withdraw");
-            assertEq(underlyingAsset.balanceOf(depositors[i]), assets, "withdrew assets for user");
+            assertApproxEqAbs(underlyingAsset.balanceOf(depositors[i]), assets, roundingErrorOnTransfer, "withdrew assets for user");
             assertApproxEqAbs(
                 totalAssetsBefore,
                 totalAssetsAfter + assets,
@@ -588,7 +593,7 @@ abstract contract BaseIntegration is Test, Permit {
         
         // Liquidate
         prizeVault.transferTokensOut(address(0), bob, address(underlyingAsset), availableAssets);
-        assertEq(underlyingAsset.balanceOf(bob), availableAssets, "liquidator is transferred expected assets");
+        assertApproxEqAbs(underlyingAsset.balanceOf(bob), availableAssets, roundingErrorOnTransfer, "liquidator is transferred expected assets");
         assertApproxEqAbs(prizeVault.availableYieldBalance(), availableYield - availableAssets, 10 ** assetPrecisionLoss, "available yield decreased (w / 1 wei rounding error)");
         assertApproxEqAbs(prizeVault.liquidatableBalanceOf(address(underlyingAsset)), 0, 10 ** assetPrecisionLoss, "no more assets can be liquidated (w/ 1 wei rounding error)");
     }

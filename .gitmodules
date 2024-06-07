@@ -34,3 +34,6 @@
 [submodule "lib/pt-v5-staking-vault"]
 	path = lib/pt-v5-staking-vault
 	url = https://github.com/GenerationSoftware/pt-v5-staking-vault
+[submodule "lib/yield-daddy"]
+	path = lib/yield-daddy
+	url = https://github.com/timeless-fi/yield-daddy
