@@ -856,6 +856,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @notice Converts assets to shares with the given vault state and rounding direction.
+    /// @dev Returns zero if the vault is in a lossy state AND there are no more assets.
     /// @param _assets The assets to convert
     /// @param _totalAssets The total assets that the vault controls
     /// @param _totalDebt The total debt the vault owes
@@ -873,7 +874,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             // If the vault controls less assets than what has been deposited a share will be worth a
             // proportional amount of the total assets. This can happen due to fees, slippage, or loss
             // of funds in the underlying yield vault.
-            return _assets.mulDiv(_totalDebt, _totalAssets, _rounding);
+            return _totalAssets == 0 ? 0 : _assets.mulDiv(_totalDebt, _totalAssets, _rounding);
         }
     }
 
