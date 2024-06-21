@@ -377,13 +377,16 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Considers the TWAB mint limit
     /// @dev Returns zero if any deposit would result in a loss of assets
     /// @dev Returns zero if total assets cannot be determined
+    /// @dev Returns zero if the yield buffer is less than half full. This is a safety precaution to ensure
+    /// a deposit of the asset amount returned by this function cannot reasonably trigger a `LossyDeposit`
+    /// revert in the `deposit` or `mint` functions if the yield buffer has been configured properly.
     /// @dev Any latent balance of assets in the prize vault will be swept in with the deposit as a part of
     /// the "dust collection strategy". This means that the max deposit must account for the latent balance
     /// by subtracting it from the max deposit available otherwise.
     function maxDeposit(address /* receiver */) public view returns (uint256) {
         uint256 _totalDebt = totalDebt();
         (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
-        if (!_success || _totalAssets < _totalDebt) return 0;
+        if (!_success || _totalAssets < _totalDebt + yieldBuffer / 2) return 0;
 
         uint256 _latentBalance = _asset.balanceOf(address(this));
         uint256 _maxYieldVaultDeposit = yieldVault.maxDeposit(address(this));

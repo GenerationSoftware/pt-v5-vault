@@ -8,38 +8,48 @@ contract PrizeVaultDepositLossyProtection is UnitBaseSetup {
 
     /* ============ maxDeposit ============ */
         
-    function testMaxDeposit_zeroWhenLossy() external {
+    function testMaxDeposit_zeroWhenYieldBufferLessThanHalfFull() external {
         underlyingAsset.mint(alice, 1e18);
+        
+        uint256 _yieldBuffer = vault.yieldBuffer();
+        assertGt(_yieldBuffer, 0);
+        underlyingAsset.mint(address(vault), _yieldBuffer / 2);
 
-        assertGe(vault.maxDeposit(alice), 1e18);
+        assertGe(vault.maxDeposit(alice), 1e18); // maxDeposit returns some normal value
 
         vm.startPrank(alice);
         underlyingAsset.approve(address(vault), 1e18);
         vault.deposit(1e18, alice);
         vm.stopPrank();
 
-        underlyingAsset.mint(alice, 1e18);
-        underlyingAsset.burn(address(yieldVault), 1); // lost 1 asset in yield vault, new deposits will be lossy
+        assertEq(vault.currentYieldBuffer(), _yieldBuffer / 2); // check that yield buffer is still the same
+        underlyingAsset.burn(address(yieldVault), 1); // lost 1 asset in yield vault
+        assertEq(vault.currentYieldBuffer(), _yieldBuffer / 2 - 1); // yield buffer no longer is now less than half
 
-        assertEq(vault.maxDeposit(alice), 0);
+        assertEq(vault.maxDeposit(alice), 0); // maxDeposit is now zero
     }
 
     /* ============ maxMint ============ */
-        
-    function testMaxMint_zeroWhenLossy() external {
-        underlyingAsset.mint(alice, 1e18);
 
-        assertGe(vault.maxMint(alice), 1e18);
+    function testMaxMint_zeroWhenYieldBufferLessThanHalfFull() external {
+        underlyingAsset.mint(alice, 1e18);
+        
+        uint256 _yieldBuffer = vault.yieldBuffer();
+        assertGt(_yieldBuffer, 0);
+        underlyingAsset.mint(address(vault), _yieldBuffer / 2);
+
+        assertGe(vault.maxMint(alice), 1e18); // maxMint returns some normal value
 
         vm.startPrank(alice);
         underlyingAsset.approve(address(vault), 1e18);
         vault.mint(1e18, alice);
         vm.stopPrank();
 
-        underlyingAsset.mint(alice, 1e18);
-        underlyingAsset.burn(address(yieldVault), 1); // lost 1 asset in yield vault, new deposits will be lossy
+        assertEq(vault.currentYieldBuffer(), _yieldBuffer / 2); // check that yield buffer is still the same
+        underlyingAsset.burn(address(yieldVault), 1); // lost 1 asset in yield vault
+        assertEq(vault.currentYieldBuffer(), _yieldBuffer / 2 - 1); // yield buffer no longer is now less than half
 
-        assertEq(vault.maxMint(alice), 0);
+        assertEq(vault.maxMint(alice), 0); // maxMint is now zero
     }
 
     /* ============ convertToShares ============ */

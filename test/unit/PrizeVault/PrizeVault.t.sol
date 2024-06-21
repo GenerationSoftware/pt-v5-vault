@@ -255,6 +255,18 @@ contract PrizeVaultTest is UnitBaseSetup {
     /* ============ maxDeposit / maxMint ============ */
 
     function testMaxDeposit_SubtractsLatentBalance() public {
+        // ensure yield buffer is full
+        if (vault.currentYieldBuffer() < vault.yieldBuffer()) {
+            underlyingAsset.mint(address(vault), vault.yieldBuffer() - vault.currentYieldBuffer());
+
+            // flush buffer to yield vault so it doesn't count as latent balance
+            underlyingAsset.mint(alice, 1e18);
+            vm.startPrank(alice);
+            underlyingAsset.approve(address(vault), 1e18);
+            vault.deposit(1e18, alice);
+            vm.stopPrank();
+        }
+
         uint256 yieldVaultMaxDeposit = 1e18;
 
         // no latent balance, so full amount available
@@ -273,6 +285,11 @@ contract PrizeVaultTest is UnitBaseSetup {
     }
 
     function testMaxDeposit_LimitedByTwabSupplyLimit() public {
+        // ensure yield buffer is full
+        if (vault.currentYieldBuffer() < vault.yieldBuffer()) {
+            underlyingAsset.mint(address(vault), vault.yieldBuffer() - vault.currentYieldBuffer());
+        }
+
         assertEq(vault.maxDeposit(address(this)), type(uint96).max);
 
         // deposit a bunch of tokens
@@ -286,6 +303,11 @@ contract PrizeVaultTest is UnitBaseSetup {
     }
 
     function testMaxDeposit_ReturnsZeroIfTotalPreciseAssetsFails() public {
+        // ensure yield buffer is full
+        if (vault.currentYieldBuffer() < vault.yieldBuffer()) {
+            underlyingAsset.mint(address(vault), vault.yieldBuffer() - vault.currentYieldBuffer());
+        }
+
         assertGt(vault.maxDeposit(address(this)), 0);
 
         vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.previewRedeem.selector, 0), "force previewRedeem fail");
