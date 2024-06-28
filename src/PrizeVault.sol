@@ -686,6 +686,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Supports the liquidation of either assets or prize vault shares.
     function liquidatableBalanceOf(address _tokenOut) external view returns (uint256) {
         uint256 _totalDebt = totalDebt();
+        uint256 _yieldFeePercentage = yieldFeePercentage;
         uint256 _maxAmountOut;
         if (_tokenOut == address(this)) {
             // Liquidation of vault shares is capped to the mint limit.
@@ -693,6 +694,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         } else if (_tokenOut == address(_asset)) {
             // Liquidation of yield assets is capped at the max yield vault withdraw plus any latent balance.
             _maxAmountOut = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
+
+            // If a yield fee will be minted, then the liquidation will also be capped based on the remaining mint limit.
+            if (_yieldFeePercentage != 0) {
+                uint256 _maxAmountBasedOnFeeMintLimit = _mintLimit(_totalDebt).mulDiv(FEE_PRECISION, _yieldFeePercentage);
+                if (_maxAmountBasedOnFeeMintLimit < _maxAmountOut) {
+                    _maxAmountOut = _maxAmountBasedOnFeeMintLimit;
+                }
+            }
         } else {
             return 0;
         }
@@ -705,7 +714,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // The final balance is computed by taking the liquid yield and multiplying it by
         // (1 - yieldFeePercentage), rounding down, to ensure that enough yield is left for
         // the yield fee.
-        return _liquidYield.mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
+        return _liquidYield.mulDiv(FEE_PRECISION - _yieldFeePercentage, FEE_PRECISION);
     }
 
     /// @inheritdoc ILiquidationSource
