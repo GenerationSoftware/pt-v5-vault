@@ -405,6 +405,25 @@ contract PrizeVaultTest is UnitBaseSetup {
         assertEq(vault.maxRedeem(alice), 0);
     }
 
+    function testMaxRedeem_ReturnsZeroIfLossyAndNoTotalAssets() public {
+        // deposit some assets
+        underlyingAsset.mint(alice, 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+        
+        assertGt(vault.maxRedeem(alice), 0);
+
+        // yield vault loses all funds
+        underlyingAsset.burn(address(yieldVault), underlyingAsset.balanceOf(address(yieldVault)));
+        assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
+        assertEq(underlyingAsset.balanceOf(address(vault)), 0);
+        assertEq(vault.totalPreciseAssets(), 0);
+
+        assertEq(vault.maxRedeem(alice), 0);
+    }
+
     /* ============ previewWithdraw ============ */
 
     function testPreviewWithdraw() public {
