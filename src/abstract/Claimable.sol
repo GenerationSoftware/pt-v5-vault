@@ -26,9 +26,9 @@ abstract contract Claimable is HookManager, IClaimable {
     /// @notice The number of bytes to limit hook return / revert data.
     /// @dev If this limit is exceeded for `beforeClaimPrize` return data, the claim will revert.
     /// @dev Revert data for both hooks will also be limited to this size.
-    /// @dev 128 bytes is enough for `beforeClaimPrize` to return the recipient address as well as 32 bytes of additional
-    /// byte string data (32 for offset, 32 for length, 32 for data).
-    uint16 public constant HOOK_DATA_LIMIT = 128;
+    /// @dev 128 bytes is enough for `beforeClaimPrize` to return the `_prizeRecipient` address as well
+    /// as 32 bytes of additional `_hookData` byte string data (32 for offset, 32 for length, 32 for data).
+    uint16 public constant HOOK_RETURN_DATA_LIMIT = 128;
 
     /// @notice Address of the PrizePool that computes prizes.
     PrizePool public immutable prizePool;
@@ -54,7 +54,7 @@ abstract contract Claimable is HookManager, IClaimable {
     /// @param claimer The claimer address
     error CallerNotClaimer(address caller, address claimer);
 
-    /// @notice Thrown if relevant hook return data is greater than the `HOOK_DATA_LIMIT`.
+    /// @notice Thrown if relevant hook return data is greater than the `HOOK_RETURN_DATA_LIMIT`.
     /// @param returnDataSize The actual size of the return data
     /// @param hookDataLimit The return data size limit for hooks
     error ReturnDataOverLimit(uint256 returnDataSize, uint256 hookDataLimit);
@@ -88,7 +88,7 @@ abstract contract Claimable is HookManager, IClaimable {
 
     /// @inheritdoc IClaimable
     /// @dev Also calls the before and after claim hooks if set by the winner.
-    /// @dev Reverts if the return data size of the `beforeClaimPrize` hook exceeds `HOOK_DATA_LIMIT`.
+    /// @dev Reverts if the return data size of the `beforeClaimPrize` hook exceeds `HOOK_RETURN_DATA_LIMIT`.
     function claimPrize(
         address _winner,
         uint8 _tier,
@@ -111,10 +111,10 @@ abstract contract Claimable is HookManager, IClaimable {
                     _rewardRecipient
                 )
             );
-            // If the actual return data is greater than the `HOOK_DATA_LIMIT` then we must revert since the
+            // If the actual return data is greater than the `HOOK_RETURN_DATA_LIMIT` then we must revert since the
             // integrity of the data is not guaranteed.
-            if (_actualReturnDataSize > HOOK_DATA_LIMIT) {
-                revert ReturnDataOverLimit(_actualReturnDataSize, HOOK_DATA_LIMIT);
+            if (_actualReturnDataSize > HOOK_RETURN_DATA_LIMIT) {
+                revert ReturnDataOverLimit(_actualReturnDataSize, HOOK_RETURN_DATA_LIMIT);
             }
             (_prizeRecipient, _hookData) = abi.decode(_returnData, (address, bytes));
         } else {
@@ -175,7 +175,7 @@ abstract contract Claimable is HookManager, IClaimable {
         (_success, _returnData) = address(_implementation).excessivelySafeCall(
             HOOK_GAS,
             0, // value
-            HOOK_DATA_LIMIT,
+            HOOK_RETURN_DATA_LIMIT,
             _calldata
         );
         assembly {
@@ -184,8 +184,8 @@ abstract contract Claimable is HookManager, IClaimable {
 
         if (!_success) {
             // If we can't access the full revert data, we use a generic revert
-            if (_actualReturnDataSize > HOOK_DATA_LIMIT) {
-                revert ReturnDataOverLimit(_actualReturnDataSize, HOOK_DATA_LIMIT);
+            if (_actualReturnDataSize > HOOK_RETURN_DATA_LIMIT) {
+                revert ReturnDataOverLimit(_actualReturnDataSize, HOOK_RETURN_DATA_LIMIT);
             }
             // Otherwise, we use a low level revert to bubble up the revert reason
             assembly {
