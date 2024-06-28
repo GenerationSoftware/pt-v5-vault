@@ -6,6 +6,7 @@ brokentoken/=lib/brokentoken/src/
 openzeppelin/=lib/openzeppelin-contracts/contracts/
 owner-manager-contracts/=lib/owner-manager-contracts/contracts/
 yield-daddy/=lib/yield-daddy/src/
+excessively-safe-call/=lib/ExcessivelySafeCall/src/
 
 pt-v5-liquidator-interfaces/=lib/pt-v5-liquidator-interfaces/src/interfaces/
 pt-v5-twab-controller=lib/pt-v5-twab-controller/src/
