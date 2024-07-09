@@ -3,23 +3,23 @@ pragma solidity ^0.8.24;
 
 import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
-contract BeefyBaseWellWethVlpV2IntegrationTest is BaseIntegration {
+contract BeefyOpBifiWethVlpV2IntegrationTest is BaseIntegration {
     uint256 fork;
-    uint256 forkBlock = 16873531;
-    uint256 forkBlockTimestamp = 1720536409;
+    uint256 forkBlock = 122471326;
+    uint256 forkBlockTimestamp = 1720541429;
 
-    address internal _beefyWrapper = address(0x917447f8f52E7Db26cE7f52BE2F3fcb4d4D00832);
+    address internal _beefyWrapper = address(0x182be93E1C0C4d305fe43bD093292F21fd679797);
 
-    address internal _asset = address(0x89D0F320ac73dd7d9513FFC5bc58D1161452a657);
-    address internal _assetWhale = address(0x2E6caE38078d715711Fc6132dF961f653c456CD2);
+    address internal _asset = address(0x6Ed6Df1C23C51cb7Cc67a348cC8d9E6108EA3BFE);
+    address internal _assetWhale = address(0xcFa050836C3E5dfA98D065d2f365Cfd78a9011F9);
     address internal _yieldVault;
-    address internal _mooVault = address(0xacDBb7c90C0F764cA7BB5307d18C5b211Fbd9C00);
-    address internal _mooYieldSource = address(0x5a6859C2f992B998837342d29911dD14E8DC2E1a);
+    address internal _mooVault = address(0x57d00d036485B5fEE6A58c8763Bdc358906E6D19);
+    address internal _mooYieldSource = address(0x9E4342660e95568956Fe51f9AA6273b16d3f6B26);
 
     /* ============ setup ============ */
 
     function setUpUnderlyingAsset() public virtual override returns (IERC20 asset, uint8 decimals, uint256 approxAssetUsdExchangeRate) {
-        return (IERC20(_asset), 18, 20e18);
+        return (IERC20(_asset), 18, 1972e18);
     }
 
     function setUpYieldVault() public virtual override returns (IERC4626) {
@@ -30,13 +30,12 @@ contract BeefyBaseWellWethVlpV2IntegrationTest is BaseIntegration {
     }
 
     function setUpFork() public virtual override {
-        fork = vm.createFork(vm.rpcUrl("base"), forkBlock);
+        fork = vm.createFork(vm.rpcUrl("optimism"), forkBlock);
         vm.selectFork(fork);
         vm.warp(forkBlockTimestamp);
     }
 
     function beforeSetup() public virtual override {
-        assetPrecisionLoss = 1; // rounding errors exceed 1 wei, so a slightly larger yield buffer should be used for consistency
         lowGasPriceEstimate = 0.05 gwei; // just L2 gas, we ignore L1 costs for a super low estimate
         ignoreLoss = true; // loss would occur on the LP token, not the reward contract
     }

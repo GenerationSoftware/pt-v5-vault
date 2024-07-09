@@ -3,23 +3,25 @@ pragma solidity ^0.8.24;
 
 import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
-contract BeefyBaseWellWethVlpV2IntegrationTest is BaseIntegration {
+/// NOTE: must be run with evm version set to "cancun" (this can be done by setting the env var FOUNDRY_PROFILE=cancun)
+
+contract BeefyOpWbtcTbtcIntegrationTest is BaseIntegration {
     uint256 fork;
-    uint256 forkBlock = 16873531;
-    uint256 forkBlockTimestamp = 1720536409;
+    uint256 forkBlock = 122471326;
+    uint256 forkBlockTimestamp = 1720541429;
 
-    address internal _beefyWrapper = address(0x917447f8f52E7Db26cE7f52BE2F3fcb4d4D00832);
+    address internal _beefyWrapper = address(0x182be93E1C0C4d305fe43bD093292F21fd679797);
 
-    address internal _asset = address(0x89D0F320ac73dd7d9513FFC5bc58D1161452a657);
-    address internal _assetWhale = address(0x2E6caE38078d715711Fc6132dF961f653c456CD2);
+    address internal _asset = address(0x1Dc5c0f8668a9F54ED922171d578011850ca0341);
+    address internal _assetWhale = address(0x952815eA349a0c10db5d854a16A27d768e85053e);
     address internal _yieldVault;
-    address internal _mooVault = address(0xacDBb7c90C0F764cA7BB5307d18C5b211Fbd9C00);
-    address internal _mooYieldSource = address(0x5a6859C2f992B998837342d29911dD14E8DC2E1a);
+    address internal _mooVault = address(0x611bB2B496c9381CdcD07458b3cfC734583429f9);
+    address internal _mooYieldSource = address(0x8D8d9aD4EEdbe335B7dA4DEd5Af32808C1032276);
 
     /* ============ setup ============ */
 
     function setUpUnderlyingAsset() public virtual override returns (IERC20 asset, uint8 decimals, uint256 approxAssetUsdExchangeRate) {
-        return (IERC20(_asset), 18, 20e18);
+        return (IERC20(_asset), 18, 57385e18);
     }
 
     function setUpYieldVault() public virtual override returns (IERC4626) {
@@ -30,13 +32,12 @@ contract BeefyBaseWellWethVlpV2IntegrationTest is BaseIntegration {
     }
 
     function setUpFork() public virtual override {
-        fork = vm.createFork(vm.rpcUrl("base"), forkBlock);
+        fork = vm.createFork(vm.rpcUrl("optimism"), forkBlock);
         vm.selectFork(fork);
         vm.warp(forkBlockTimestamp);
     }
 
     function beforeSetup() public virtual override {
-        assetPrecisionLoss = 1; // rounding errors exceed 1 wei, so a slightly larger yield buffer should be used for consistency
         lowGasPriceEstimate = 0.05 gwei; // just L2 gas, we ignore L1 costs for a super low estimate
         ignoreLoss = true; // loss would occur on the LP token, not the reward contract
     }
@@ -58,7 +59,7 @@ contract BeefyBaseWellWethVlpV2IntegrationTest is BaseIntegration {
     /// @dev Accrues yield by letting time pass and triggering multiple yield accruals
     function _accrueYield() internal virtual override prankception(_assetWhale) {
         // yield accrues on deposit / withdraw so we can do a deposit and withdraw to the yield vault directly to trigger some yield accrual
-        uint256 amount = 10 ** (assetDecimals - 1); // some small amount of assets
+        uint256 amount = maxDeal() / 100; // some small amount of assets
         underlyingAsset.approve(_yieldVault, amount);
         yieldVault.deposit(amount, _assetWhale);
         vm.warp(block.timestamp + 1 days); // let 1 day pass by
