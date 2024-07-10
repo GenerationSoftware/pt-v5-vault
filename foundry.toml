@@ -16,6 +16,9 @@ max_test_rejects = 100000
 runs = 100
 max_test_rejects = 1000
 
+[profile.cancun]
+evm_version = "cancun"
+
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"

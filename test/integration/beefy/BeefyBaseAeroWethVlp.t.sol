@@ -3,23 +3,23 @@ pragma solidity ^0.8.24;
 
 import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
-contract BeefyBaseWellWethVlpV2IntegrationTest is BaseIntegration {
+contract BeefyBaseAeroWethVlpIntegrationTest is BaseIntegration {
     uint256 fork;
     uint256 forkBlock = 16873531;
     uint256 forkBlockTimestamp = 1720536409;
 
     address internal _beefyWrapper = address(0x917447f8f52E7Db26cE7f52BE2F3fcb4d4D00832);
 
-    address internal _asset = address(0x89D0F320ac73dd7d9513FFC5bc58D1161452a657);
-    address internal _assetWhale = address(0x2E6caE38078d715711Fc6132dF961f653c456CD2);
+    address internal _asset = address(0x6cDcb1C4A4D1C3C6d054b27AC5B77e89eAFb971d);
+    address internal _assetWhale = address(0xc1342eE2B9d9E8f1B7A612131b69cf03261957E0);
     address internal _yieldVault;
-    address internal _mooVault = address(0xacDBb7c90C0F764cA7BB5307d18C5b211Fbd9C00);
-    address internal _mooYieldSource = address(0x5a6859C2f992B998837342d29911dD14E8DC2E1a);
+    address internal _mooVault = address(0xc005B9833deBcF5fe6cc5bC9ba4fD74Bb382ae55);
+    address internal _mooYieldSource = address(0xedE4Dd6758634007Eb1f4cF8A203bf237A44ea4C);
 
     /* ============ setup ============ */
 
     function setUpUnderlyingAsset() public virtual override returns (IERC20 asset, uint8 decimals, uint256 approxAssetUsdExchangeRate) {
-        return (IERC20(_asset), 18, 20e18);
+        return (IERC20(_asset), 18, 82460000e18);
     }
 
     function setUpYieldVault() public virtual override returns (IERC4626) {
