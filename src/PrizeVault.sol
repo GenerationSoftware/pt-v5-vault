@@ -12,7 +12,7 @@ import { TwabERC20 } from "./TwabERC20.sol";
 
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
-import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
+import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 /// @dev The TWAB supply limit is the max number of shares that can be minted in the TWAB controller.
 uint256 constant TWAB_SUPPLY_LIMIT = type(uint96).max;
@@ -151,12 +151,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Emitted when a new yield fee percentage has been set.
     /// @param yieldFeePercentage New yield fee percentage
     event YieldFeePercentageSet(uint256 yieldFeePercentage);
-
-    /// @notice Emitted when a user sponsors the Vault.
-    /// @param caller Address that called the function
-    /// @param assets Amount of assets deposited into the Vault
-    /// @param shares Amount of shares minted to the caller address
-    event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
     /// @notice Emitted when yield is transferred out by the liquidation pair address.
     /// @param liquidationPair The liquidation pair address that initiated the transfer
@@ -551,25 +545,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
         uint256 _shares = previewDeposit(_assets);
         _depositAndMint(_owner, _owner, _assets, _shares);
-        return _shares;
-    }
-
-    /// @notice Deposit assets into the Vault and delegate to the sponsorship address.
-    /// @dev Emits a `Sponsor` event
-    /// @param _assets Amount of assets to deposit
-    /// @return Amount of shares minted to caller.
-    function sponsor(uint256 _assets) external returns (uint256) {
-        address _owner = msg.sender;
-
-        uint256 _shares = previewDeposit(_assets);
-        _depositAndMint(_owner, _owner, _assets, _shares);
-
-        if (twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS) {
-            twabController.sponsor(_owner);
-        }
-
-        emit Sponsor(_owner, _assets, _shares);
-
         return _shares;
     }
 

@@ -128,26 +128,6 @@ contract PrizeVaultDepositLossyProtection is UnitBaseSetup {
         vm.stopPrank();
     }
 
-    /* ============ sponsor ============ */
-        
-    function testSponsor_revertWhenLossy() external {
-        underlyingAsset.mint(alice, 1e18);
-
-        vm.startPrank(alice);
-        underlyingAsset.approve(address(vault), 1e18);
-        vault.sponsor(1e18);
-        vm.stopPrank();
-
-        underlyingAsset.mint(alice, 1e18);
-        underlyingAsset.burn(address(yieldVault), 1); // lost 1 asset in yield vault, new sponsors will be lossy
-
-        vm.startPrank(alice);
-        underlyingAsset.approve(address(vault), 1e18);
-        vm.expectRevert(abi.encodeWithSelector(PrizeVault.LossyDeposit.selector, 2e18 - 1, 2e18));
-        vault.sponsor(1e18);
-        vm.stopPrank();
-    }
-
     /* ============ depositWithPermit ============ */
         
     function testDepositWithPermit_revertWhenLossy() external {

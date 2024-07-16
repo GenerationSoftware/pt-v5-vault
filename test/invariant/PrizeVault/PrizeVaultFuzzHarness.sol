@@ -50,8 +50,6 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
     address public joe;
     uint256 public joePrivateKey;
 
-    address public constant SPONSORSHIP_ADDRESS = address(1);
-
     PrizeVault public vault;
     string public vaultName = "PoolTogether Test Vault";
     string public vaultSymbol = "pTest";
@@ -295,19 +293,6 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
         }
         vault.depositWithPermit(assets, currentActor, block.timestamp, _v, _r, _s);
         vm.stopPrank();
-    }
-
-    /* ============ sponsor ============ */
-
-    function sponsor(uint256 callerSeed, uint256 assets) public useCurrentTime useActor(callerSeed) {
-        assets = _bound(assets, 0, vault.maxDeposit(currentActor));
-        assets = _bound(assets, 0, _maxDealAssets());
-        _dealAssets(currentActor, assets);
-        IERC20(vault.asset()).approve(address(vault), assets);
-
-        vm.expectEmit();
-        emit Deposit(currentActor, currentActor, assets, vault.previewDeposit(assets));
-        vault.sponsor(assets);
     }
 
     /* ============ claimYieldFeeShares ============ */

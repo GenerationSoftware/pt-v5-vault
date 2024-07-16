@@ -30,7 +30,6 @@ contract UnitBaseSetup is Test, Permit {
     event MockContribute(address prizeVault, uint256 amount);
     event ClaimYieldFeeShares(address indexed recipient, uint256 shares);
     event TransferYieldOut(address indexed liquidationPair, address indexed tokenOut, address indexed recipient, uint256 amountOut, uint256 yieldFee);
-    event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
     /* ============ variables ============ */
 
@@ -42,8 +41,6 @@ contract UnitBaseSetup is Test, Permit {
 
     address internal bob;
     uint256 internal bobPrivateKey;
-
-    address public constant SPONSORSHIP_ADDRESS = address(1);
 
     PrizeVaultWrapper public vault;
     string public vaultName = "PoolTogether Test Vault";

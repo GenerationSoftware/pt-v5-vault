@@ -480,42 +480,6 @@ contract PrizeVaultTest is UnitBaseSetup {
         vault.previewWithdraw(1);
     }
 
-    /* ============ sponsor ============ */
-
-    function testSponsor() public {
-        // sponsor the vault
-        uint256 assets = 4e18;
-        underlyingAsset.mint(address(this), assets);
-        underlyingAsset.approve(address(vault), assets);
-        vm.expectEmit();
-        emit Sponsor(address(this), assets, assets); // 1:1
-        uint256 shares = vault.sponsor(assets);
-        assertEq(shares, assets);
-        assertEq(twabController.delegateOf(address(vault), address(this)), address(1));
-
-        // sponsor again
-        underlyingAsset.mint(address(this), assets);
-        underlyingAsset.approve(address(vault), assets);
-        vm.expectEmit();
-        emit Sponsor(address(this), assets, assets); // 1:1
-        shares = vault.sponsor(assets);
-        assertEq(shares, assets);
-        assertEq(twabController.delegateOf(address(vault), address(this)), address(1));
-    }
-
-    // tests if the TWAB sponsor call reverts
-    function testSponsor_SameDelegateAlreadySet() public {
-        uint256 assets = 4e18;
-        underlyingAsset.mint(address(this), assets);
-        underlyingAsset.approve(address(vault), assets);
-
-        // spoof sponsor revert
-        bytes memory err = abi.encodeWithSelector(SameDelegateAlreadySet.selector, address(this));
-        vm.mockCallRevert(address(twabController), abi.encodeWithSelector(TwabController.sponsor.selector, address(this)), err);
-        vm.expectRevert(err);
-        vault.sponsor(assets);
-    }
-
     /* ============ depositAndMint ============ */
 
     function testDepositAndMint_DepositZeroAssets() public {
