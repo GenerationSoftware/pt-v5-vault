@@ -28,7 +28,6 @@ abstract contract BaseIntegration is Test, Permit {
     event MockContribute(address prizeVault, uint256 amount);
     event ClaimYieldFeeShares(address indexed recipient, uint256 shares);
     event TransferYieldOut(address indexed liquidationPair, address indexed tokenOut, address indexed recipient, uint256 amountOut, uint256 yieldFee);
-    event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
     /* ============ variables ============ */
 

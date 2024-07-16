@@ -12,7 +12,7 @@ import { TwabERC20 } from "./TwabERC20.sol";
 
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
-import { TwabController, SPONSORSHIP_ADDRESS } from "pt-v5-twab-controller/TwabController.sol";
+import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 /// @dev The TWAB supply limit is the max number of shares that can be minted in the TWAB controller.
 uint256 constant TWAB_SUPPLY_LIMIT = type(uint96).max;
@@ -151,12 +151,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @notice Emitted when a new yield fee percentage has been set.
     /// @param yieldFeePercentage New yield fee percentage
     event YieldFeePercentageSet(uint256 yieldFeePercentage);
-
-    /// @notice Emitted when a user sponsors the Vault.
-    /// @param caller Address that called the function
-    /// @param assets Amount of assets deposited into the Vault
-    /// @param shares Amount of shares minted to the caller address
-    event Sponsor(address indexed caller, uint256 assets, uint256 shares);
 
     /// @notice Emitted when yield is transferred out by the liquidation pair address.
     /// @param liquidationPair The liquidation pair address that initiated the transfer
@@ -377,13 +371,16 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Considers the TWAB mint limit
     /// @dev Returns zero if any deposit would result in a loss of assets
     /// @dev Returns zero if total assets cannot be determined
+    /// @dev Returns zero if the yield buffer is less than half full. This is a safety precaution to ensure
+    /// a deposit of the asset amount returned by this function cannot reasonably trigger a `LossyDeposit`
+    /// revert in the `deposit` or `mint` functions if the yield buffer has been configured properly.
     /// @dev Any latent balance of assets in the prize vault will be swept in with the deposit as a part of
     /// the "dust collection strategy". This means that the max deposit must account for the latent balance
     /// by subtracting it from the max deposit available otherwise.
     function maxDeposit(address /* receiver */) public view returns (uint256) {
         uint256 _totalDebt = totalDebt();
         (bool _success, uint256 _totalAssets) = _tryGetTotalPreciseAssets();
-        if (!_success || _totalAssets < _totalDebt) return 0;
+        if (!_success || _totalAssets < _totalDebt + yieldBuffer / 2) return 0;
 
         uint256 _latentBalance = _asset.balanceOf(address(this));
         uint256 _maxYieldVaultDeposit = yieldVault.maxDeposit(address(this));
@@ -551,25 +548,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         return _shares;
     }
 
-    /// @notice Deposit assets into the Vault and delegate to the sponsorship address.
-    /// @dev Emits a `Sponsor` event
-    /// @param _assets Amount of assets to deposit
-    /// @return Amount of shares minted to caller.
-    function sponsor(uint256 _assets) external returns (uint256) {
-        address _owner = msg.sender;
-
-        uint256 _shares = previewDeposit(_assets);
-        _depositAndMint(_owner, _owner, _assets, _shares);
-
-        if (twabController.delegateOf(address(this), _owner) != SPONSORSHIP_ADDRESS) {
-            twabController.sponsor(_owner);
-        }
-
-        emit Sponsor(_owner, _assets, _shares);
-
-        return _shares;
-    }
-
     ////////////////////////////////////////////////////////////////////////////////
     // Additional Withdrawal Flows
     ////////////////////////////////////////////////////////////////////////////////
@@ -686,6 +664,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Supports the liquidation of either assets or prize vault shares.
     function liquidatableBalanceOf(address _tokenOut) external view returns (uint256) {
         uint256 _totalDebt = totalDebt();
+        uint256 _yieldFeePercentage = yieldFeePercentage;
         uint256 _maxAmountOut;
         if (_tokenOut == address(this)) {
             // Liquidation of vault shares is capped to the mint limit.
@@ -693,6 +672,14 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         } else if (_tokenOut == address(_asset)) {
             // Liquidation of yield assets is capped at the max yield vault withdraw plus any latent balance.
             _maxAmountOut = _maxYieldVaultWithdraw() + _asset.balanceOf(address(this));
+
+            // If a yield fee will be minted, then the liquidation will also be capped based on the remaining mint limit.
+            if (_yieldFeePercentage != 0) {
+                uint256 _maxAmountBasedOnFeeMintLimit = _mintLimit(_totalDebt).mulDiv(FEE_PRECISION, _yieldFeePercentage);
+                if (_maxAmountBasedOnFeeMintLimit < _maxAmountOut) {
+                    _maxAmountOut = _maxAmountBasedOnFeeMintLimit;
+                }
+            }
         } else {
             return 0;
         }
@@ -705,7 +692,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         // The final balance is computed by taking the liquid yield and multiplying it by
         // (1 - yieldFeePercentage), rounding down, to ensure that enough yield is left for
         // the yield fee.
-        return _liquidYield.mulDiv(FEE_PRECISION - yieldFeePercentage, FEE_PRECISION);
+        return _liquidYield.mulDiv(FEE_PRECISION - _yieldFeePercentage, FEE_PRECISION);
     }
 
     /// @inheritdoc ILiquidationSource
@@ -856,6 +843,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     }
 
     /// @notice Converts assets to shares with the given vault state and rounding direction.
+    /// @dev Returns zero if the vault is in a lossy state AND there are no more assets.
     /// @param _assets The assets to convert
     /// @param _totalAssets The total assets that the vault controls
     /// @param _totalDebt The total debt the vault owes
@@ -873,7 +861,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             // If the vault controls less assets than what has been deposited a share will be worth a
             // proportional amount of the total assets. This can happen due to fees, slippage, or loss
             // of funds in the underlying yield vault.
-            return _assets.mulDiv(_totalDebt, _totalAssets, _rounding);
+            return _totalAssets == 0 ? 0 : _assets.mulDiv(_totalDebt, _totalAssets, _rounding);
         }
     }
 

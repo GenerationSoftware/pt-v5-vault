@@ -123,6 +123,50 @@ contract PrizeVaultLiquidationTest is UnitBaseSetup {
         vault.claimYieldFeeShares(supplyCapLeft - amountOut);
     }
 
+    function testLiquidatableBalanceOf_hasBalanceAtShareLimitWhenNoFee() public {
+        vault.setYieldFeePercentage(0); // no fee
+
+        // make a large deposit to use all of the shares:
+        underlyingAsset.mint(address(alice), type(uint96).max);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), type(uint96).max);
+        vault.deposit(type(uint96).max, alice);
+        vm.stopPrank();
+
+        underlyingAsset.mint(address(vault), 1e18);
+        uint256 availableYield = vault.availableYieldBalance();
+        assertApproxEqAbs(availableYield, 1e18 - vault.yieldBuffer(), 1);
+
+        assertEq(vault.liquidatableBalanceOf(address(underlyingAsset)), availableYield); // can still liquidate
+    }
+
+    function testLiquidatableBalanceOf_respectsFeeShareLimitWithAssetBalance() public {
+        vault.setYieldFeePercentage(1e8); // 10% fee
+
+        uint256 supplyCapLeft = 100; // this means that with a 10% fee, we should be able to liquidate 900 assets so that the yield fee is minted up to the supply cap, but no further
+
+        // make a large deposit to use most of the shares:
+        underlyingAsset.mint(address(alice), type(uint96).max);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), type(uint96).max - supplyCapLeft);
+        vault.deposit(type(uint96).max - supplyCapLeft, alice);
+        vm.stopPrank();
+
+        underlyingAsset.mint(address(vault), 1e18);
+        uint256 availableYield = vault.availableYieldBalance();
+        assertApproxEqAbs(availableYield, 1e18 - vault.yieldBuffer(), 1);
+
+        assertGt(availableYield, 900);
+
+        assertEq(vault.liquidatableBalanceOf(address(underlyingAsset)), 900); // capped at 900 since that results in our max 100 yield fee mint
+
+        // ensure a liquidation can occur at the max:
+        vault.setLiquidationPair(address(this));
+        vm.expectEmit();
+        emit TransferYieldOut(address(this), address(underlyingAsset), alice, 900, 100);
+        vault.transferTokensOut(address(0), alice, address(underlyingAsset), 900);
+    }
+
     /* ============ transferTokensOut ============ */
 
     function testTransferTokensOut_noFee() public {

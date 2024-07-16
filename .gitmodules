@@ -37,3 +37,6 @@
 [submodule "lib/yield-daddy"]
 	path = lib/yield-daddy
 	url = https://github.com/timeless-fi/yield-daddy
+[submodule "lib/ExcessivelySafeCall"]
+	path = lib/ExcessivelySafeCall
+	url = https://github.com/nomad-xyz/ExcessivelySafeCall

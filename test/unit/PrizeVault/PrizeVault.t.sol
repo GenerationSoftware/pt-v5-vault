@@ -255,6 +255,18 @@ contract PrizeVaultTest is UnitBaseSetup {
     /* ============ maxDeposit / maxMint ============ */
 
     function testMaxDeposit_SubtractsLatentBalance() public {
+        // ensure yield buffer is full
+        if (vault.currentYieldBuffer() < vault.yieldBuffer()) {
+            underlyingAsset.mint(address(vault), vault.yieldBuffer() - vault.currentYieldBuffer());
+
+            // flush buffer to yield vault so it doesn't count as latent balance
+            underlyingAsset.mint(alice, 1e18);
+            vm.startPrank(alice);
+            underlyingAsset.approve(address(vault), 1e18);
+            vault.deposit(1e18, alice);
+            vm.stopPrank();
+        }
+
         uint256 yieldVaultMaxDeposit = 1e18;
 
         // no latent balance, so full amount available
@@ -273,6 +285,11 @@ contract PrizeVaultTest is UnitBaseSetup {
     }
 
     function testMaxDeposit_LimitedByTwabSupplyLimit() public {
+        // ensure yield buffer is full
+        if (vault.currentYieldBuffer() < vault.yieldBuffer()) {
+            underlyingAsset.mint(address(vault), vault.yieldBuffer() - vault.currentYieldBuffer());
+        }
+
         assertEq(vault.maxDeposit(address(this)), type(uint96).max);
 
         // deposit a bunch of tokens
@@ -286,6 +303,11 @@ contract PrizeVaultTest is UnitBaseSetup {
     }
 
     function testMaxDeposit_ReturnsZeroIfTotalPreciseAssetsFails() public {
+        // ensure yield buffer is full
+        if (vault.currentYieldBuffer() < vault.yieldBuffer()) {
+            underlyingAsset.mint(address(vault), vault.yieldBuffer() - vault.currentYieldBuffer());
+        }
+
         assertGt(vault.maxDeposit(address(this)), 0);
 
         vm.mockCallRevert(address(yieldVault), abi.encodeWithSelector(IERC4626.previewRedeem.selector, 0), "force previewRedeem fail");
@@ -405,6 +427,25 @@ contract PrizeVaultTest is UnitBaseSetup {
         assertEq(vault.maxRedeem(alice), 0);
     }
 
+    function testMaxRedeem_ReturnsZeroIfLossyAndNoTotalAssets() public {
+        // deposit some assets
+        underlyingAsset.mint(alice, 1e18);
+        vm.startPrank(alice);
+        underlyingAsset.approve(address(vault), 1e18);
+        vault.deposit(1e18, alice);
+        vm.stopPrank();
+        
+        assertGt(vault.maxRedeem(alice), 0);
+
+        // yield vault loses all funds
+        underlyingAsset.burn(address(yieldVault), underlyingAsset.balanceOf(address(yieldVault)));
+        assertEq(underlyingAsset.balanceOf(address(yieldVault)), 0);
+        assertEq(underlyingAsset.balanceOf(address(vault)), 0);
+        assertEq(vault.totalPreciseAssets(), 0);
+
+        assertEq(vault.maxRedeem(alice), 0);
+    }
+
     /* ============ previewWithdraw ============ */
 
     function testPreviewWithdraw() public {
@@ -437,42 +478,6 @@ contract PrizeVaultTest is UnitBaseSetup {
         assertEq(vault.totalPreciseAssets(), 0);
         vm.expectRevert(abi.encodeWithSelector(PrizeVault.ZeroTotalAssets.selector));
         vault.previewWithdraw(1);
-    }
-
-    /* ============ sponsor ============ */
-
-    function testSponsor() public {
-        // sponsor the vault
-        uint256 assets = 4e18;
-        underlyingAsset.mint(address(this), assets);
-        underlyingAsset.approve(address(vault), assets);
-        vm.expectEmit();
-        emit Sponsor(address(this), assets, assets); // 1:1
-        uint256 shares = vault.sponsor(assets);
-        assertEq(shares, assets);
-        assertEq(twabController.delegateOf(address(vault), address(this)), address(1));
-
-        // sponsor again
-        underlyingAsset.mint(address(this), assets);
-        underlyingAsset.approve(address(vault), assets);
-        vm.expectEmit();
-        emit Sponsor(address(this), assets, assets); // 1:1
-        shares = vault.sponsor(assets);
-        assertEq(shares, assets);
-        assertEq(twabController.delegateOf(address(vault), address(this)), address(1));
-    }
-
-    // tests if the TWAB sponsor call reverts
-    function testSponsor_SameDelegateAlreadySet() public {
-        uint256 assets = 4e18;
-        underlyingAsset.mint(address(this), assets);
-        underlyingAsset.approve(address(vault), assets);
-
-        // spoof sponsor revert
-        bytes memory err = abi.encodeWithSelector(SameDelegateAlreadySet.selector, address(this));
-        vm.mockCallRevert(address(twabController), abi.encodeWithSelector(TwabController.sponsor.selector, address(this)), err);
-        vm.expectRevert(err);
-        vault.sponsor(assets);
     }
 
     /* ============ depositAndMint ============ */

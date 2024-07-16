@@ -3,14 +3,17 @@ pragma solidity ^0.8.24;
 
 import { IClaimable } from "pt-v5-claimable-interface/interfaces/IClaimable.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
+import { ExcessivelySafeCall  } from "excessively-safe-call/ExcessivelySafeCall.sol";
 
 import { HookManager } from "./HookManager.sol";
+import { IPrizeHooks } from "../interfaces/IPrizeHooks.sol";
 
 /// @title  PoolTogether V5 Claimable Vault Extension
 /// @author G9 Software Inc.
 /// @notice Provides an interface for Claimer contracts to interact with a vault in PoolTogether
 /// V5 while allowing each account to set and manage prize hooks that are called when they win.
 abstract contract Claimable is HookManager, IClaimable {
+    using ExcessivelySafeCall for address;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Public Constants and Variables
@@ -19,6 +22,13 @@ abstract contract Claimable is HookManager, IClaimable {
     /// @notice The gas to give to each of the before and after prize claim hooks.
     /// @dev This should be enough gas to mint an NFT if needed.
     uint24 public constant HOOK_GAS = 150_000;
+
+    /// @notice The number of bytes to limit hook return / revert data.
+    /// @dev If this limit is exceeded for `beforeClaimPrize` return data, the claim will revert.
+    /// @dev Revert data for both hooks will also be limited to this size.
+    /// @dev 128 bytes is enough for `beforeClaimPrize` to return the `_prizeRecipient` address as well
+    /// as 32 bytes of additional `_hookData` byte string data (32 for offset, 32 for length, 32 for data).
+    uint16 public constant HOOK_RETURN_DATA_LIMIT = 128;
 
     /// @notice Address of the PrizePool that computes prizes.
     PrizePool public immutable prizePool;
@@ -43,6 +53,11 @@ abstract contract Claimable is HookManager, IClaimable {
     /// @param caller The caller address
     /// @param claimer The claimer address
     error CallerNotClaimer(address caller, address claimer);
+
+    /// @notice Thrown if relevant hook return data is greater than the `HOOK_RETURN_DATA_LIMIT`.
+    /// @param returnDataSize The actual size of the return data
+    /// @param hookDataLimit The return data size limit for hooks
+    error ReturnDataOverLimit(uint256 returnDataSize, uint256 hookDataLimit);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Modifiers
@@ -73,6 +88,7 @@ abstract contract Claimable is HookManager, IClaimable {
 
     /// @inheritdoc IClaimable
     /// @dev Also calls the before and after claim hooks if set by the winner.
+    /// @dev Reverts if the return data size of the `beforeClaimPrize` hook exceeds `HOOK_RETURN_DATA_LIMIT`.
     function claimPrize(
         address _winner,
         uint8 _tier,
@@ -84,13 +100,23 @@ abstract contract Claimable is HookManager, IClaimable {
         bytes memory _hookData;
 
         if (_hooks[_winner].useBeforeClaimPrize) {
-            (_prizeRecipient, _hookData) = _hooks[_winner].implementation.beforeClaimPrize{ gas: HOOK_GAS }(
-                _winner,
-                _tier,
-                _prizeIndex,
-                _reward,
-                _rewardRecipient
+            (bytes memory _returnData, uint256 _actualReturnDataSize) = _safeHookCall(
+                _hooks[_winner].implementation,
+                abi.encodeWithSelector(
+                    IPrizeHooks.beforeClaimPrize.selector,
+                    _winner,
+                    _tier,
+                    _prizeIndex,
+                    _reward,
+                    _rewardRecipient
+                )
             );
+            // If the actual return data is greater than the `HOOK_RETURN_DATA_LIMIT` then we must revert since the
+            // integrity of the data is not guaranteed.
+            if (_actualReturnDataSize > HOOK_RETURN_DATA_LIMIT) {
+                revert ReturnDataOverLimit(_actualReturnDataSize, HOOK_RETURN_DATA_LIMIT);
+            }
+            (_prizeRecipient, _hookData) = abi.decode(_returnData, (address, bytes));
         } else {
             _prizeRecipient = _winner;
         }
@@ -107,13 +133,17 @@ abstract contract Claimable is HookManager, IClaimable {
         );
 
         if (_hooks[_winner].useAfterClaimPrize) {
-            _hooks[_winner].implementation.afterClaimPrize{ gas: HOOK_GAS }(
-                _winner,
-                _tier,
-                _prizeIndex,
-                _prizeTotal - _reward,
-                _prizeRecipient,
-                _hookData
+            _safeHookCall(
+                _hooks[_winner].implementation,
+                abi.encodeWithSelector(
+                    IPrizeHooks.afterClaimPrize.selector,
+                    _winner,
+                    _tier,
+                    _prizeIndex,
+                    _prizeTotal - _reward,
+                    _prizeRecipient,
+                    _hookData
+                )
             );
         }
 
@@ -131,6 +161,37 @@ abstract contract Claimable is HookManager, IClaimable {
         if (_claimer == address(0)) revert ClaimerZeroAddress();
         claimer = _claimer;
         emit ClaimerSet(_claimer);
+    }
+
+    /// @notice Uses ExcessivelySafeCall to limit the return data size to a safe limit.
+    /// @dev This is used for both hook calls to prevent gas bombs that can be triggered using a large
+    /// amount of return data or a large revert string.
+    /// @dev In the case of an unsuccessful call, the revert reason will be bubbled up if it is within
+    /// the safe data limit. Otherwise, a `ReturnDataOverLimit` reason will be thrown.
+    /// @return _returnData The safe, size limited return data
+    /// @return _actualReturnDataSize The actual return data size of the original result
+    function _safeHookCall(IPrizeHooks _implementation, bytes memory _calldata) internal returns (bytes memory _returnData, uint256 _actualReturnDataSize) {
+        bool _success;
+        (_success, _returnData) = address(_implementation).excessivelySafeCall(
+            HOOK_GAS,
+            0, // value
+            HOOK_RETURN_DATA_LIMIT,
+            _calldata
+        );
+        assembly {
+            _actualReturnDataSize := returndatasize()
+        }
+
+        if (!_success) {
+            // If we can't access the full revert data, we use a generic revert
+            if (_actualReturnDataSize > HOOK_RETURN_DATA_LIMIT) {
+                revert ReturnDataOverLimit(_actualReturnDataSize, HOOK_RETURN_DATA_LIMIT);
+            }
+            // Otherwise, we use a low level revert to bubble up the revert reason
+            assembly {
+                revert(add(32, _returnData), mload(_returnData))
+            }
+        }
     }
     
 }

@@ -250,6 +250,236 @@ contract ClaimableTest is Test, IPrizeHooks {
         claimable.claimPrize(alice, 1, 2, 1e17, bob);
     }
 
+    function testClaimPrize_beforeClaimPrize_ReturnDataOverLimit_hookData() public {
+        bytes memory tooMuchHookData = new bytes(33); // 33 bytes of data
+
+        // mock to return too much hook data
+        vm.mockCall(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.beforeClaimPrize.selector,
+                alice, 1, 2, 1e17, bob
+            ),
+            abi.encode(alice, tooMuchHookData)
+        );
+
+        PrizeHooks memory bothHooks = PrizeHooks(true, true, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(bothHooks);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, alice, 1e17, bob);
+
+        // We expect a revert since the `beforeClaimPrize` function returns too much data
+        vm.expectRevert(abi.encodeWithSelector(Claimable.ReturnDataOverLimit.selector, 160, 128)); // 5 words used, which is 32 bytes over the limit
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
+    function testClaimPrize_beforeClaimPrize_ReturnDataOverLimit_onRevert() public {
+        bytes memory tooMuchRevertData = new bytes(129); // 129 bytes of revert data
+
+        // mock to revert with too much data
+        vm.mockCallRevert(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.beforeClaimPrize.selector,
+                alice, 1, 2, 1e17, bob
+            ),
+            tooMuchRevertData
+        );
+
+        PrizeHooks memory beforeHookOnly = PrizeHooks(true, false, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(beforeHookOnly);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, prizeRedirectionAddress, 1e17, bob);
+
+        vm.expectRevert(abi.encodeWithSelector(Claimable.ReturnDataOverLimit.selector, 129, 128)); // 1 byte over the limit
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
+    function testClaimPrize_afterClaimPrize_ReturnDataOverLimit_onRevert() public {
+        bytes memory tooMuchRevertData = new bytes(129); // 129 bytes of revert data
+
+        // mock to revert with too much data
+        vm.mockCallRevert(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.afterClaimPrize.selector,
+                alice, 1, 2, 9e17, alice, ""
+            ),
+            tooMuchRevertData
+        );
+
+        PrizeHooks memory afterHookOnly = PrizeHooks(false, true, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(afterHookOnly);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, alice, 1e17, bob);
+
+        vm.expectRevert(abi.encodeWithSelector(Claimable.ReturnDataOverLimit.selector, 129, 128)); // 1 byte over the limit
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
+    function testClaimPrize_beforeClaimPrize_bubblesRevertData() public {
+        bytes memory maxRevertData = new bytes(128); // 128 bytes of revert data
+        maxRevertData[0] = bytes1(0x01); // make the data non-zero
+
+        // mock to revert with too much data
+        vm.mockCallRevert(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.beforeClaimPrize.selector,
+                alice, 1, 2, 1e17, bob
+            ),
+            maxRevertData
+        );
+
+        PrizeHooks memory beforeHookOnly = PrizeHooks(true, false, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(beforeHookOnly);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, prizeRedirectionAddress, 1e17, bob);
+
+        vm.expectRevert(maxRevertData); // expected bubbled revert data
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
+    function testClaimPrize_afterClaimPrize_bubblesRevertData() public {
+        bytes memory maxRevertData = new bytes(128); // 128 bytes of revert data
+        maxRevertData[0] = bytes1(0x01); // make the data non-zero
+
+        // mock to revert with too much data
+        vm.mockCallRevert(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.afterClaimPrize.selector,
+                alice, 1, 2, 9e17, alice, ""
+            ),
+            maxRevertData
+        );
+
+        PrizeHooks memory afterHookOnly = PrizeHooks(false, true, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(afterHookOnly);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, alice, 1e17, bob);
+
+        vm.expectRevert(maxRevertData); // expected bubbled revert data
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
+    function testClaimPrize_beforeClaimPrize_bubblesEmptyRevertData() public {
+        bytes memory emptyRevertData = new bytes(0); // 0 bytes
+
+        // mock to revert with too much data
+        vm.mockCallRevert(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.beforeClaimPrize.selector,
+                alice, 1, 2, 1e17, bob
+            ),
+            emptyRevertData
+        );
+
+        PrizeHooks memory beforeHookOnly = PrizeHooks(true, false, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(beforeHookOnly);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, prizeRedirectionAddress, 1e17, bob);
+
+        vm.expectRevert(emptyRevertData); // expected bubbled empty revert data
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
+    function testClaimPrize_afterClaimPrize_bubblesEmptyRevertData() public {
+        bytes memory emptyRevertData = new bytes(0); // 0 bytes
+
+        // mock to revert with too much data
+        vm.mockCallRevert(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.afterClaimPrize.selector,
+                alice, 1, 2, 9e17, alice, ""
+            ),
+            emptyRevertData
+        );
+
+        PrizeHooks memory afterHookOnly = PrizeHooks(false, true, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(afterHookOnly);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, alice, 1e17, bob);
+
+        vm.expectRevert(emptyRevertData); // expected bubbled empty revert data
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
+    function testClaimPrize_beforeClaimPrize_noRevertOnMaxHookData() public {
+        bytes memory maxHookData = new bytes(32); // 32 bytes of data
+
+        // mock to return max hook data
+        vm.mockCall(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.beforeClaimPrize.selector,
+                alice, 1, 2, 1e17, bob
+            ),
+            abi.encode(alice, maxHookData)
+        );
+
+        PrizeHooks memory bothHooks = PrizeHooks(true, true, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(bothHooks);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, alice, 1e17, bob);
+
+        // expect the after hook to be called with the max hook data with no issues
+        vm.expectEmit();
+        emit AfterClaimPrizeCalled(alice, 1, 2, 9e17, alice, maxHookData);
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
+    function testClaimPrize_afterClaimPrize_ignoresHookData() public {
+        bytes memory tooMuchHookData = new bytes(33); // 33 bytes of data
+
+        // mock to return too much hook data
+        vm.mockCall(
+            address(this),
+            abi.encodeWithSelector(
+                IPrizeHooks.afterClaimPrize.selector,
+                alice, 1, 2, 9e17, alice, ""
+            ),
+            abi.encode(alice, tooMuchHookData)
+        );
+
+        PrizeHooks memory afterHookOnly = PrizeHooks(false, true, hooks);
+
+        vm.startPrank(alice);
+        claimable.setHooks(afterHookOnly);
+        vm.stopPrank();
+
+        mockClaimPrize(alice, 1, 2, alice, 1e17, bob);
+
+        // expect no revert even though the return data has been limited since the afterClaimPrize return data isn't used
+        claimable.claimPrize(alice, 1, 2, 1e17, bob);
+    }
+
     /* ============ IPrizeHooks Implementation ============ */
 
     function beforeClaimPrize(

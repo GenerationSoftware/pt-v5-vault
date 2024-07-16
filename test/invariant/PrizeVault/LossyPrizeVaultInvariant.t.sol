@@ -18,7 +18,8 @@ contract LossyPrizeVaultInvariant is Test {
         uint256 totalPreciseAssets = lossyVaultHarness.vault().totalPreciseAssets();
         uint256 totalDebt = lossyVaultHarness.vault().totalDebt();
         uint256 totalSupply = lossyVaultHarness.vault().totalSupply();
-        if (totalDebt > totalPreciseAssets || type(uint96).max - totalSupply == 0) {
+        uint256 yieldBuffer = lossyVaultHarness.vault().yieldBuffer();
+        if (totalDebt + yieldBuffer / 2 > totalPreciseAssets || type(uint96).max - totalSupply == 0) {
             assertEq(lossyVaultHarness.vault().maxDeposit(address(this)), 0);
         } else {
             assertGt(lossyVaultHarness.vault().maxDeposit(address(this)), 0);
