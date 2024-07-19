@@ -40,3 +40,6 @@
 [submodule "lib/ExcessivelySafeCall"]
 	path = lib/ExcessivelySafeCall
 	url = https://github.com/nomad-xyz/ExcessivelySafeCall
+[submodule "lib/rETHERC4626"]
+	path = lib/rETHERC4626
+	url = https://github.com/rocket-pool/rETHERC4626
