@@ -749,7 +749,7 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         address _tokenIn,
         uint256 _amountIn,
         bytes calldata /* transferTokensOutData */
-    ) external onlyLiquidationPair {
+    ) external virtual onlyLiquidationPair {
         address _prizeToken = address(prizePool.prizeToken());
         if (_tokenIn != _prizeToken) {
             revert LiquidationTokenInNotPrizeToken(_tokenIn, _prizeToken);
