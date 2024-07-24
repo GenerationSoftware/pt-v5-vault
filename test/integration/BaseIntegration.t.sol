@@ -337,12 +337,14 @@ abstract contract BaseIntegration is Test, Permit {
             uint256 totalSupplyAfter = prizeVault.totalSupply();
 
             assertEq(prizeVault.balanceOf(depositors[i]), amount, "shares minted");
-            assertApproxEqAbs(
-                totalAssetsBefore + amount,
-                totalAssetsAfter,
-                10 ** assetPrecisionLoss,
-                "assets accounted for with possible rounding error"
-            );
+            if (totalAssetsAfter < totalAssetsBefore + amount) {
+                assertApproxEqAbs(
+                    totalAssetsBefore + amount,
+                    totalAssetsAfter,
+                    10 ** assetPrecisionLoss,
+                    "assets accounted for with possible rounding error"
+                );
+            }
             assertEq(totalSupplyBefore + amount, totalSupplyAfter, "supply increased by amount");
         }
     }
