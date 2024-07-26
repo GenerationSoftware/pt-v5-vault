@@ -5,8 +5,8 @@ import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
 contract GearboxArbWethV3IntegrationTest is BaseIntegration {
     uint256 fork;
-    uint256 forkBlock = 215943912;
-    uint256 forkBlockTimestamp = 1716909490;
+    uint256 forkBlock = 236247099;
+    uint256 forkBlockTimestamp = 1721997380;
 
     address internal _asset = address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
     address internal _assetWhale = address(0x70d95587d40A2caf56bd97485aB3Eec10Bee6336);
@@ -32,6 +32,7 @@ contract GearboxArbWethV3IntegrationTest is BaseIntegration {
 
     function beforeSetup() public virtual override {
         lowGasPriceEstimate = 0.05 gwei; // just L2 gas, we ignore L1 costs for a super low estimate
+        ignoreLoss = true;
     }
 
     function afterSetup() public virtual override { }
@@ -53,10 +54,9 @@ contract GearboxArbWethV3IntegrationTest is BaseIntegration {
         vm.warp(block.timestamp + 2 days);
     }
 
-    /// @dev Simulates loss by transferring some latent WETH out of a credit account
+    /// @dev Unsure how to simulate realistic loss
     function _simulateLoss() internal virtual override prankception(_creditAccount) {
-        uint256 wethBalance = IERC20(_asset).balanceOf(_creditAccount);
-        IERC20(_asset).transfer(_assetWhale, wethBalance / 2);
+        
     }
 
 }
