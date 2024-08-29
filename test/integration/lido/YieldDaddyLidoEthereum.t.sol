@@ -16,11 +16,11 @@ import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
 contract YieldDaddyLidoEthereumIntegrationTest is BaseIntegration {
     uint256 fork;
-    uint256 forkBlock = 19311723;
-    uint256 forkBlockTimestamp = 1708950275;
+    uint256 forkBlock = 20636046;
+    uint256 forkBlockTimestamp = 1724956295;
 
     address internal _asset = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
-    address internal _assetWhale = address(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
+    address internal _assetWhale = address(0x93c4b944D05dfe6df7645A86cd2206016c51564D);
     address internal _yieldVault = address(0xF9A98A9452485ed55cd3Ce5260C2b71c9807b11a);
 
 
@@ -43,7 +43,7 @@ contract YieldDaddyLidoEthereumIntegrationTest is BaseIntegration {
     function beforeSetup() public virtual override {
         lowGasPriceEstimate = 3 gwei;
         assetPrecisionLoss = 1; // loses 1 decimal of precision due to extra 1-wei rounding errors on transfer
-        roundingErrorOnTransfer = 1; // loses 1 wei on asset transfer
+        roundingErrorOnTransfer = 2; // loses 1-2 wei on asset transfer
     }
 
     function afterSetup() public virtual override { }
