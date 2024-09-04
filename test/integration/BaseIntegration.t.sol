@@ -40,6 +40,9 @@ abstract contract BaseIntegration is Test, Permit {
     address internal bob;
     uint256 internal bobPrivateKey;
 
+    address internal karen;
+    uint256 internal karenPrivateKey;
+
     PrizeVaultWrapper public prizeVault;
     string public vaultName = "PoolTogether Test Vault";
     string public vaultSymbol = "pTest";
@@ -102,6 +105,7 @@ abstract contract BaseIntegration is Test, Permit {
         (owner, ownerPrivateKey) = makeAddrAndKey("Owner");
         (alice, alicePrivateKey) = makeAddrAndKey("Alice");
         (bob, bobPrivateKey) = makeAddrAndKey("Bob");
+        (karen, karenPrivateKey) = makeAddrAndKey("Karen");
 
         setUpFork();
         (underlyingAsset, assetDecimals, approxAssetUsdExchangeRate) = setUpUnderlyingAsset();
@@ -467,7 +471,7 @@ abstract contract BaseIntegration is Test, Permit {
         address[] memory depositors = new address[](3);
         depositors[0] = alice;
         depositors[1] = bob;
-        depositors[2] = address(this);
+        depositors[2] = karen;
 
         uint256[] memory amounts = new uint256[](3);
 
@@ -516,7 +520,7 @@ abstract contract BaseIntegration is Test, Permit {
         address[] memory depositors = new address[](3);
         depositors[0] = alice;
         depositors[1] = bob;
-        depositors[2] = address(this);
+        depositors[2] = karen;
 
         // deposit
         for (uint256 i = 0; i < depositors.length; i++) {
