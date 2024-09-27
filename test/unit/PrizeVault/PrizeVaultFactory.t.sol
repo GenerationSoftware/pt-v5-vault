@@ -90,7 +90,8 @@ contract PrizeVaultFactoryTest is Test {
             address(this),
             yieldFeePercentage,
             yieldBuffer,
-            owner
+            owner,
+            address(0)
         );
 
         assertEq(address(PrizeVault(_vault).asset()), address(asset));
@@ -123,7 +124,8 @@ contract PrizeVaultFactoryTest is Test {
                 address(this),
                 yieldFeePercentage,
                 yieldBuffer,
-                owner
+                owner,
+            address(0)
             )
         );
 
@@ -139,7 +141,8 @@ contract PrizeVaultFactoryTest is Test {
                 address(this),
                 yieldFeePercentage,
                 yieldBuffer,
-                owner
+                owner,
+            address(0)
             )
         );
 
@@ -160,7 +163,8 @@ contract PrizeVaultFactoryTest is Test {
             address(this),
             yieldFeePercentage,
             yieldBuffer,
-            owner
+            owner,
+            address(0)
         );
     }
 
@@ -179,7 +183,8 @@ contract PrizeVaultFactoryTest is Test {
             address(this),
             yieldFeePercentage,
             differentYieldBuffer,
-            owner
+            owner,
+            address(0)
         );
         assertEq(_vault.yieldBuffer(), differentYieldBuffer);
     }
@@ -194,7 +199,8 @@ contract PrizeVaultFactoryTest is Test {
             address(this),
             yieldFeePercentage,
             0,
-            owner
+            owner,
+            address(0)
         );
         assertEq(_vault.yieldBuffer(), 0);
     }

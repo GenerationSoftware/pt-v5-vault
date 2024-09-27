@@ -29,7 +29,8 @@ contract PrizeVaultTest is UnitBaseSetup {
             address(this),
             YIELD_FEE_PERCENTAGE,
             1e6,
-            address(this)
+            address(this),
+            address(0)
         );
 
         uint256 assetDecimals = ERC20(address(underlyingAsset)).decimals();
@@ -57,7 +58,8 @@ contract PrizeVaultTest is UnitBaseSetup {
             address(this),
             YIELD_FEE_PERCENTAGE,
             1e6,
-            address(this)
+            address(this),
+            address(0)
         );
     }
 
@@ -72,7 +74,8 @@ contract PrizeVaultTest is UnitBaseSetup {
             address(this),
             YIELD_FEE_PERCENTAGE,
             1e6,
-            address(this)
+            address(this),
+            address(0)
         );
     }
 
@@ -88,6 +91,7 @@ contract PrizeVaultTest is UnitBaseSetup {
             address(this),
             YIELD_FEE_PERCENTAGE,
             1e6,
+            address(0),
             address(0)
         );
     }
@@ -104,7 +108,8 @@ contract PrizeVaultTest is UnitBaseSetup {
             address(this),
             YIELD_FEE_PERCENTAGE,
             1e6,
-            address(this)
+            address(this),
+            address(0)
         );
     }
 
@@ -197,7 +202,8 @@ contract PrizeVaultTest is UnitBaseSetup {
             address(this),
             YIELD_FEE_PERCENTAGE,
             1e6,
-            address(this)
+            address(this),
+            address(0)
         );
     }
 

@@ -99,6 +99,7 @@ contract TwabERC20 is ERC20, ERC20Permit {
     /// @param _to Address to transfer to
     /// @param _amount The amount of tokens to transfer
     function _transfer(address _from, address _to, uint256 _amount) internal virtual override {
+        _beforeTokenTransfer(_from, _to, _amount);
         twabController.transfer(_from, _to, SafeCast.toUint96(_amount));
         emit Transfer(_from, _to, _amount);
     }

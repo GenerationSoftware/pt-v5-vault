@@ -14,8 +14,9 @@ contract PrizeVaultWrapper is PrizeVault {
         address yieldFeeRecipient_,
         uint32 yieldFeePercentage_,
         uint256 yieldBuffer_,
-        address owner_
-    ) PrizeVault(name_, symbol_, yieldVault_, prizePool_, claimer_, yieldFeeRecipient_, yieldFeePercentage_, yieldBuffer_, owner_) { }
+        address owner_,
+        address _extension
+    ) PrizeVault(name_, symbol_, yieldVault_, prizePool_, claimer_, yieldFeeRecipient_, yieldFeePercentage_, yieldBuffer_, owner_, _extension) { }
 
     function tryGetAssetDecimals(IERC20 asset_) public view returns (bool, uint8) {
         return _tryGetAssetDecimals(asset_);

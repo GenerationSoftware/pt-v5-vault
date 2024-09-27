@@ -98,7 +98,8 @@ contract PrizeVaultFactory {
       address _yieldFeeRecipient,
       uint32 _yieldFeePercentage,
       uint256 _yieldBuffer,
-      address _owner
+      address _owner,
+      address _extension
     ) external returns (PrizeVault) {
         PrizeVault _vault = new PrizeVault{
             salt: keccak256(abi.encode(msg.sender, deployerNonces[msg.sender]++))
@@ -111,7 +112,8 @@ contract PrizeVaultFactory {
             _yieldFeeRecipient,
             _yieldFeePercentage,
             _yieldBuffer,
-            _owner
+            _owner,
+            _extension
         );
 
         // A donation to fill the yield buffer is made to ensure that early depositors have

@@ -131,7 +131,8 @@ abstract contract BaseIntegration is Test, Permit {
             address(this),
             0,
             yieldBuffer, // yield buffer
-            address(this)
+            address(this),
+            address(0)
         );
         prizeVault.setLiquidationPair(address(this));
 

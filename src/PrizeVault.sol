@@ -9,6 +9,7 @@ import { Ownable } from "owner-manager-contracts/Ownable.sol";
 
 import { Claimable } from "./abstract/Claimable.sol";
 import { TwabERC20 } from "./TwabERC20.sol";
+import { IPrizeVaultListener } from "./interfaces/IPrizeVaultListener.sol";
 
 import { ILiquidationSource } from "pt-v5-liquidator-interfaces/ILiquidationSource.sol";
 import { PrizePool } from "pt-v5-prize-pool/PrizePool.sol";
@@ -116,6 +117,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
 
     /// @notice Address of the underlying ERC4626 vault generating yield.
     IERC4626 public immutable yieldVault;
+
+    IPrizeVaultListener immutable extension;
 
     /// @notice Yield fee percentage represented in integer format with decimal precision defined by `FEE_PRECISION`.
     /// @dev For example, if `FEE_PRECISION` were 1e9 a value of 1e7 = 0.01 = 1%.
@@ -307,7 +310,8 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         address yieldFeeRecipient_,
         uint32 yieldFeePercentage_,
         uint256 yieldBuffer_,
-        address owner_
+        address owner_,
+        address extension_
     ) TwabERC20(name_, symbol_, prizePool_.twabController()) Claimable(prizePool_, claimer_) Ownable(owner_) {
         if (address(yieldVault_) == address(0)) revert YieldVaultZeroAddress();
         if (owner_ == address(0)) revert OwnerZeroAddress();
@@ -320,12 +324,30 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             revert FailedToGetAssetDecimals(address(asset_));
         }
         _asset = asset_;
+        extension = IPrizeVaultListener(extension_);
 
         yieldVault = yieldVault_;
         yieldBuffer = yieldBuffer_;
 
-        _setYieldFeeRecipient(yieldFeeRecipient_);
-        _setYieldFeePercentage(yieldFeePercentage_);
+        yieldFeeRecipient = yieldFeeRecipient_;
+        emit YieldFeeRecipientSet(yieldFeeRecipient_);
+        if (yieldFeePercentage_ > MAX_YIELD_FEE) {
+            revert YieldFeePercentageExceedsMax(yieldFeePercentage_, MAX_YIELD_FEE);
+        }
+        yieldFeePercentage = yieldFeePercentage_;
+        emit YieldFeePercentageSet(yieldFeePercentage_);
+    }
+
+    function _beforeClaimPrize(address winner, uint8 tier, address prizeRecipient) internal override {
+        if (address(extension) != address(0)) {
+            extension.beforeClaimPrize(winner, tier, prizeRecipient);
+        }
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
+        if (address(extension) != address(0)) {
+            extension.beforeTokenTransfer(from, to, amount);
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -728,16 +750,25 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
             yieldFeeBalance = yieldFeeBalance + _yieldFee;
         }
 
-        // Mint or withdraw amountOut to `_receiver`:
-        if (_tokenOut == address(_asset)) {
-            _enforceMintLimit(_totalDebtBefore, _yieldFee);
-            _withdraw(_receiver, _amountOut);
-        } else if (_tokenOut == address(this)) {
-            _enforceMintLimit(_totalDebtBefore, _amountOut + _yieldFee);
-            _mint(_receiver, _amountOut);
-        } else {
+        uint256 mintLimit = _yieldFee;
+        if (_tokenOut == address(this)) {
+            mintLimit += _amountOut;
+        } else if (_tokenOut != address(_asset)) {
             revert LiquidationTokenOutNotSupported(_tokenOut);
         }
+        _enforceMintLimit(_totalDebtBefore, mintLimit);
+        _withdraw(_receiver, _amountOut);
+        
+        // // Mint or withdraw amountOut to `_receiver`:
+        // if (_tokenOut == address(_asset)) {
+        //     _enforceMintLimit(_totalDebtBefore, _yieldFee);
+        //     _withdraw(_receiver, _amountOut);
+        // } else if (_tokenOut == address(this)) {
+        //     _enforceMintLimit(_totalDebtBefore, _amountOut + _yieldFee);
+        //     _mint(_receiver, _amountOut);
+        // } else {
+        //     revert LiquidationTokenOutNotSupported(_tokenOut);
+        // }
 
         emit TransferYieldOut(msg.sender, _tokenOut, _receiver, _amountOut, _yieldFee);
 
@@ -750,11 +781,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         uint256 _amountIn,
         bytes calldata /* transferTokensOutData */
     ) external virtual onlyLiquidationPair {
-        address _prizeToken = address(prizePool.prizeToken());
-        if (_tokenIn != _prizeToken) {
-            revert LiquidationTokenInNotPrizeToken(_tokenIn, _prizeToken);
-        }
-
         prizePool.contributePrizeTokens(address(this), _amountIn);
     }
 
@@ -796,13 +822,18 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
     /// @dev Yield fee is defined on a scale from `0` to `FEE_PRECISION`, inclusive.
     /// @param _yieldFeePercentage The new yield fee percentage to set
     function setYieldFeePercentage(uint32 _yieldFeePercentage) external onlyOwner {
-        _setYieldFeePercentage(_yieldFeePercentage);
+        if (_yieldFeePercentage > MAX_YIELD_FEE) {
+            revert YieldFeePercentageExceedsMax(_yieldFeePercentage, MAX_YIELD_FEE);
+        }
+        yieldFeePercentage = _yieldFeePercentage;
+        emit YieldFeePercentageSet(_yieldFeePercentage);
     }
 
     /// @notice Set fee recipient.
     /// @param _yieldFeeRecipient Address of the fee recipient
     function setYieldFeeRecipient(address _yieldFeeRecipient) external onlyOwner {
-        _setYieldFeeRecipient(_yieldFeeRecipient);
+        yieldFeeRecipient = _yieldFeeRecipient;
+        emit YieldFeeRecipientSet(_yieldFeeRecipient);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -1052,26 +1083,6 @@ contract PrizeVault is TwabERC20, Claimable, IERC4626, ILiquidationSource, Ownab
         if (_receiver != address(this)) {
             _asset.safeTransfer(_receiver, _assets);
         }
-    }
-
-    /// @notice Set yield fee percentage.
-    /// @dev Yield fee is defined on a scale from `0` to `MAX_YIELD_FEE`, inclusive.
-    /// @dev Emits a `YieldFeePercentageSet` event
-    /// @param _yieldFeePercentage The new yield fee percentage to set
-    function _setYieldFeePercentage(uint32 _yieldFeePercentage) internal {
-        if (_yieldFeePercentage > MAX_YIELD_FEE) {
-            revert YieldFeePercentageExceedsMax(_yieldFeePercentage, MAX_YIELD_FEE);
-        }
-        yieldFeePercentage = _yieldFeePercentage;
-        emit YieldFeePercentageSet(_yieldFeePercentage);
-    }
-
-    /// @notice Set yield fee recipient address.
-    /// @dev Emits a `YieldFeeRecipientSet` event
-    /// @param _yieldFeeRecipient Address of the fee recipient
-    function _setYieldFeeRecipient(address _yieldFeeRecipient) internal {
-        yieldFeeRecipient = _yieldFeeRecipient;
-        emit YieldFeeRecipientSet(_yieldFeeRecipient);
     }
 
 }

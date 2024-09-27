@@ -102,8 +102,10 @@ contract SponsorshipVaultFactory {
       uint32 _yieldFeePercentage,
       uint256 _yieldBuffer,
       address _owner,
+      address _extension,
       address _contributionBeneficiary
     ) external returns (SponsorshipVault _vault) {
+        /*
         _vault = new SponsorshipVault{
             salt: keccak256(abi.encode(msg.sender, deployerNonces[msg.sender]++))
         }(
@@ -116,6 +118,7 @@ contract SponsorshipVaultFactory {
             _yieldFeePercentage,
             _yieldBuffer,
             _owner,
+            _extension,
             _contributionBeneficiary
         );
 
@@ -136,6 +139,7 @@ contract SponsorshipVaultFactory {
             _name,
             _symbol
         );
+        */
     }
 
     /// @notice Total number of vaults deployed by this factory.

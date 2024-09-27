@@ -123,6 +123,7 @@ abstract contract Claimable is HookManager, IClaimable {
 
         if (_prizeRecipient == address(0)) revert ClaimRecipientZeroAddress();
 
+        _beforeClaimPrize(_winner, _tier, _prizeRecipient);
         uint256 _prizeTotal = prizePool.claimPrize(
             _winner,
             _tier,
@@ -153,6 +154,8 @@ abstract contract Claimable is HookManager, IClaimable {
     ////////////////////////////////////////////////////////////////////////////////
     // Internal Helpers
     ////////////////////////////////////////////////////////////////////////////////
+
+    function _beforeClaimPrize(address winner, uint8 tier, address prizeRecipient) internal virtual {}
 
     /// @notice Set claimer address.
     /// @dev Will revert if `_claimer` is address zero.

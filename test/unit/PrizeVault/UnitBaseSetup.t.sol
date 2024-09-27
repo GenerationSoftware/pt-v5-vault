@@ -97,7 +97,8 @@ contract UnitBaseSetup is Test, Permit {
             address(this),
             0,
             1e6,
-            address(this)
+            address(this),
+            address(0)
         );
 
         liquidationPair = new LiquidationPairMock(

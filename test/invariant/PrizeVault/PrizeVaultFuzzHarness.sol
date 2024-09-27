@@ -126,7 +126,8 @@ contract PrizeVaultFuzzHarness is Permit, StdCheats, StdUtils {
             address(this), // yield fee recipient (changes as tests run)
             0, // yield fee percent (changes as tests run)
             _yieldBuffer, // yield buffer
-            owner // owner
+            owner, // owner
+            address(0)
         );
 
         setCurrentTime(block.timestamp);

@@ -57,7 +57,8 @@ contract PrizeVaultERC4626AndLiquidationFuzzTest is ERC4626Test {
                 address(this),
                 0,
                 yieldBuffer,
-                address(this)
+                address(this),
+                address(0)
             )
         );
 

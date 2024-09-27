@@ -35,6 +35,7 @@ contract SponsorshipVault is PrizeVault {
         uint32 yieldFeePercentage_,
         uint256 yieldBuffer_,
         address owner_,
+        address _extension,
         address contributionBeneficiary_
     ) PrizeVault(
         name_,
@@ -45,7 +46,8 @@ contract SponsorshipVault is PrizeVault {
         yieldFeeRecipient_,
         yieldFeePercentage_,
         yieldBuffer_,
-        owner_
+        owner_,
+        _extension
     ) {
         assert(contributionBeneficiary_ != address(0));
         assert(contributionBeneficiary_ != address(this));
