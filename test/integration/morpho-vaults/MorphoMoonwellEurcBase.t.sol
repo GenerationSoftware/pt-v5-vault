@@ -3,19 +3,19 @@ pragma solidity ^0.8.24;
 
 import { BaseIntegration, IERC20, IERC4626 } from "../BaseIntegration.t.sol";
 
-contract MorphoMoonwellUsdcBaseIntegrationTest is BaseIntegration {
+contract MorphoMoonwellEurcBaseIntegrationTest is BaseIntegration {
     uint256 fork;
     uint256 forkBlock = 23787058;
     uint256 forkBlockTimestamp = 1734363463;
 
-    address internal _asset = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
-    address internal _assetWhale = address(0x0B0A5886664376F59C351ba3f598C8A8B4D0A6f3);
-    address internal _yieldVault = address(0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca);
+    address internal _asset = address(0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42);
+    address internal _assetWhale = address(0x10fA7EC83b7BFF48E8eb064815bc79dA7F964296);
+    address internal _yieldVault = address(0xf24608E0CCb972b0b0f4A6446a0BBf58c701a026);
 
     /* ============ setup ============ */
 
     function setUpUnderlyingAsset() public virtual override returns (IERC20 asset, uint8 decimals, uint256 approxAssetUsdExchangeRate) {
-        return (IERC20(_asset), 6, 1e18);
+        return (IERC20(_asset), 6, 1.05e18);
     }
 
     function setUpYieldVault() public virtual override returns (IERC4626) {
